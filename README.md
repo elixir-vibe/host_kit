@@ -8,7 +8,7 @@ HostKit is intended to be used from a normal Mix project with `.exs` infrastruct
 
 - Core owns systemd/systemdkit persistent units.
 - Core owns unitctl transient runtime primitives.
-- Integrations such as Caddy, Forgejo, object storage, and monitoring are plugins.
+- Integrations such as Caddy, Forgejo, object storage, and monitoring are providers.
 - DSL evaluation never applies changes to a host.
 - Planning and rendering are available as runtime APIs.
 
@@ -45,15 +45,14 @@ project :toys do
 end
 ```
 
-## Plugins
+## Providers
 
-Plugins can contribute DSL modules, resource types, renderers, and validators.
-Systemd and Unitctl are core primitives, not plugins; integrations such as Caddy should be plugins.
+Providers can contribute DSL modules, resource types, renderers, validators, and eventually read/plan/apply lifecycle operations. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.
 
 ```elixir
-use HostKit.DSL, plugins: [MyCaddyPlugin]
+use HostKit.DSL, providers: [MyCaddyProvider]
 
-project :demo, plugins: [MyCaddyPlugin] do
+project :demo, providers: [MyCaddyProvider] do
   service :web do
     caddy_site "example.com" do
       reverse_proxy "127.0.0.1:4000"

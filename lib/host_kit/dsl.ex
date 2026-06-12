@@ -9,13 +9,13 @@ defmodule HostKit.DSL do
   defmacro __using__(opts) do
     plugins =
       opts
-      |> Keyword.get(:plugins, [])
+      |> Keyword.get(:providers, Keyword.get(opts, :plugins, []))
       |> Enum.map(&Macro.expand(&1, __CALLER__))
-      |> HostKit.Plugin.resolve()
+      |> HostKit.Provider.resolve()
 
-    plugin_imports =
+    provider_imports =
       plugins
-      |> HostKit.Plugin.dsl_modules()
+      |> HostKit.Provider.dsl_modules()
       |> Enum.map(fn dsl ->
         quote do
           import unquote(dsl)
@@ -25,7 +25,7 @@ defmodule HostKit.DSL do
     quote do
       import HostKit.DSL
       import HostKit.DSL.Systemd
-      unquote_splicing(plugin_imports)
+      unquote_splicing(provider_imports)
     end
   end
 
@@ -37,9 +37,15 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro providers(providers) do
+    quote do
+      HostKit.DSL.Scope.put_providers(unquote(providers))
+    end
+  end
+
   defmacro plugins(plugins) do
     quote do
-      HostKit.DSL.Scope.put_plugins(unquote(plugins))
+      HostKit.DSL.Scope.put_providers(unquote(plugins))
     end
   end
 

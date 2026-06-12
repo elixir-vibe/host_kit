@@ -1,13 +1,13 @@
 defmodule HostKit.Project do
   @moduledoc "Project-level declaration loaded from HostKit DSL files."
 
-  alias HostKit.{Plugin, Service}
+  alias HostKit.{Provider, Service}
 
   @type t :: %__MODULE__{
           name: atom(),
           hosts: [HostKit.Host.t()],
           services: [Service.t()],
-          plugins: [module()],
+          providers: [module()],
           conventions: map(),
           meta: map()
         }
@@ -15,25 +15,26 @@ defmodule HostKit.Project do
   defstruct name: nil,
             hosts: [],
             services: [],
-            plugins: [],
+            providers: [],
             conventions: %{},
             meta: %{}
 
   @spec new(atom(), keyword()) :: t()
   def new(name, opts \\ []) when is_atom(name) do
-    plugins = opts |> Keyword.get(:plugins, []) |> Plugin.resolve()
+    providers =
+      opts |> Keyword.get(:providers, Keyword.get(opts, :plugins, [])) |> Provider.resolve()
 
     %__MODULE__{
       name: name,
-      plugins: plugins,
+      providers: providers,
       conventions: Keyword.get(opts, :conventions, %{}),
       meta: Keyword.get(opts, :meta, %{})
     }
   end
 
-  @spec put_plugins(t(), [module()]) :: t()
-  def put_plugins(%__MODULE__{} = project, plugins),
-    do: %{project | plugins: Plugin.resolve(plugins)}
+  @spec put_providers(t(), [module()]) :: t()
+  def put_providers(%__MODULE__{} = project, providers),
+    do: %{project | providers: Provider.resolve(providers)}
 
   @spec add_host(t(), HostKit.Host.t()) :: t()
   def add_host(%__MODULE__{} = project, host), do: %{project | hosts: project.hosts ++ [host]}

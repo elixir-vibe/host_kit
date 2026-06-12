@@ -1,12 +1,12 @@
 defmodule HostKit.Validate do
   @moduledoc "Validates resources through core validators and optional plugin validators."
 
-  alias HostKit.{Plugin, Project}
+  alias HostKit.{Project, Provider}
 
   @spec validate(Project.t(), struct(), map()) :: :ok | {:error, term()}
   def validate(%Project{} = project, resource, context \\ %{}) do
     case validate_core(resource, context) do
-      :ignore -> Plugin.validate(project.plugins, resource, context)
+      :ignore -> Provider.validate(project.providers, resource, context)
       result -> result
     end
   end

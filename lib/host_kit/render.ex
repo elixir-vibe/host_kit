@@ -1,7 +1,7 @@
 defmodule HostKit.Render do
   @moduledoc "Renders resources through core renderers and optional plugin renderers."
 
-  alias HostKit.{Plugin, Project, Resource}
+  alias HostKit.{Project, Provider, Resource}
 
   @spec render(Project.t(), term(), map()) :: {:ok, iodata()} | {:error, term()}
   def render(%Project{} = project, resource_id, context \\ %{}) do
@@ -13,7 +13,7 @@ defmodule HostKit.Render do
   @spec render_resource(Project.t(), struct(), map()) :: {:ok, iodata()} | {:error, term()}
   def render_resource(%Project{} = project, resource, context \\ %{}) do
     case render_core(resource, context) do
-      :ignore -> Plugin.render(project.plugins, resource, context)
+      :ignore -> Provider.render(project.providers, resource, context)
       result -> result
     end
   end

@@ -1,7 +1,10 @@
 defmodule HostKit.TestPlugin do
   @moduledoc false
 
-  @behaviour HostKit.Plugin
+  @behaviour HostKit.Provider
+
+  @impl true
+  def provider_name, do: :test
 
   @impl true
   def dsl_modules, do: [HostKit.TestPlugin.DSL]

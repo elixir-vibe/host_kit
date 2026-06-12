@@ -15,8 +15,8 @@ defmodule HostKit.DSL.Scope do
     Process.delete(@project_key) || raise "no HostKit project in scope"
   end
 
-  def put_plugins(plugins) do
-    update_project(&Project.put_plugins(&1, plugins))
+  def put_providers(providers) do
+    update_project(&Project.put_providers(&1, providers))
   end
 
   def start_host(name, opts) do

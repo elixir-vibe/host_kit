@@ -3,7 +3,7 @@ defmodule HostKit do
   Elixir-native host infrastructure declarations, planning, and runtime control.
 
   HostKit keeps systemd and transient unit execution as core primitives while
-  integrations such as Caddy are provided by plugins. DSL files compile to plain
+  integrations such as Caddy are provided by providers. DSL files compile to plain
   structs that can be inspected and consumed through the runtime API.
   """
 
