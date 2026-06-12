@@ -14,22 +14,14 @@ defmodule HostKit.Plugin do
                       validate: 2,
                       inference_hints: 0
 
-  @built_in_plugins [
-    HostKit.Plugins.Systemd,
-    HostKit.Plugins.Unitctl
-  ]
-
-  @doc "Returns first-party core plugins."
-  @spec built_in_plugins() :: [module()]
-  def built_in_plugins, do: @built_in_plugins
-
-  @doc "Resolves plugins from explicit modules plus first-party built-ins."
+  @doc "Resolves optional integration plugins."
   @spec resolve([module()] | keyword()) :: [module()]
   def resolve(opts_or_plugins \\ [])
 
   def resolve(opts) when is_list(opts) do
-    plugins = Keyword.get(opts, :plugins, opts)
-    Enum.uniq(@built_in_plugins ++ plugins)
+    opts
+    |> Keyword.get(:plugins, opts)
+    |> Enum.uniq()
   end
 
   @spec dsl_modules([module()]) :: [module()]

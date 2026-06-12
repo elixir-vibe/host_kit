@@ -20,7 +20,7 @@ defmodule HostKitTest do
     assert plan.summary == %{directory: 1, systemd_service: 1, user: 1}
   end
 
-  test "systemd resources render through core plugin" do
+  test "systemd resources render through core renderer" do
     project = HostKit.load!(fixture_path("project.hostkit"))
 
     assert {:ok, rendered} =

@@ -48,7 +48,7 @@ end
 ## Plugins
 
 Plugins can contribute DSL modules, resource types, renderers, and validators.
-Systemd and Unitctl are core built-ins; integrations such as Caddy should be plugins.
+Systemd and Unitctl are core primitives, not plugins; integrations such as Caddy should be plugins.
 
 ```elixir
 use HostKit.DSL, plugins: [MyCaddyPlugin]
