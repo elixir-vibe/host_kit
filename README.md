@@ -127,6 +127,23 @@ end
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
 ```
 
+## Runtime controls
+
+HostKit exposes Unitctl as its core transient runtime layer:
+
+```elixir
+{:ok, spec} =
+  HostKit.Runtime.Spec.new(
+    name: "demo-check",
+    command: ["/usr/bin/env", "true"],
+    sandbox: %{no_new_privileges: true, private_tmp: true}
+  )
+
+{:ok, instance} = HostKit.Runtime.start(spec)
+{:ok, state} = HostKit.Runtime.inspect(instance)
+:ok = HostKit.Runtime.stop(instance)
+```
+
 ## Mix tasks
 
 ```sh
