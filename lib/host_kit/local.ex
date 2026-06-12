@@ -75,9 +75,26 @@ defmodule HostKit.Local do
     end
   end
 
+  def read(%Directory{path: path} = desired, context) do
+    case stat_metadata(path, context) do
+      {:ok, %{type: :directory} = metadata} ->
+        {:ok,
+         %Directory{desired | owner: metadata.owner, group: metadata.group, mode: metadata.mode}}
+
+      {:ok, %{type: type}} ->
+        {:error, {:not_directory, path, type}}
+
+      {:error, :enoent} ->
+        {:ok, nil}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   def read(%File{path: path} = desired, context) do
-    with {:stat, {:ok, %Elixir.File.Stat{type: :regular}}} <- {:stat, Elixir.File.stat(path)},
-         {:metadata, {:ok, metadata}} <- {:metadata, stat_metadata(path)},
+    with {:metadata, {:ok, %{type: :regular} = metadata}} <-
+           {:metadata, stat_metadata(path, context)},
          {:content, {:ok, content}} <- {:content, read_file(path, context)} do
       {:ok,
        %File{
@@ -88,9 +105,8 @@ defmodule HostKit.Local do
            mode: metadata.mode
        }}
     else
-      {:stat, {:ok, %Elixir.File.Stat{type: type}}} -> {:error, {:not_file, path, type}}
-      {:stat, {:error, :enoent}} -> {:ok, nil}
-      {:stat, {:error, reason}} -> {:error, reason}
+      {:metadata, {:ok, %{type: type}}} -> {:error, {:not_file, path, type}}
+      {:metadata, {:error, :enoent}} -> {:ok, nil}
       {:metadata, {:error, reason}} -> {:error, reason}
       {:content, {:error, reason}} -> {:error, reason}
     end
@@ -129,35 +145,85 @@ defmodule HostKit.Local do
   defp caddy_site_filename(%Caddy.Site{meta: %{path: path}}), do: path
   defp caddy_site_filename(%Caddy.Site{name: name}), do: "#{name}.caddy"
 
-  defp stat_metadata(path) do
-    with {:error, _reason} <- linux_stat_metadata(path) do
-      bsd_stat_metadata(path)
+  defp stat_metadata(path), do: stat_metadata(path, %{})
+
+  defp stat_metadata(path, context) do
+    case stat_metadata_without_sudo(path) do
+      {:error, :enoent} -> {:error, :enoent}
+      {:error, _reason} -> sudo_stat_metadata(path, context)
+      result -> result
     end
   end
 
-  defp linux_stat_metadata(path) do
-    case System.cmd("stat", ["-c", "%U:%G:%a", path], stderr_to_stdout: true) do
-      {output, 0} -> parse_stat_output(output)
-      {output, status} -> {:error, {:stat_failed, status, output}}
+  defp stat_metadata_without_sudo(path) do
+    with {:error, _reason} <- linux_stat_metadata(path, []) do
+      bsd_stat_metadata(path, [])
     end
   end
 
-  defp bsd_stat_metadata(path) do
-    case System.cmd("stat", ["-f", "%Su:%Sg:%Lp", path], stderr_to_stdout: true) do
-      {output, 0} -> parse_stat_output(output)
-      {output, status} -> {:error, {:stat_failed, status, output}}
+  defp sudo_stat_metadata(path, %{opts: opts}) do
+    if Keyword.get(opts, :sudo, false) do
+      with {:error, _reason} <- linux_stat_metadata(path, ["sudo"]) do
+        bsd_stat_metadata(path, ["sudo"])
+      end
+    else
+      {:error, :eacces}
     end
   end
+
+  defp sudo_stat_metadata(_path, _context), do: {:error, :eacces}
+
+  defp linux_stat_metadata(path, prefix) do
+    case System.cmd(command(prefix, "stat"), args(prefix, ["-c", "%F:%U:%G:%a", path]),
+           stderr_to_stdout: true
+         ) do
+      {output, 0} -> parse_stat_output(output)
+      {output, status} -> {:error, stat_error(status, output)}
+    end
+  end
+
+  defp bsd_stat_metadata(path, prefix) do
+    case System.cmd(command(prefix, "stat"), args(prefix, ["-f", "%HT:%Su:%Sg:%Lp", path]),
+           stderr_to_stdout: true
+         ) do
+      {output, 0} -> parse_stat_output(output)
+      {output, status} -> {:error, stat_error(status, output)}
+    end
+  end
+
+  defp stat_error(status, output) do
+    if String.contains?(output, ["No such file", "cannot stat"]) do
+      :enoent
+    else
+      {:stat_failed, status, output}
+    end
+  end
+
+  defp command([command | _rest], _fallback), do: command
+  defp command([], fallback), do: fallback
+
+  defp args([_command | _rest], args), do: ["stat" | args]
+  defp args([], args), do: args
 
   defp parse_stat_output(output) do
-    case output |> String.trim() |> String.split(":", parts: 3) do
-      [owner, group, mode] ->
-        {:ok, %{owner: owner, group: group, mode: String.to_integer(mode, 8)}}
+    case output |> String.trim() |> String.split(":", parts: 4) do
+      [type, owner, group, mode] ->
+        {:ok,
+         %{
+           type: normalize_type(type),
+           owner: owner,
+           group: group,
+           mode: String.to_integer(mode, 8)
+         }}
 
       fields ->
         {:error, {:unexpected_stat_output, fields}}
     end
   end
+
+  defp normalize_type(type) when type in ["directory", "Directory"], do: :directory
+  defp normalize_type(type) when type in ["regular file", "Regular File"], do: :regular
+  defp normalize_type(type), do: type
 
   defp user_from_passwd(line, %User{} = desired) do
     [_name, _password, _uid, _gid, _gecos, home, shell] =
