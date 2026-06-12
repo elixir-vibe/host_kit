@@ -15,7 +15,12 @@ defmodule HostKit.Runner.SSH do
 
   @impl true
   def mkdir_p(path, opts) do
-    case cmd("mkdir", ["-p", path], opts) do
+    command =
+      if Keyword.get(opts, :sudo, false),
+        do: ["sudo", "mkdir", "-p", path],
+        else: ["mkdir", "-p", path]
+
+    case cmd("sh", ["-c", shell_join(command)], opts) do
       {_output, 0} -> :ok
       {output, status} -> {:error, {:command_failed, "mkdir", ["-p", path], status, output}}
     end
@@ -23,6 +28,33 @@ defmodule HostKit.Runner.SSH do
 
   @impl true
   def write_file(path, content, opts) do
+    if Keyword.get(opts, :sudo, false) do
+      sudo_write_file(path, content, opts)
+    else
+      direct_write_file(path, content, opts)
+    end
+  end
+
+  defp sudo_write_file(path, content, opts) do
+    temp_path = "/tmp/host-kit-#{System.unique_integer([:positive])}"
+
+    result =
+      with :ok <- direct_write_file(temp_path, content, Keyword.put(opts, :sudo, false)),
+           {_output, 0} <- cmd("sudo", ["install", "-m", "0644", temp_path, path], opts) do
+        :ok
+      else
+        {:error, reason} ->
+          {:error, reason}
+
+        {output, status} ->
+          {:error, {:command_failed, "install", [temp_path, path], status, output}}
+      end
+
+    remove_temp_file(temp_path, opts)
+    result
+  end
+
+  defp direct_write_file(path, content, opts) do
     encoded = content |> IO.iodata_to_binary() |> Base.encode64()
 
     case cmd(
@@ -33,6 +65,11 @@ defmodule HostKit.Runner.SSH do
       {_output, 0} -> :ok
       {output, status} -> {:error, {:command_failed, "write_file", [path], status, output}}
     end
+  end
+
+  defp remove_temp_file(path, opts) do
+    cmd("rm", ["-f", path], Keyword.put(opts, :sudo, false))
+    :ok
   end
 
   defp connect(opts) do

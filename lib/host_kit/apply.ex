@@ -154,11 +154,11 @@ defmodule HostKit.Apply do
   defp systemd_change?(_result), do: false
 
   defp mkdir_p(path, opts) do
-    opts |> runner() |> Runner.mkdir_p(path, [])
+    opts |> runner() |> Runner.mkdir_p(path, opts)
   end
 
   defp write_file(path, content, opts) do
-    opts |> runner() |> Runner.write_file(path, content, [])
+    opts |> runner() |> Runner.write_file(path, content, opts)
   end
 
   defp chown(_path, nil, nil, _opts), do: :ok
