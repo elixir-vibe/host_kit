@@ -1,7 +1,7 @@
 defmodule HostKit.Apply do
   @moduledoc "Applies supported HostKit plan changes."
 
-  alias HostKit.{Change, Plan}
+  alias HostKit.{Change, Plan, Runner}
   alias HostKit.Resources.{Directory, File, User}
   alias HostKit.Systemd
 
@@ -168,9 +168,9 @@ defmodule HostKit.Apply do
 
   defp cmd(opts, command, args) do
     {command, args} = maybe_sudo(command, args, opts)
-    runner = Keyword.get(opts, :command_runner, &System.cmd/3)
+    runner = Keyword.get(opts, :runner, HostKit.Runner.Local)
 
-    case runner.(command, args, stderr_to_stdout: true) do
+    case Runner.cmd(runner, command, args, stderr_to_stdout: true) do
       {_output, 0} -> :ok
       {output, status} -> {:error, {:command_failed, command, args, status, output}}
     end

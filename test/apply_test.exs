@@ -76,12 +76,18 @@ defmodule HostKit.ApplyTest do
 
     parent = self()
 
-    runner = fn command, args, opts ->
-      send(parent, {:cmd, command, args, opts})
-      {"", 0}
+    defmodule UseraddRunner do
+      @behaviour HostKit.Runner
+
+      @impl true
+      def cmd(command, args, opts) do
+        send(opts[:test_pid], {:cmd, command, args, Keyword.delete(opts, :test_pid)})
+        {"", 0}
+      end
     end
 
-    assert {:ok, [%{status: :applied}]} = Apply.run(plan, confirm: true, command_runner: runner)
+    assert {:ok, [%{status: :applied}]} =
+             Apply.run(plan, confirm: true, runner: {UseraddRunner, test_pid: parent})
 
     assert_received {:cmd, "useradd",
                      [
