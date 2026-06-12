@@ -18,6 +18,13 @@ HostKit is intended to be used from a normal Mix project with `.exs` infrastruct
 use HostKit.DSL
 
 project :toys do
+  roots source: "/opt/toys/src",
+        data: "/srv/toys",
+        state: "/var/lib/toys",
+        config: "/etc/toys"
+
+  prefixes user: "toys-", unit: "toys-"
+
   host :elixir_toys do
     hostname "elixir.toys"
     user "dannote"
@@ -169,7 +176,23 @@ directory HostKit.Storage.directory(volume)
 read_write_paths HostKit.Storage.read_write_paths([volume])
 ```
 
-Project-local DSLs can derive these paths from service conventions and later reuse the same volume metadata for systemd sandboxing, Unitctl transient runtimes, and backups.
+Service conventions can derive these paths without project-specific macros and later reuse the same volume metadata for systemd sandboxing, Unitctl transient runtimes, and backups.
+
+```elixir
+project :toys do
+  roots data: "/srv/toys", config: "/etc/toys"
+  prefixes user: "toys-", unit: "toys-"
+
+  service :forgejo do
+    storage :repositories, under: :data, path: "repositories", mode: 0o750, backup: true
+    storage :config, under: :config, owner: "root", group: service_user(), writable: false, secret: true
+
+    systemd_service unit_name() do
+      service user: service_user(), read_write_paths: writable_storage_paths()
+    end
+  end
+end
+```
 
 ## Runtime isolation
 

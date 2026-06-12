@@ -78,6 +78,16 @@ defmodule HostKit.ProjectDSL do
     quote do
       defmacro __using__(_opts) do
         quote do
+          import HostKit.DSL,
+            except: [
+              service_name: 0,
+              service_user: 0,
+              unit_name: 0,
+              unit_name: 1,
+              root_path: 1,
+              root_path: 2
+            ]
+
           import unquote(__MODULE__)
         end
       end

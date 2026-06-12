@@ -1,7 +1,7 @@
 defmodule HostKit.Project do
   @moduledoc "Project-level declaration loaded from HostKit DSL files."
 
-  alias HostKit.{Provider, ProviderConfig, Service}
+  alias HostKit.{Conventions, Provider, ProviderConfig, Service}
 
   @type t :: %__MODULE__{
           name: atom(),
@@ -29,7 +29,7 @@ defmodule HostKit.Project do
     %__MODULE__{
       name: name,
       providers: providers,
-      conventions: Keyword.get(opts, :conventions, %{}),
+      conventions: opts |> Keyword.get(:conventions, %{}) |> Conventions.new(),
       meta: Keyword.get(opts, :meta, %{})
     }
   end
@@ -37,6 +37,22 @@ defmodule HostKit.Project do
   @spec put_providers(t(), [module()]) :: t()
   def put_providers(%__MODULE__{} = project, providers),
     do: %{project | providers: Provider.resolve(providers)}
+
+  @spec put_convention_root(t(), atom(), String.t()) :: t()
+  def put_convention_root(%__MODULE__{} = project, name, path) do
+    %{
+      project
+      | conventions: Conventions.put_root(Conventions.new(project.conventions), name, path)
+    }
+  end
+
+  @spec put_convention_prefix(t(), atom(), String.t()) :: t()
+  def put_convention_prefix(%__MODULE__{} = project, name, prefix) do
+    %{
+      project
+      | conventions: Conventions.put_prefix(Conventions.new(project.conventions), name, prefix)
+    }
+  end
 
   @spec put_provider_config(t(), ProviderConfig.t()) :: t()
   def put_provider_config(%__MODULE__{} = project, %ProviderConfig{} = config) do

@@ -43,6 +43,20 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro roots(values) do
+    quote do
+      Enum.each(unquote(values), fn {name, path} -> HostKit.DSL.Scope.put_root(name, path) end)
+    end
+  end
+
+  defmacro prefixes(values) do
+    quote do
+      Enum.each(unquote(values), fn {name, prefix} ->
+        HostKit.DSL.Scope.put_prefix(name, prefix)
+      end)
+    end
+  end
+
   defmacro provider(name, module, do: block) do
     quote do
       HostKit.DSL.Scope.start_provider_config(unquote(name), unquote(module))
@@ -76,6 +90,66 @@ defmodule HostKit.DSL do
       HostKit.DSL.Scope.start_service(unquote(name), unquote(opts))
       unquote(block)
       HostKit.DSL.Scope.finish_service()
+    end
+  end
+
+  defmacro path_name(value) do
+    quote do
+      HostKit.DSL.Scope.set_service_path_name(unquote(value))
+    end
+  end
+
+  defmacro service_name do
+    quote do
+      HostKit.DSL.Scope.service_name()
+    end
+  end
+
+  defmacro service_user do
+    quote do
+      HostKit.DSL.Scope.service_user()
+    end
+  end
+
+  defmacro unit_name(suffix \\ ".service") do
+    quote do
+      HostKit.DSL.Scope.unit_name(unquote(suffix))
+    end
+  end
+
+  defmacro root_path(root, child \\ nil) do
+    quote do
+      HostKit.DSL.Scope.root_path(unquote(root), unquote(child))
+    end
+  end
+
+  defmacro storage(name, opts) do
+    quote do
+      HostKit.DSL.Scope.put_storage(unquote(name), unquote(opts))
+    end
+  end
+
+  defmacro storage_volume(name) do
+    quote do
+      HostKit.DSL.Scope.storage_volume(unquote(name))
+    end
+  end
+
+  defmacro storage_path(name) do
+    quote do
+      HostKit.DSL.Scope.storage_path(unquote(name))
+    end
+  end
+
+  defmacro writable_storage_paths do
+    quote do
+      HostKit.DSL.Scope.writable_storage_paths()
+    end
+  end
+
+  defmacro backup_storage do
+    quote do
+      HostKit.DSL.Scope.backup_storage()
     end
   end
 
