@@ -133,6 +133,12 @@ HostKit.format_plan(plan)
 # Command and filesystem operations are routed through a runner boundary.
 {:ok, results} = HostKit.apply(plan, confirm: true, runner: HostKit.Runner.Local)
 
+{:ok, results} =
+  HostKit.apply(plan,
+    confirm: true,
+    runner: {HostKit.Runner.SSH, host: "elixir.toys", user: "dannote"}
+  )
+
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
 ```
 

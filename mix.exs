@@ -10,7 +10,7 @@ defmodule HostKit.MixProject do
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
-      dialyzer: [plt_add_apps: [:mix]]
+      dialyzer: [plt_add_apps: [:mix, :ssh]]
     ]
   end
 
@@ -20,7 +20,7 @@ defmodule HostKit.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger, :ssh]
     ]
   end
 
