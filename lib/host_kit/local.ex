@@ -155,23 +155,30 @@ defmodule HostKit.Local do
     end
   end
 
-  defp stat_metadata_without_sudo(path) do
-    with {:error, _reason} <- linux_stat_metadata(path, []) do
-      bsd_stat_metadata(path, [])
-    end
-  end
+  defp stat_metadata_without_sudo(path), do: stat_metadata_for_platform(path, [])
 
   defp sudo_stat_metadata(path, %{opts: opts}) do
     if Keyword.get(opts, :sudo, false) do
-      with {:error, _reason} <- linux_stat_metadata(path, ["sudo"]) do
-        bsd_stat_metadata(path, ["sudo"])
-      end
+      stat_metadata_for_platform(path, ["sudo"])
     else
       {:error, :eacces}
     end
   end
 
   defp sudo_stat_metadata(_path, _context), do: {:error, :eacces}
+
+  defp stat_metadata_for_platform(path, prefix) do
+    case linux_stat_metadata(path, prefix) do
+      {:error, {:stat_failed, _status, output}} = error ->
+        if linux_stat_unsupported?(output), do: bsd_stat_metadata(path, prefix), else: error
+
+      result ->
+        result
+    end
+  end
+
+  defp linux_stat_unsupported?(output),
+    do: String.contains?(output, ["illegal option", "invalid option"])
 
   defp linux_stat_metadata(path, prefix) do
     case System.cmd(command(prefix, "stat"), args(prefix, ["-c", "%F:%U:%G:%a", path]),
