@@ -1,5 +1,42 @@
 defmodule HostKit.ProjectDSL do
-  @moduledoc "Helpers for building project-local HostKit DSLs."
+  @moduledoc """
+  Helpers for building project-local HostKit DSLs.
+
+  HostKit stays generic; consuming projects can define their own roots, prefixes,
+  service wrappers, and helper macros with this module.
+
+      defmodule MyInfra do
+        use HostKit.ProjectDSL
+
+        root :source, "/opt/apps/src"
+        root :state, "/var/lib/apps"
+        prefix :user, "app-"
+
+        defservice :app_service do
+          let :service_user, do: prefixed(:user, service_name())
+          path :source_dir, root(:source), service_name()
+          path :state_dir, root(:state), service_name()
+
+          macro :standard_user do
+            system_user service_user(), home: state_path("home")
+          end
+        end
+      end
+
+  Then explicitly load and use it from a HostKit config:
+
+      Code.require_file("my_infra.exs", __DIR__)
+
+      use HostKit.DSL
+      use MyInfra
+
+      project :demo do
+        app_service :web do
+          standard_user()
+          directory state_path("home"), owner: service_user()
+        end
+      end
+  """
 
   defmacro __using__(_opts) do
     quote do
@@ -64,8 +101,19 @@ defmodule HostKit.ProjectDSL do
   defp parse_definition({:macro, _meta, [name, [do: block]]}) when is_atom(name),
     do: {:macro, name, block}
 
-  defp parse_definition(other),
-    do: raise(ArgumentError, "unknown ProjectDSL definition: #{Macro.to_string(other)}")
+  defp parse_definition(other) do
+    raise ArgumentError, """
+    unknown ProjectDSL definition: #{Macro.to_string(other)}
+
+    Supported forms inside defservice are:
+
+        let :helper_name, do: expression
+        path :helper_dir, root(:root_name), service_name()
+        macro :helper_name do
+          ...
+        end
+    """
+  end
 
   defp build_service_macros({service_macro, definitions}, roots, prefixes) do
     context = %{roots: roots, prefixes: prefixes, definitions: definitions}
@@ -157,25 +205,29 @@ defmodule HostKit.ProjectDSL do
 
   defp path_alias(name) do
     string = Atom.to_string(name)
-    suffix_size = byte_size("_dir")
-    prefix_size = byte_size(string) - suffix_size
 
-    case string do
-      <<prefix::binary-size(^prefix_size), "_dir">> ->
-        :erlang.binary_to_atom(prefix <> "_path", :utf8)
-
-      _other ->
-        name
+    if String.ends_with?(string, "_dir") do
+      string |> String.replace_suffix("_dir", "_path") |> :erlang.binary_to_atom(:utf8)
+    else
+      name
     end
   end
 
-  defp expand_expression({:root, _meta, [name]}, %{roots: roots}) when is_atom(name) do
-    Map.fetch!(roots, name)
+  defp expand_expression({:root, meta, [name]}, %{roots: roots}) when is_atom(name) do
+    case Map.fetch(roots, name) do
+      {:ok, root} -> root
+      :error -> raise_missing_root!(name, meta, roots)
+    end
   end
 
-  defp expand_expression({:prefixed, _meta, [name, value]}, %{prefixes: prefixes} = context)
+  defp expand_expression({:prefixed, meta, [name, value]}, %{prefixes: prefixes} = context)
        when is_atom(name) do
-    prefix = Map.fetch!(prefixes, name)
+    prefix =
+      case Map.fetch(prefixes, name) do
+        {:ok, prefix} -> prefix
+        :error -> raise_missing_prefix!(name, meta, prefixes)
+      end
+
     value = expand_expression(value, context)
 
     quote do
@@ -197,4 +249,42 @@ defmodule HostKit.ProjectDSL do
     do: Enum.map(list, &expand_expression(&1, context))
 
   defp expand_expression(other, _context), do: other
+
+  defp raise_missing_root!(name, meta, roots) do
+    raise ArgumentError, """
+    unknown ProjectDSL root #{inspect(name)}#{location(meta)}
+
+    Define it before defservice:
+
+        root #{inspect(name)}, "/path"
+
+    Known roots: #{known_keys(roots)}
+    """
+  end
+
+  defp raise_missing_prefix!(name, meta, prefixes) do
+    raise ArgumentError, """
+    unknown ProjectDSL prefix #{inspect(name)}#{location(meta)}
+
+    Define it before defservice:
+
+        prefix #{inspect(name)}, "value-"
+
+    Known prefixes: #{known_keys(prefixes)}
+    """
+  end
+
+  defp known_keys(map) do
+    map
+    |> Map.keys()
+    |> Enum.sort()
+    |> inspect()
+  end
+
+  defp location(meta) do
+    case Keyword.get(meta, :line) do
+      nil -> ""
+      line -> " at line #{line}"
+    end
+  end
 end
