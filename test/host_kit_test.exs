@@ -2,7 +2,7 @@ defmodule HostKitTest do
   use ExUnit.Case, async: true
 
   test "DSL builds inspectable project structs" do
-    path = fixture_path("project.hostkit.exs")
+    path = fixture_path("project.hostkit")
 
     assert {:ok, project} = HostKit.load(path)
     assert project.name == :toys
@@ -14,14 +14,14 @@ defmodule HostKitTest do
   end
 
   test "plan summarizes resource kinds" do
-    project = HostKit.load!(fixture_path("project.hostkit.exs"))
+    project = HostKit.load!(fixture_path("project.hostkit"))
 
     assert {:ok, plan} = HostKit.plan(project)
     assert plan.summary == %{directory: 1, systemd_service: 1, user: 1}
   end
 
   test "systemd resources render through core plugin" do
-    project = HostKit.load!(fixture_path("project.hostkit.exs"))
+    project = HostKit.load!(fixture_path("project.hostkit"))
 
     assert {:ok, rendered} =
              HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
