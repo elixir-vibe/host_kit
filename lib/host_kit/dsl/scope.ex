@@ -81,11 +81,11 @@ defmodule HostKit.DSL.Scope do
   end
 
   def service_user do
-    prefixed(:user, service_name())
+    prefixed(:user, service_path_name())
   end
 
   def unit_name(suffix \\ ".service") do
-    prefixed(:unit, service_name()) <> suffix
+    prefixed(:unit, service_path_name()) <> suffix
   end
 
   def root_path(root, child \\ nil) do
