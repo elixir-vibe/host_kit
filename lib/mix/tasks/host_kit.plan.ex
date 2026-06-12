@@ -27,8 +27,11 @@ defmodule Mix.Tasks.HostKit.Plan do
 
     path = List.first(positional) || "infra/config.exs"
     project = HostKit.load!(path, require: Keyword.get_values(opts, :require))
-    {:ok, plan} = HostKit.plan(project, plan_opts(opts))
-    IO.puts(format_plan(plan, opts))
+
+    Options.with_target_opts(opts, fn target_opts ->
+      {:ok, plan} = HostKit.plan(project, plan_opts(opts, target_opts))
+      IO.puts(format_plan(plan, opts))
+    end)
   end
 
   defp format_plan(plan, opts) do
@@ -38,9 +41,7 @@ defmodule Mix.Tasks.HostKit.Plan do
     end
   end
 
-  defp plan_opts(opts) do
-    opts
-    |> Options.target_opts()
-    |> Keyword.put(:ignore, Options.ignored_resources(opts))
+  defp plan_opts(opts, target_opts) do
+    Keyword.put(target_opts, :ignore, Options.ignored_resources(opts))
   end
 end
