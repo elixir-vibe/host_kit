@@ -49,11 +49,11 @@ defmodule HostKit.Local do
   end
 
   def read(%Systemd.Service{name: name} = desired) do
-    read_systemd_unit("/etc/systemd/system/#{name}", desired, &Systemd.Service.render/1)
+    read_systemd_unit("/etc/systemd/system/#{name}", desired)
   end
 
   def read(%Systemd.Timer{name: name} = desired) do
-    read_systemd_unit("/etc/systemd/system/#{name}", desired, &Systemd.Timer.render/1)
+    read_systemd_unit("/etc/systemd/system/#{name}", desired)
   end
 
   def read(_resource), do: {:ok, nil}
@@ -168,18 +168,10 @@ defmodule HostKit.Local do
     %User{desired | home: home, shell: shell}
   end
 
-  defp read_systemd_unit(path, desired, render) do
+  defp read_systemd_unit(path, desired) do
     case Elixir.File.read(path) do
       {:ok, content} ->
-        {:ok,
-         %{
-           desired
-           | meta: Map.put(desired.meta, :content, content),
-             unit: desired.unit,
-             service: desired.service,
-             install: desired.install
-         }
-         |> mark_render(render)}
+        {:ok, %{desired | meta: Map.put(desired.meta, :content, content)} |> mark_render()}
 
       {:error, :enoent} ->
         {:ok, nil}
@@ -189,7 +181,11 @@ defmodule HostKit.Local do
     end
   end
 
-  defp mark_render(actual, render) do
-    Map.update!(actual, :meta, &Map.put(&1, :desired_render, render.(actual)))
+  defp mark_render(%Systemd.Service{} = actual) do
+    Map.update!(actual, :meta, &Map.put(&1, :desired_render, Systemd.Service.render(actual)))
+  end
+
+  defp mark_render(%Systemd.Timer{} = actual) do
+    Map.update!(actual, :meta, &Map.put(&1, :desired_render, Systemd.Timer.render(actual)))
   end
 end
