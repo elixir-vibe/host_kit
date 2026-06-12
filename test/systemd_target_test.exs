@@ -46,7 +46,7 @@ defmodule HostKit.SystemdTargetTest do
     project :demo do
       service :sync do
         schedule "sync.timer" do
-          timer on_calendar: "hourly"
+          every :hour
           wanted_by :timers
         end
       end

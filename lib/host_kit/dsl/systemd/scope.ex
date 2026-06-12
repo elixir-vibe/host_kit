@@ -45,6 +45,9 @@ defmodule HostKit.DSL.Systemd.Scope do
 
   def put_timer(values), do: update(:timer, &%{&1 | timer: merge_directives(&1.timer, values)})
 
+  def put_timer(key, value),
+    do: update(:timer, &%{&1 | timer: put_directive(&1.timer, key, normalize_value(key, value))})
+
   def put_install(values),
     do: update_current(&%{&1 | install: Keyword.merge(&1.install, normalize_values(values))})
 
@@ -104,5 +107,6 @@ defmodule HostKit.DSL.Systemd.Scope do
 
   defp normalize_value(:exec_start, argv) when is_list(argv), do: Enum.join(argv, " ")
   defp normalize_value(:restart, :on_failure), do: "on-failure"
+  defp normalize_value(:on_calendar, value), do: HostKit.Systemd.Calendar.name(value)
   defp normalize_value(_key, value), do: value
 end

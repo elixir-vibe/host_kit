@@ -65,6 +65,27 @@ defmodule HostKit.DSL.Systemd do
     end
   end
 
+  defmacro every(interval) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_timer(
+        :on_calendar,
+        HostKit.Systemd.Calendar.name(unquote(interval))
+      )
+    end
+  end
+
+  defmacro persistent(value) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_timer(:persistent, unquote(value))
+    end
+  end
+
+  defmacro on_boot(value) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_timer(:on_boot_sec, unquote(value))
+    end
+  end
+
   defmacro description(value) do
     quote do
       HostKit.DSL.Systemd.Scope.put_unit(:description, unquote(value))
