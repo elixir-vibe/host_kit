@@ -9,7 +9,8 @@ defmodule HostKit.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      aliases: aliases()
+      aliases: aliases(),
+      dialyzer: [plt_add_apps: [:mix]]
     ]
   end
 

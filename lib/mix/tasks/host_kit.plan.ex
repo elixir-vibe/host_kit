@@ -12,6 +12,6 @@ defmodule Mix.Tasks.HostKit.Plan do
     path = List.first(args) || "infra/config.exs"
     project = HostKit.load!(path)
     {:ok, plan} = HostKit.plan(project)
-    IO.inspect(plan, pretty: true, limit: :infinity, structs: true)
+    plan |> inspect(pretty: true, limit: :infinity, structs: true) |> IO.puts()
   end
 end

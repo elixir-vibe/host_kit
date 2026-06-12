@@ -50,11 +50,12 @@ end
 Providers can contribute DSL modules, resource types, renderers, validators, and eventually read/plan/apply lifecycle operations. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.
 
 ```elixir
-use HostKit.DSL, providers: [MyCaddyProvider]
+use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
 
-project :demo, providers: [MyCaddyProvider] do
+project :demo, providers: [HostKit.Plugins.Caddy] do
   service :web do
-    caddy_site "example.com" do
+    caddy_site :web, "example.com" do
+      encode [:zstd, :gzip]
       reverse_proxy "127.0.0.1:4000"
     end
   end

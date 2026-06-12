@@ -11,6 +11,6 @@ defmodule Mix.Tasks.HostKit.Dump do
 
     path = List.first(args) || "infra/config.exs"
     project = HostKit.load!(path)
-    IO.inspect(project, pretty: true, limit: :infinity, structs: true)
+    project |> inspect(pretty: true, limit: :infinity, structs: true) |> IO.puts()
   end
 end

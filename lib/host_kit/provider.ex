@@ -39,32 +39,35 @@ defmodule HostKit.Provider do
 
   @spec render([module()], struct(), map()) :: {:ok, iodata()} | {:error, term()}
   def render(providers, resource, context \\ %{}) do
-    Enum.find_value(providers, {:error, :no_renderer}, fn provider ->
-      if exports?(provider, :render, 2) do
-        case provider.render(resource, context) do
-          :ignore -> nil
-          result -> result
-        end
-      end
-    end)
+    Enum.find_value(providers, {:error, :no_renderer}, &render_with(&1, resource, context))
   end
 
   @spec validate([module()], struct(), map()) :: :ok | {:error, [term()]}
   def validate(providers, resource, context \\ %{}) do
-    errors =
-      Enum.flat_map(providers, fn provider ->
-        if exports?(provider, :validate, 2) do
-          case provider.validate(resource, context) do
-            :ok -> []
-            :ignore -> []
-            {:error, reason} -> [{provider, reason}]
-          end
-        else
-          []
-        end
-      end)
+    errors = Enum.flat_map(providers, &validate_with(&1, resource, context))
 
     if errors == [], do: :ok, else: {:error, errors}
+  end
+
+  defp render_with(provider, resource, context) do
+    if exports?(provider, :render, 2) do
+      case provider.render(resource, context) do
+        :ignore -> nil
+        result -> result
+      end
+    end
+  end
+
+  defp validate_with(provider, resource, context) do
+    if exports?(provider, :validate, 2) do
+      case provider.validate(resource, context) do
+        :ok -> []
+        :ignore -> []
+        {:error, reason} -> [{provider, reason}]
+      end
+    else
+      []
+    end
   end
 
   defp exports?(provider, function, arity) do
