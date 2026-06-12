@@ -50,10 +50,10 @@ end
 Providers can contribute DSL modules, resource types, renderers, validators, and read/plan/apply lifecycle operations. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.
 
 ```elixir
-use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
+use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
-project :demo, providers: [HostKit.Plugins.Caddy] do
-  provider :caddy, HostKit.Plugins.Caddy do
+project :demo, providers: [HostKit.Providers.Caddy] do
+  provider :caddy, HostKit.Providers.Caddy do
     set :sites_dir, "/etc/caddy/sites"
   end
 
@@ -102,7 +102,7 @@ end
 
 ```elixir
 # infra/config.exs
-use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
+use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 use ToysInfra
 
 project :toys do
@@ -124,6 +124,9 @@ end
 {:ok, plan} = HostKit.plan(project)
 #=> %HostKit.Plan{changes: [%HostKit.Change{action: :create, ...}]}
 
+HostKit.format_plan(plan)
+{:ok, results} = HostKit.apply(plan, dry_run: true)
+
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
 ```
 
@@ -140,7 +143,7 @@ HostKit exposes Unitctl as its core transient runtime layer:
   )
 
 {:ok, instance} = HostKit.Runtime.start(spec)
-{:ok, state} = HostKit.Runtime.inspect(instance)
+{:ok, state} = HostKit.Runtime.status(instance)
 :ok = HostKit.Runtime.stop(instance)
 ```
 
@@ -150,5 +153,6 @@ HostKit exposes Unitctl as its core transient runtime layer:
 mix host_kit.dump --require toys_infra.exs infra/config.exs
 mix host_kit.plan --require toys_infra.exs infra/config.exs
 mix host_kit.plan --require toys_infra.exs infra/config.exs --local
+mix host_kit.apply --require toys_infra.exs infra/config.exs --local --dry-run
 mix host_kit.render --require toys_infra.exs infra/config.exs systemd_service toys-exograph.service
 ```

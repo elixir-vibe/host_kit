@@ -17,8 +17,12 @@ defmodule HostKit.Runtime do
   defdelegate restart(instance_or_unit, opts \\ []), to: Unitctl
 
   @doc "Reads common systemd state for a unit or Unitctl instance."
+  @spec status(unit_ref(), keyword()) :: {:ok, Systemd.UnitState.t()} | {:error, term()}
+  def status(instance_or_unit, opts \\ []), do: Unitctl.inspect(instance_or_unit, opts)
+
+  @doc "Alias for `status/2` kept for Unitctl API compatibility."
   @spec inspect(unit_ref(), keyword()) :: {:ok, Systemd.UnitState.t()} | {:error, term()}
-  defdelegate inspect(instance_or_unit, opts \\ []), to: Unitctl
+  def inspect(instance_or_unit, opts \\ []), do: status(instance_or_unit, opts)
 
   @doc "Reads runtime stats for a unit or Unitctl instance."
   @spec stats(unit_ref(), keyword()) :: {:ok, Unitctl.Stats.t()} | {:error, term()}

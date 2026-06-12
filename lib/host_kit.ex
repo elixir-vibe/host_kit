@@ -1,4 +1,6 @@
 defmodule HostKit do
+  import Kernel, except: [apply: 2]
+
   @moduledoc """
   Elixir-native host infrastructure declarations, planning, and runtime control.
 
@@ -7,7 +9,7 @@ defmodule HostKit do
   structs that can be inspected and consumed through the runtime API.
   """
 
-  alias HostKit.{Loader, Plan, Project}
+  alias HostKit.{Apply, Loader, Plan, Project}
 
   @doc "Loads a HostKit project from an `.exs` file."
   @spec load(Path.t(), keyword()) :: {:ok, Project.t()} | {:error, term()}
@@ -33,4 +35,24 @@ defmodule HostKit do
   """
   @spec plan(Project.t(), keyword()) :: {:ok, Plan.t()}
   def plan(%Project{} = project, opts \\ []), do: Plan.build(project, opts)
+
+  @doc "Applies supported changes from a HostKit plan."
+  @spec apply(Plan.t(), keyword()) :: {:ok, [Apply.result()]} | {:error, term()}
+  def apply(%Plan{} = plan, opts \\ []), do: Apply.run(plan, opts)
+
+  @doc "Applies supported changes from a HostKit plan or raises."
+  @spec apply!(Plan.t(), keyword()) :: [Apply.result()]
+  def apply!(%Plan{} = plan, opts \\ []) do
+    case apply(plan, opts) do
+      {:ok, results} ->
+        results
+
+      {:error, reason} ->
+        raise ArgumentError, "could not apply HostKit plan: #{inspect(reason)}"
+    end
+  end
+
+  @doc "Formats a HostKit plan for human-readable output."
+  @spec format_plan(Plan.t()) :: String.t()
+  def format_plan(%Plan{} = plan), do: Plan.Format.format(plan)
 end
