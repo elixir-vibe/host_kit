@@ -82,11 +82,17 @@ defmodule HostKit.Plan do
   end
 
   defp equivalent?(%HostKit.Systemd.Service{} = desired, actual) do
-    Map.get(actual.meta, :content) == HostKit.Systemd.Service.render(desired)
+    Systemd.UnitFile.equivalent?(
+      Map.get(actual.meta, :content),
+      HostKit.Systemd.Service.render(desired)
+    )
   end
 
   defp equivalent?(%HostKit.Systemd.Timer{} = desired, actual) do
-    Map.get(actual.meta, :content) == HostKit.Systemd.Timer.render(desired)
+    Systemd.UnitFile.equivalent?(
+      Map.get(actual.meta, :content),
+      HostKit.Systemd.Timer.render(desired)
+    )
   end
 
   defp equivalent?(%HostKit.Caddy.Site{} = desired, actual) do
