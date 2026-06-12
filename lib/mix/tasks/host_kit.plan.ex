@@ -9,9 +9,11 @@ defmodule Mix.Tasks.HostKit.Plan do
   def run(args) do
     Mix.Task.run("app.start")
 
-    {opts, positional} = OptionParser.parse!(args, strict: [local: :boolean, sudo: :boolean])
+    {opts, positional} =
+      OptionParser.parse!(args, strict: [local: :boolean, sudo: :boolean, require: :keep])
+
     path = List.first(positional) || "infra/config.exs"
-    project = HostKit.load!(path)
+    project = HostKit.load!(path, require: Keyword.get_values(opts, :require))
     {:ok, plan} = HostKit.plan(project, plan_opts(opts))
     plan |> inspect(pretty: true, limit: :infinity, structs: true) |> IO.puts()
   end

@@ -69,7 +69,7 @@ end
 ## Project-local DSLs
 
 Use `HostKit.ProjectDSL` in consuming projects to build local conventions without baking them into HostKit.
-Explicitly load the local DSL before `use`:
+Load project-local DSL files explicitly through the runtime API or Mix task `--require` option:
 
 ```elixir
 # infra/toys_infra.exs
@@ -102,8 +102,6 @@ end
 
 ```elixir
 # infra/config.exs
-Code.require_file("toys_infra.exs", __DIR__)
-
 use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
 use ToysInfra
 
@@ -122,7 +120,7 @@ end
 ## Runtime API
 
 ```elixir
-{:ok, project} = HostKit.load("infra/config.exs")
+{:ok, project} = HostKit.load("infra/config.exs", require: ["toys_infra.exs"])
 {:ok, plan} = HostKit.plan(project)
 #=> %HostKit.Plan{changes: [%HostKit.Change{action: :create, ...}]}
 
@@ -132,8 +130,8 @@ end
 ## Mix tasks
 
 ```sh
-mix host_kit.dump infra/config.exs
-mix host_kit.plan infra/config.exs
-mix host_kit.plan infra/config.exs --local
-mix host_kit.render infra/config.exs systemd_service toys-exograph.service
+mix host_kit.dump --require toys_infra.exs infra/config.exs
+mix host_kit.plan --require toys_infra.exs infra/config.exs
+mix host_kit.plan --require toys_infra.exs infra/config.exs --local
+mix host_kit.render --require toys_infra.exs infra/config.exs systemd_service toys-exograph.service
 ```

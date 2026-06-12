@@ -4,10 +4,11 @@ defmodule HostKit.Loader do
   alias HostKit.Project
 
   @spec load(Path.t(), keyword()) :: {:ok, Project.t()} | {:error, term()}
-  def load(path, _opts \\ []) do
+  def load(path, opts \\ []) do
     path = Path.expand(path)
 
     try do
+      require_files(path, Keyword.get(opts, :require, []))
       {project, _binding} = Code.eval_file(path)
 
       case project do
@@ -18,5 +19,14 @@ defmodule HostKit.Loader do
       exception in [ArgumentError, Code.LoadError, CompileError, RuntimeError, SyntaxError] ->
         {:error, {exception, __STACKTRACE__}}
     end
+  end
+
+  defp require_files(path, files) do
+    base = Path.dirname(path)
+
+    files
+    |> List.wrap()
+    |> Enum.map(&Path.expand(&1, base))
+    |> Enum.each(&Code.require_file/1)
   end
 end
