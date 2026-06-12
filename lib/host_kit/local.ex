@@ -2,13 +2,14 @@ defmodule HostKit.Local do
   @moduledoc "Read-only inspection of resources on the local host."
 
   alias HostKit.Caddy
+  alias HostKit.Reader.Helpers
   alias HostKit.Resources.{Directory, File, User}
   alias HostKit.Systemd
 
   @spec read(struct()) :: {:ok, struct() | nil} | {:error, term()}
   def read(%User{name: name} = desired) do
     case System.cmd("getent", ["passwd", name], stderr_to_stdout: true) do
-      {line, 0} -> {:ok, user_from_passwd(line, desired)}
+      {line, 0} -> {:ok, Helpers.user_from_passwd(line, desired)}
       {_output, 2} -> {:ok, nil}
       {output, status} -> {:error, {:getent_failed, status, output}}
     end
@@ -71,7 +72,7 @@ defmodule HostKit.Local do
 
     case sites_dir do
       nil -> {:ok, nil}
-      dir -> read_caddy_site(Path.join(dir, caddy_site_filename(desired)), desired)
+      dir -> read_caddy_site(Path.join(dir, Helpers.caddy_site_filename(desired)), desired)
     end
   end
 
@@ -142,9 +143,6 @@ defmodule HostKit.Local do
     end
   end
 
-  defp caddy_site_filename(%Caddy.Site{meta: %{path: path}}), do: path
-  defp caddy_site_filename(%Caddy.Site{name: name}), do: "#{name}.caddy"
-
   defp stat_metadata(path), do: stat_metadata(path, %{})
 
   defp stat_metadata(path, context) do
@@ -184,7 +182,7 @@ defmodule HostKit.Local do
     case System.cmd(command(prefix, "stat"), args(prefix, ["-c", "%F:%U:%G:%a", path]),
            stderr_to_stdout: true
          ) do
-      {output, 0} -> parse_stat_output(output)
+      {output, 0} -> Helpers.parse_stat_output(output)
       {output, status} -> {:error, stat_error(status, output)}
     end
   end
@@ -193,7 +191,7 @@ defmodule HostKit.Local do
     case System.cmd(command(prefix, "stat"), args(prefix, ["-f", "%HT:%Su:%Sg:%Lp", path]),
            stderr_to_stdout: true
          ) do
-      {output, 0} -> parse_stat_output(output)
+      {output, 0} -> Helpers.parse_stat_output(output)
       {output, status} -> {:error, stat_error(status, output)}
     end
   end
@@ -212,39 +210,11 @@ defmodule HostKit.Local do
   defp args([_command | _rest], args), do: ["stat" | args]
   defp args([], args), do: args
 
-  defp parse_stat_output(output) do
-    case output |> String.trim() |> String.split(":", parts: 4) do
-      [type, owner, group, mode] ->
-        {:ok,
-         %{
-           type: normalize_type(type),
-           owner: owner,
-           group: group,
-           mode: String.to_integer(mode, 8)
-         }}
-
-      fields ->
-        {:error, {:unexpected_stat_output, fields}}
-    end
-  end
-
-  defp normalize_type(type) when type in ["directory", "Directory"], do: :directory
-  defp normalize_type(type) when type in ["regular file", "Regular File"], do: :regular
-  defp normalize_type(type), do: type
-
-  defp user_from_passwd(line, %User{} = desired) do
-    [_name, _password, _uid, _gid, _gecos, home, shell] =
-      line
-      |> String.trim()
-      |> String.split(":", parts: 7)
-
-    %User{desired | home: home, shell: shell}
-  end
-
   defp read_systemd_unit(path, desired) do
     case Elixir.File.read(path) do
       {:ok, content} ->
-        {:ok, %{desired | meta: Map.put(desired.meta, :content, content)} |> mark_render()}
+        {:ok,
+         %{desired | meta: Map.put(desired.meta, :content, content)} |> Helpers.mark_render()}
 
       {:error, :enoent} ->
         {:ok, nil}
@@ -252,13 +222,5 @@ defmodule HostKit.Local do
       {:error, reason} ->
         {:error, reason}
     end
-  end
-
-  defp mark_render(%Systemd.Service{} = actual) do
-    Map.update!(actual, :meta, &Map.put(&1, :desired_render, Systemd.Service.render(actual)))
-  end
-
-  defp mark_render(%Systemd.Timer{} = actual) do
-    Map.update!(actual, :meta, &Map.put(&1, :desired_render, Systemd.Timer.render(actual)))
   end
 end

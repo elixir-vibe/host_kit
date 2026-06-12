@@ -124,6 +124,9 @@ end
 {:ok, plan} = HostKit.plan(project)
 #=> %HostKit.Plan{changes: [%HostKit.Change{action: :create, ...}]}
 
+prod = HostKit.Target.ssh(:prod, host: "elixir.toys", user: "dannote", sudo: true)
+{:ok, remote_plan} = HostKit.plan(project, target: prod, reader: HostKit.Remote)
+
 HostKit.format_plan(plan)
 {:ok, results} = HostKit.apply(plan, dry_run: true)
 

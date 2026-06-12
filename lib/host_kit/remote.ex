@@ -1,0 +1,130 @@
+defmodule HostKit.Remote do
+  @moduledoc "Read-only inspection of resources through a HostKit runner."
+
+  alias HostKit.Caddy
+  alias HostKit.{Reader.Helpers, Runner, Systemd}
+  alias HostKit.Resources.{Directory, File, User}
+
+  @spec read(struct(), map()) :: {:ok, struct() | nil} | {:error, term()}
+  def read(%User{name: name} = desired, context) do
+    case cmd(context, "getent", ["passwd", name]) do
+      {line, 0} -> {:ok, Helpers.user_from_passwd(line, desired)}
+      {_output, 2} -> {:ok, nil}
+      {output, status} -> {:error, {:getent_failed, status, output}}
+    end
+  end
+
+  def read(%Directory{} = desired, context) do
+    Helpers.read_directory(desired, &stat_metadata(&1, context))
+  end
+
+  def read(%File{} = desired, context) do
+    Helpers.read_file(desired, &stat_metadata(&1, context), &read_file(&1, context))
+  end
+
+  def read(%Systemd.Service{name: name} = desired, context) do
+    read_systemd_unit("/etc/systemd/system/#{name}", desired, context)
+  end
+
+  def read(%Systemd.Timer{name: name} = desired, context) do
+    read_systemd_unit("/etc/systemd/system/#{name}", desired, context)
+  end
+
+  def read(%Caddy.Site{} = desired, context) do
+    sites_dir =
+      get_in(context, [
+        :project,
+        Access.key(:provider_configs),
+        :caddy,
+        Access.key(:config),
+        :sites_dir
+      ])
+
+    case sites_dir do
+      nil ->
+        {:ok, nil}
+
+      dir ->
+        read_caddy_site(Path.join(dir, Helpers.caddy_site_filename(desired)), desired, context)
+    end
+  end
+
+  def read(_resource, _context), do: {:ok, nil}
+
+  defp read_systemd_unit(path, desired, context) do
+    case read_file(path, context) do
+      {:ok, content} ->
+        {:ok,
+         %{desired | meta: Map.put(desired.meta, :content, content)} |> Helpers.mark_render()}
+
+      {:error, :enoent} ->
+        {:ok, nil}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp read_caddy_site(path, desired, context) do
+    case read_file(path, context) do
+      {:ok, content} -> {:ok, %{desired | meta: Map.put(desired.meta, :content, content)}}
+      {:error, :enoent} -> {:ok, nil}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp read_file(path, context) do
+    case cmd(context, "sh", ["-c", read_command(path, context)]) do
+      {content, 0} -> decode_content(content)
+      {output, _status} -> {:error, stat_error(output)}
+    end
+  end
+
+  defp read_command(path, context) do
+    prefix = if sudo?(context), do: "sudo ", else: ""
+    "#{prefix}base64 #{shell_escape(path)}"
+  end
+
+  defp decode_content(content) do
+    content
+    |> String.replace(~r/\s+/, "")
+    |> Base.decode64()
+  end
+
+  defp stat_metadata(path, context) do
+    command = if sudo?(context), do: "sudo", else: "stat"
+
+    args =
+      if sudo?(context),
+        do: ["stat", "-c", "%F:%U:%G:%a", path],
+        else: ["-c", "%F:%U:%G:%a", path]
+
+    case cmd(context, command, args) do
+      {output, 0} -> Helpers.parse_stat_output(output)
+      {output, _status} -> {:error, stat_error(output)}
+    end
+  end
+
+  defp stat_error(output) do
+    cond do
+      String.contains?(output, "No such file") ->
+        :enoent
+
+      String.contains?(output, "cannot stat") and
+          not String.contains?(output, "Permission denied") ->
+        :enoent
+
+      true ->
+        {:remote_read_failed, output}
+    end
+  end
+
+  defp cmd(%{opts: opts}, command, args) do
+    runner = Keyword.get(opts, :runner, HostKit.Runner.Local)
+    Runner.cmd(runner, command, args, stderr_to_stdout: true)
+  end
+
+  defp sudo?(%{opts: opts}), do: Keyword.get(opts, :sudo, false)
+
+  defp shell_escape(value), do: "'" <> String.replace(to_string(value), "'", "'\\''") <> "'"
+end

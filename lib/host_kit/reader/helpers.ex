@@ -1,0 +1,79 @@
+defmodule HostKit.Reader.Helpers do
+  @moduledoc false
+
+  alias HostKit.Caddy
+  alias HostKit.Resources.{Directory, File, User}
+  alias HostKit.Systemd
+
+  def read_directory(%Directory{path: path} = desired, stat_fun) do
+    case stat_fun.(path) do
+      {:ok, %{type: :directory} = metadata} ->
+        {:ok,
+         %Directory{desired | owner: metadata.owner, group: metadata.group, mode: metadata.mode}}
+
+      {:ok, %{type: type}} ->
+        {:error, {:not_directory, path, type}}
+
+      {:error, :enoent} ->
+        {:ok, nil}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def read_file(%File{path: path} = desired, stat_fun, read_fun) do
+    with {:metadata, {:ok, %{type: :regular} = metadata}} <- {:metadata, stat_fun.(path)},
+         {:content, {:ok, content}} <- {:content, read_fun.(path)} do
+      {:ok,
+       %File{
+         desired
+         | content: content,
+           owner: metadata.owner,
+           group: metadata.group,
+           mode: metadata.mode
+       }}
+    else
+      {:metadata, {:ok, %{type: type}}} -> {:error, {:not_file, path, type}}
+      {:metadata, {:error, :enoent}} -> {:ok, nil}
+      {:metadata, {:error, reason}} -> {:error, reason}
+      {:content, {:error, reason}} -> {:error, reason}
+    end
+  end
+
+  def parse_stat_output(output) do
+    case output |> String.trim() |> String.split(":", parts: 4) do
+      [type, owner, group, mode] ->
+        {:ok,
+         %{
+           type: normalize_type(type),
+           owner: owner,
+           group: group,
+           mode: String.to_integer(mode, 8)
+         }}
+
+      fields ->
+        {:error, {:unexpected_stat_output, fields}}
+    end
+  end
+
+  def caddy_site_filename(%Caddy.Site{meta: %{path: path}}), do: path
+  def caddy_site_filename(%Caddy.Site{name: name}), do: "#{name}.caddy"
+
+  def mark_render(%Systemd.Service{} = actual),
+    do: Map.update!(actual, :meta, &Map.put(&1, :desired_render, Systemd.Service.render(actual)))
+
+  def mark_render(%Systemd.Timer{} = actual),
+    do: Map.update!(actual, :meta, &Map.put(&1, :desired_render, Systemd.Timer.render(actual)))
+
+  def user_from_passwd(line, %User{} = desired) do
+    [_name, _password, _uid, _gid, _gecos, home, shell] =
+      line |> String.trim() |> String.split(":", parts: 7)
+
+    %User{desired | home: home, shell: shell}
+  end
+
+  defp normalize_type(type) when type in ["directory", "Directory"], do: :directory
+  defp normalize_type(type) when type in ["regular file", "Regular File"], do: :regular
+  defp normalize_type(type), do: type
+end
