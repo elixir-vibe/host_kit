@@ -2,7 +2,7 @@ defmodule HostKit.Apply do
   @moduledoc "Applies supported HostKit plan changes."
 
   alias HostKit.{Change, Plan}
-  alias HostKit.Resources.{Directory, File}
+  alias HostKit.Resources.{Directory, File, User}
   alias HostKit.Systemd
 
   @type result :: %{change: Change.t(), status: :dry_run | :applied | :skipped}
@@ -39,6 +39,13 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: :no_op} = change, _opts), do: {:ok, skipped(change)}
   defp apply_change(%Change{action: :read} = change, _opts), do: {:ok, skipped(change)}
   defp apply_change(%Change{action: :delete}, _opts), do: {:error, :delete_not_supported}
+
+  defp apply_change(%Change{action: :create, after: %User{} = user} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> apply_user(user, opts) end)
+  end
+
+  defp apply_change(%Change{action: :update, after: %User{}}, _opts),
+    do: {:error, :user_update_not_supported}
 
   defp apply_change(%Change{action: action, after: %Directory{} = directory} = change, opts)
        when action in [:create, :update] do
@@ -93,6 +100,15 @@ defmodule HostKit.Apply do
          :ok <- chown(path, file.owner, file.group, opts) do
       chmod(path, file.mode, opts)
     end
+  end
+
+  defp apply_user(%User{name: name} = user, opts) do
+    args = if user.system, do: ["--system"], else: []
+    args = if user.home, do: args ++ ["--home", user.home], else: args
+    args = if user.shell, do: args ++ ["--shell", user.shell], else: args
+    args = args ++ Enum.flat_map(user.groups, &["--groups", &1])
+
+    cmd(opts, "useradd", args ++ [name])
   end
 
   defp apply_systemd_unit(name, content, opts) do
@@ -152,8 +168,9 @@ defmodule HostKit.Apply do
 
   defp cmd(opts, command, args) do
     {command, args} = maybe_sudo(command, args, opts)
+    runner = Keyword.get(opts, :command_runner, &System.cmd/3)
 
-    case System.cmd(command, args, stderr_to_stdout: true) do
+    case runner.(command, args, stderr_to_stdout: true) do
       {_output, 0} -> :ok
       {output, status} -> {:error, {:command_failed, command, args, status, output}}
     end

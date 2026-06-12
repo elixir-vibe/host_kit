@@ -127,7 +127,7 @@ end
 HostKit.format_plan(plan)
 {:ok, results} = HostKit.apply(plan, dry_run: true)
 
-# Supported apply resources: directories, files, systemd services, and systemd timers.
+# Supported apply resources: users, directories, files, systemd services, and systemd timers.
 {:ok, results} = HostKit.apply(plan, confirm: true, sudo: true)
 
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})

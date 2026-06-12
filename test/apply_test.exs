@@ -4,7 +4,7 @@ defmodule HostKit.ApplyTest do
   alias HostKit.Apply
   alias HostKit.Change
   alias HostKit.Plan
-  alias HostKit.Resources.{Directory, File}
+  alias HostKit.Resources.{Directory, File, User}
   alias HostKit.Systemd
 
   test "requires confirmation outside dry-run" do
@@ -59,6 +59,52 @@ defmodule HostKit.ApplyTest do
     assert Bitwise.band(file_mode, 0o777) == 0o600
 
     Elixir.File.rm_rf!(root)
+  end
+
+  test "creates users through useradd" do
+    user = %User{
+      name: "toys-demo",
+      system: true,
+      home: "/var/lib/toys/demo",
+      shell: "/usr/sbin/nologin",
+      groups: ["caddy"]
+    }
+
+    plan = %Plan{
+      changes: [%Change{action: :create, resource_id: {:user, user.name}, after: user}]
+    }
+
+    parent = self()
+
+    runner = fn command, args, opts ->
+      send(parent, {:cmd, command, args, opts})
+      {"", 0}
+    end
+
+    assert {:ok, [%{status: :applied}]} = Apply.run(plan, confirm: true, command_runner: runner)
+
+    assert_received {:cmd, "useradd",
+                     [
+                       "--system",
+                       "--home",
+                       "/var/lib/toys/demo",
+                       "--shell",
+                       "/usr/sbin/nologin",
+                       "--groups",
+                       "caddy",
+                       "toys-demo"
+                     ], [stderr_to_stdout: true]}
+  end
+
+  test "refuses user updates" do
+    user = %User{name: "toys-demo"}
+
+    plan = %Plan{
+      changes: [%Change{action: :update, resource_id: {:user, user.name}, after: user}]
+    }
+
+    assert {:error, {{:user, "toys-demo"}, :user_update_not_supported}} =
+             Apply.run(plan, confirm: true)
   end
 
   test "writes systemd units and can skip daemon reload in tests" do
