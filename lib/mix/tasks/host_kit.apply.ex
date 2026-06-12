@@ -3,6 +3,8 @@ defmodule Mix.Tasks.HostKit.Apply do
 
   use Mix.Task
 
+  alias Mix.Tasks.HostKit.Options
+
   @shortdoc "Apply HostKit resources"
 
   @impl true
@@ -13,8 +15,12 @@ defmodule Mix.Tasks.HostKit.Apply do
       OptionParser.parse!(args,
         strict: [
           local: :boolean,
+          remote: :string,
+          user: :string,
+          port: :integer,
           sudo: :boolean,
           require: :keep,
+          ignore: :keep,
           dry_run: :boolean,
           confirm: :boolean
         ],
@@ -25,7 +31,7 @@ defmodule Mix.Tasks.HostKit.Apply do
     project = HostKit.load!(path, require: Keyword.get_values(opts, :require))
     {:ok, plan} = HostKit.plan(project, plan_opts(opts))
 
-    case HostKit.Apply.run(plan, apply_opts(opts)) do
+    case HostKit.apply(plan, apply_opts(opts)) do
       {:ok, results} -> print_results(results)
       {:error, reason} -> Mix.raise("HostKit apply failed: #{inspect(reason)}")
     end
@@ -40,18 +46,18 @@ defmodule Mix.Tasks.HostKit.Apply do
   end
 
   defp plan_opts(opts) do
-    if Keyword.get(opts, :local, false) do
-      [reader: HostKit.Local, sudo: Keyword.get(opts, :sudo, false)]
-    else
-      []
-    end
+    opts
+    |> Options.target_opts()
+    |> Keyword.put(:ignore, Options.ignored_resources(opts))
   end
 
   defp apply_opts(opts) do
-    [
+    opts
+    |> Options.target_opts()
+    |> Keyword.merge(
       dry_run: Keyword.get(opts, :dry_run, false),
       confirm: Keyword.get(opts, :confirm, false),
       sudo: Keyword.get(opts, :sudo, false)
-    ]
+    )
   end
 end

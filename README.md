@@ -167,6 +167,7 @@ mix host_kit.dump --require toys_infra.exs infra/config.exs
 mix host_kit.plan --require toys_infra.exs infra/config.exs
 mix host_kit.plan --require toys_infra.exs infra/config.exs --local
 mix host_kit.plan --require toys_infra.exs infra/config.exs --local --ignore systemd_service:toys-exograph.service
+mix host_kit.plan --require toys_infra.exs infra/config.exs --remote elixir.toys --user dannote --sudo
 mix host_kit.apply --require toys_infra.exs infra/config.exs --local --dry-run
 mix host_kit.render --require toys_infra.exs infra/config.exs systemd_service toys-exograph.service
 ```
