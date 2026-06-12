@@ -103,6 +103,10 @@ defmodule HostKit.Plan do
   defp equivalent?(%HostKit.Resources.Directory{} = desired, actual),
     do: comparable(desired, actual, [:path, :owner, :group, :mode])
 
+  defp equivalent?(%HostKit.Resources.File{content: content} = desired, actual)
+       when content in [:redacted, :managed_elsewhere],
+       do: comparable(desired, actual, [:path, :owner, :group, :mode])
+
   defp equivalent?(%HostKit.Resources.File{} = desired, actual),
     do: comparable(desired, actual, [:path, :content, :owner, :group, :mode])
 
