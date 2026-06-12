@@ -8,7 +8,6 @@ defmodule HostKit.Loader do
     path = Path.expand(path)
 
     try do
-      require_project_support_files(path)
       {project, _binding} = Code.eval_file(path)
 
       case project do
@@ -19,14 +18,5 @@ defmodule HostKit.Loader do
       exception in [ArgumentError, Code.LoadError, CompileError, RuntimeError, SyntaxError] ->
         {:error, {exception, __STACKTRACE__}}
     end
-  end
-
-  defp require_project_support_files(path) do
-    path
-    |> Path.dirname()
-    |> Path.join("*_infra.exs")
-    |> Path.wildcard()
-    |> Enum.reject(&(&1 == path))
-    |> Enum.each(&Code.require_file/1)
   end
 end

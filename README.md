@@ -66,6 +66,59 @@ project :demo, providers: [HostKit.Plugins.Caddy] do
 end
 ```
 
+## Project-local DSLs
+
+Use `HostKit.ProjectDSL` in consuming projects to build local conventions without baking them into HostKit.
+Explicitly load the local DSL before `use`:
+
+```elixir
+# infra/toys_infra.exs
+defmodule ToysInfra do
+  use HostKit.ProjectDSL
+
+  root :source, "/opt/toys/src"
+  root :data, "/srv/toys"
+  root :state, "/var/lib/toys"
+  root :config, "/etc/toys"
+
+  prefix :user, "toys-"
+  prefix :unit, "toys-"
+
+  defservice :toy_service do
+    let :service_user, do: prefixed(:user, service_name())
+    let :unit_name, do: prefixed(:unit, service_name()) <> ".service"
+
+    path :source_dir, root(:source), service_name()
+    path :data_dir, root(:data), service_name()
+    path :state_dir, root(:state), service_name()
+    path :config_dir, root(:config), service_name()
+
+    macro :standard_user do
+      system_user service_user(), home: state_path("home")
+    end
+  end
+end
+```
+
+```elixir
+# infra/config.exs
+Code.require_file("toys_infra.exs", __DIR__)
+
+use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
+use ToysInfra
+
+project :toys do
+  toy_service :exograph do
+    standard_user()
+
+    systemd_service unit_name() do
+      working_directory source_dir()
+      read_write_paths [data_dir(), state_dir(), source_dir()]
+    end
+  end
+end
+```
+
 ## Runtime API
 
 ```elixir
