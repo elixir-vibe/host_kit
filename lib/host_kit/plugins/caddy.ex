@@ -17,12 +17,19 @@ defmodule HostKit.Plugins.Caddy do
 
   @impl true
   def render(%Site{} = site, _context) do
-    {:ok, render_site(site)}
+    {:ok, render_json_site(site)}
+  end
+
+  def render(_resource, _context), do: :ignore
+
+  @spec render_json_site(Site.t()) :: String.t()
+  def render_json_site(%Site{} = site) do
+    site
+    |> HostKit.Caddy.JSON.route_for_site()
+    |> HostKit.Caddy.JSON.encode!()
   end
 
   @spec render_site(Site.t()) :: iodata()
-
-  def render(_resource, _context), do: :ignore
 
   @impl true
   def validate(%Site{host: host, directives: directives}, _context) do

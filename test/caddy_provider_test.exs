@@ -29,12 +29,19 @@ defmodule HostKit.CaddyProviderTest do
 
     assert {:ok, rendered} = HostKit.Render.render(project, Resource.new(:caddy_site, :search))
 
-    assert IO.iodata_to_binary(rendered) == """
-           search.elixir.toys {
-           \tencode zstd gzip
-           \treverse_proxy 127.0.0.1:4200
-           }
-           """
+    route = rendered |> IO.iodata_to_binary() |> Jason.decode!()
+
+    assert get_in(route, ["match", Access.at(0), "host"]) == ["search.elixir.toys"]
+
+    assert [subroute] = route["handle"]
+    handlers = get_in(subroute, ["routes", Access.at(0), "handle"])
+
+    assert %{"handler" => "encode", "encodings" => %{"gzip" => %{}, "zstd" => %{}}} in handlers
+
+    assert %{
+             "handler" => "reverse_proxy",
+             "upstreams" => [%{"dial" => "127.0.0.1:4200"}]
+           } in handlers
   end
 
   test "caddy DSL is unavailable without provider import" do
