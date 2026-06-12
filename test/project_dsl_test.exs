@@ -88,9 +88,11 @@ defmodule HostKit.ProjectDSLTest do
     end
     """
 
-    assert_raise ArgumentError, ~r/Supported forms inside defservice/, fn ->
-      Code.compile_string(source)
-    end
+    assert_raise HostKit.ProjectDSL.UnknownDefinitionError,
+                 ~r/Supported forms inside defservice/,
+                 fn ->
+                   Code.compile_string(source)
+                 end
   end
 
   test "unknown roots and prefixes raise helpful errors" do
@@ -104,7 +106,7 @@ defmodule HostKit.ProjectDSLTest do
     end
     """
 
-    assert_raise ArgumentError, ~r/unknown ProjectDSL root :state/, fn ->
+    assert_raise HostKit.ProjectDSL.UnknownRootError, ~r/unknown ProjectDSL root :state/, fn ->
       Code.compile_string(missing_root)
     end
 
@@ -118,7 +120,7 @@ defmodule HostKit.ProjectDSLTest do
     end
     """
 
-    assert_raise ArgumentError, ~r/unknown ProjectDSL prefix :user/, fn ->
+    assert_raise HostKit.ProjectDSL.UnknownPrefixError, ~r/unknown ProjectDSL prefix :user/, fn ->
       Code.compile_string(missing_prefix)
     end
   end

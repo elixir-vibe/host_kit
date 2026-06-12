@@ -102,17 +102,7 @@ defmodule HostKit.ProjectDSL do
     do: {:macro, name, block}
 
   defp parse_definition(other) do
-    raise ArgumentError, """
-    unknown ProjectDSL definition: #{Macro.to_string(other)}
-
-    Supported forms inside defservice are:
-
-        let :helper_name, do: expression
-        path :helper_dir, root(:root_name), service_name()
-        macro :helper_name do
-          ...
-        end
-    """
+    raise HostKit.ProjectDSL.UnknownDefinitionError, form: Macro.to_string(other)
   end
 
   defp build_service_macros({service_macro, definitions}, roots, prefixes) do
@@ -251,40 +241,18 @@ defmodule HostKit.ProjectDSL do
   defp expand_expression(other, _context), do: other
 
   defp raise_missing_root!(name, meta, roots) do
-    raise ArgumentError, """
-    unknown ProjectDSL root #{inspect(name)}#{location(meta)}
-
-    Define it before defservice:
-
-        root #{inspect(name)}, "/path"
-
-    Known roots: #{known_keys(roots)}
-    """
+    raise HostKit.ProjectDSL.UnknownRootError,
+      name: name,
+      known: sorted_keys(roots),
+      line: Keyword.get(meta, :line)
   end
 
   defp raise_missing_prefix!(name, meta, prefixes) do
-    raise ArgumentError, """
-    unknown ProjectDSL prefix #{inspect(name)}#{location(meta)}
-
-    Define it before defservice:
-
-        prefix #{inspect(name)}, "value-"
-
-    Known prefixes: #{known_keys(prefixes)}
-    """
+    raise HostKit.ProjectDSL.UnknownPrefixError,
+      name: name,
+      known: sorted_keys(prefixes),
+      line: Keyword.get(meta, :line)
   end
 
-  defp known_keys(map) do
-    map
-    |> Map.keys()
-    |> Enum.sort()
-    |> inspect()
-  end
-
-  defp location(meta) do
-    case Keyword.get(meta, :line) do
-      nil -> ""
-      line -> " at line #{line}"
-    end
-  end
+  defp sorted_keys(map), do: map |> Map.keys() |> Enum.sort()
 end
