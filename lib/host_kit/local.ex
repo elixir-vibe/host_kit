@@ -192,7 +192,7 @@ defmodule HostKit.Local do
   end
 
   defp stat_error(status, output) do
-    if String.contains?(output, ["No such file", "cannot stat"]) do
+    if String.contains?(output, "No such file") do
       :enoent
     else
       {:stat_failed, status, output}
