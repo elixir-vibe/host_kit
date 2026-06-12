@@ -77,6 +77,31 @@ defmodule HostKit.ProjectDSLTest do
     assert beta.owner == "app-beta"
   end
 
+  test "service path names can differ from service names" do
+    source = """
+    use HostKit.DSL
+    use HostKit.ToysInfra
+
+    project :demo do
+      toy_service :hex_mirror, as: "hex-mirror" do
+        directory data_path(), owner: service_user()
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+
+    assert [
+             %HostKit.Service{
+               name: :hex_mirror,
+               resources: [%HostKit.Resources.Directory{} = dir]
+             }
+           ] = project.services
+
+    assert dir.path == "/srv/toys/hex-mirror"
+    assert dir.owner == "toys-hex_mirror"
+  end
+
   test "unknown defservice entries raise helpful errors" do
     source = """
     defmodule HostKit.ProjectDSLBadEntryFixture do

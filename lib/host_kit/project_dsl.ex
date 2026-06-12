@@ -113,10 +113,14 @@ defmodule HostKit.ProjectDSL do
 
   defp build_service_macro(name) do
     quote do
-      defmacro unquote(name)(service_name, do: block) do
+      defmacro unquote(name)(service_name, opts \\ [], do: block) do
         quote do
           service unquote(service_name) do
             var!(host_kit_project_dsl_service_name) = unquote(service_name)
+
+            var!(host_kit_project_dsl_path_name) =
+              Keyword.get(unquote(opts), :as, unquote(service_name))
+
             unquote(block)
           end
         end
@@ -228,6 +232,12 @@ defmodule HostKit.ProjectDSL do
   defp expand_expression({:service_name, _meta, []}, _context) do
     quote do
       var!(host_kit_project_dsl_service_name)
+    end
+  end
+
+  defp expand_expression({:path_name, _meta, []}, _context) do
+    quote do
+      var!(host_kit_project_dsl_path_name)
     end
   end
 
