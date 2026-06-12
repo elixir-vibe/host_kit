@@ -48,6 +48,9 @@ defmodule HostKit.DSL.Systemd.Scope do
   def put_install(values),
     do: update_current(&%{&1 | install: Keyword.merge(&1.install, normalize_values(values))})
 
+  def put_install(key, value),
+    do: update_current(&%{&1 | install: Keyword.put(&1.install, key, value)})
+
   def apply_hardening(:web_service) do
     update(:service, fn service ->
       hardened =

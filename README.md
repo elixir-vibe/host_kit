@@ -37,8 +37,8 @@ project :toys do
 
     daemon "toys-exograph.service" do
       description "Exograph search"
-      after_units ["network-online.target"]
-      wants ["network-online.target"]
+      after_target :network_online
+      wants :network_online
       service_user "toys-exograph"
       working_directory "/opt/toys/src/exograph"
       exec_start ["/usr/local/bin/mix", "exograph.index.hex", "--web", "--port", "4200"]
@@ -46,7 +46,7 @@ project :toys do
       restart_sec 10
       hardening :web_service
       read_write_paths ["/srv/toys/exograph", "/var/lib/toys/exograph"]
-      install wanted_by: "multi-user.target"
+      wanted_by :multi_user
     end
   end
 end

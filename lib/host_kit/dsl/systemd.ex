@@ -77,9 +77,21 @@ defmodule HostKit.DSL.Systemd do
     end
   end
 
+  defmacro after_target(targets) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_unit(:after, HostKit.Systemd.Target.names(unquote(targets)))
+    end
+  end
+
   defmacro wants(values) do
     quote do
-      HostKit.DSL.Systemd.Scope.put_unit(:wants, unquote(values))
+      HostKit.DSL.Systemd.Scope.put_unit(:wants, HostKit.Systemd.Target.names(unquote(values)))
+    end
+  end
+
+  defmacro requires(values) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_unit(:requires, HostKit.Systemd.Target.names(unquote(values)))
     end
   end
 
@@ -128,6 +140,15 @@ defmodule HostKit.DSL.Systemd do
   defmacro install(opts) do
     quote do
       HostKit.DSL.Systemd.Scope.put_install(unquote(opts))
+    end
+  end
+
+  defmacro wanted_by(targets) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_install(
+        :wanted_by,
+        HostKit.Systemd.Target.names(unquote(targets))
+      )
     end
   end
 
