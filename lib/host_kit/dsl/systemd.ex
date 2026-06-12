@@ -9,6 +9,32 @@ defmodule HostKit.DSL.Systemd do
     end
   end
 
+  defmacro systemd_timer(name, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Systemd.Scope.start_timer(unquote(name), unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.add_resource(HostKit.DSL.Systemd.Scope.finish_timer())
+    end
+  end
+
+  defmacro unit(opts) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_unit(unquote(opts))
+    end
+  end
+
+  defmacro service(opts) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_service(unquote(opts))
+    end
+  end
+
+  defmacro timer(opts) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_timer(unquote(opts))
+    end
+  end
+
   defmacro description(value) do
     quote do
       HostKit.DSL.Systemd.Scope.put_unit(:description, unquote(value))

@@ -1,0 +1,17 @@
+use HostKit.DSL
+
+project :timer_demo do
+  service :hex do
+    systemd_timer "toys-hex-mirror-sync.timer" do
+      unit description: "Run Hex mirror sync hourly"
+
+      timer \
+        on_boot_sec: "10min",
+        on_unit_active_sec: "1h",
+        persistent: true,
+        randomized_delay_sec: "10min"
+
+      install wanted_by: "timers.target"
+    end
+  end
+end
