@@ -151,6 +151,20 @@ end
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
 ```
 
+## Runtime isolation
+
+HostKit uses shared runtime isolation structs for persistent systemd units and future transient Unitctl workloads:
+
+```elixir
+sandbox = HostKit.Runtime.Sandbox.new(:strict_web)
+resources = HostKit.Runtime.Resources.new(memory_max: "512M", cpu_quota: "50%")
+
+service sandbox |> HostKit.Runtime.Sandbox.to_systemd_service_options()
+service resources |> HostKit.Runtime.Resources.to_systemd_service_options()
+```
+
+Built-in profiles include `:web_service`, `:strict_web`, `:small`, `:medium`, and `:large`.
+
 ## Runtime controls
 
 HostKit exposes Unitctl as its core transient runtime layer:
