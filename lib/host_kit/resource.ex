@@ -5,6 +5,8 @@ defmodule HostKit.Resource do
 
   @spec id(struct()) :: term()
   def id(resource) do
+    Code.ensure_loaded?(resource.__struct__)
+
     if function_exported?(resource.__struct__, :id, 1) do
       resource.__struct__.id(resource)
     else
