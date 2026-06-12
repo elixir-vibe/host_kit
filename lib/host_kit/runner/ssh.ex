@@ -5,6 +5,14 @@ defmodule HostKit.Runner.SSH do
 
   @default_port 22
   @timeout 30_000
+  @default_preferred_algorithms [
+    kex: [
+      :"curve25519-sha256",
+      :"curve25519-sha256@libssh.org",
+      :"ecdh-sha2-nistp256",
+      :"diffie-hellman-group14-sha256"
+    ]
+  ]
 
   @impl true
   def cmd(command, args, opts) do
@@ -137,6 +145,7 @@ defmodule HostKit.Runner.SSH do
       pair -> pair
     end)
     |> Keyword.put_new(:user_interaction, false)
+    |> Keyword.put_new(:preferred_algorithms, @default_preferred_algorithms)
   end
 
   defp shell_join(parts), do: Enum.map_join(parts, " ", &shell_escape/1)
