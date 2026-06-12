@@ -22,7 +22,7 @@ defmodule HostKit.Plan do
   def build(%Project{} = project, opts \\ []) do
     resources = Project.resources(project)
 
-    changes = Enum.map(resources, &change_for(&1, opts))
+    changes = Enum.map(resources, &change_for(&1, project, opts))
 
     {:ok,
      %__MODULE__{
@@ -34,10 +34,10 @@ defmodule HostKit.Plan do
      }}
   end
 
-  defp change_for(resource, opts) do
+  defp change_for(resource, project, opts) do
     case Keyword.get(opts, :reader) do
       nil -> desired_change(resource)
-      reader -> compare_with_actual(resource, reader)
+      reader -> compare_with_actual(resource, reader, %{project: project})
     end
   end
 
@@ -45,11 +45,21 @@ defmodule HostKit.Plan do
     build_change(:create, resource, nil, :desired_state)
   end
 
-  defp compare_with_actual(resource, reader) do
-    case reader.read(resource) do
+  defp compare_with_actual(resource, reader, context) do
+    case read_actual(reader, resource, context) do
       {:ok, nil} -> build_change(:create, resource, nil, :missing)
       {:ok, actual} -> diff_change(resource, actual)
       {:error, reason} -> build_change(:read, resource, nil, {:read_error, reason})
+    end
+  end
+
+  defp read_actual(reader, resource, context) do
+    Code.ensure_loaded?(reader)
+
+    cond do
+      function_exported?(reader, :read, 2) -> reader.read(resource, context)
+      function_exported?(reader, :read, 1) -> reader.read(resource)
+      true -> {:error, {:missing_reader_callback, reader}}
     end
   end
 
@@ -77,6 +87,11 @@ defmodule HostKit.Plan do
 
   defp equivalent?(%HostKit.Systemd.Timer{} = desired, actual) do
     Map.get(actual.meta, :content) == HostKit.Systemd.Timer.render(desired)
+  end
+
+  defp equivalent?(%HostKit.Caddy.Site{} = desired, actual) do
+    Map.get(actual.meta, :content) ==
+      IO.iodata_to_binary(HostKit.Plugins.Caddy.render_site(desired))
   end
 
   defp equivalent?(%HostKit.Resources.Directory{} = desired, actual),

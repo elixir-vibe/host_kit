@@ -20,6 +20,8 @@ defmodule HostKit.Plugins.Caddy do
     {:ok, render_site(site)}
   end
 
+  @spec render_site(Site.t()) :: iodata()
+
   def render(_resource, _context), do: :ignore
 
   @impl true
@@ -33,7 +35,7 @@ defmodule HostKit.Plugins.Caddy do
 
   def validate(_resource, _context), do: :ignore
 
-  defp render_site(%Site{} = site) do
+  def render_site(%Site{} = site) do
     [site.host, " {\n", Enum.map(site.directives, &render_directive/1), "}\n"]
   end
 

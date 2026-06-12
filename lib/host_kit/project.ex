@@ -1,13 +1,14 @@
 defmodule HostKit.Project do
   @moduledoc "Project-level declaration loaded from HostKit DSL files."
 
-  alias HostKit.{Provider, Service}
+  alias HostKit.{Provider, ProviderConfig, Service}
 
   @type t :: %__MODULE__{
           name: atom(),
           hosts: [HostKit.Host.t()],
           services: [Service.t()],
           providers: [module()],
+          provider_configs: %{optional(atom()) => ProviderConfig.t()},
           conventions: map(),
           meta: map()
         }
@@ -16,6 +17,7 @@ defmodule HostKit.Project do
             hosts: [],
             services: [],
             providers: [],
+            provider_configs: %{},
             conventions: %{},
             meta: %{}
 
@@ -35,6 +37,13 @@ defmodule HostKit.Project do
   @spec put_providers(t(), [module()]) :: t()
   def put_providers(%__MODULE__{} = project, providers),
     do: %{project | providers: Provider.resolve(providers)}
+
+  @spec put_provider_config(t(), ProviderConfig.t()) :: t()
+  def put_provider_config(%__MODULE__{} = project, %ProviderConfig{} = config) do
+    providers = Provider.resolve([config.module | project.providers])
+    configs = Map.put(project.provider_configs, config.name, config)
+    %{project | providers: providers, provider_configs: configs}
+  end
 
   @spec add_host(t(), HostKit.Host.t()) :: t()
   def add_host(%__MODULE__{} = project, host), do: %{project | hosts: project.hosts ++ [host]}

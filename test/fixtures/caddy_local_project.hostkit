@@ -1,0 +1,14 @@
+use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
+
+project :caddy_local_demo do
+  provider :caddy, HostKit.Plugins.Caddy do
+    set :sites_dir, System.fetch_env!("HOST_KIT_CADDY_TEST_SITES_DIR")
+  end
+
+  service :exograph do
+    caddy_site :search, "search.elixir.toys", path: "exograph-search.caddy" do
+      encode [:zstd, :gzip]
+      reverse_proxy "127.0.0.1:4200"
+    end
+  end
+end

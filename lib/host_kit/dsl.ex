@@ -43,6 +43,20 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro provider(name, module, do: block) do
+    quote do
+      HostKit.DSL.Scope.start_provider_config(unquote(name), unquote(module))
+      unquote(block)
+      HostKit.DSL.Scope.finish_provider_config()
+    end
+  end
+
+  defmacro set(key, value) do
+    quote do
+      HostKit.DSL.Scope.put_provider_config(unquote(key), unquote(value))
+    end
+  end
+
   defmacro plugins(plugins) do
     quote do
       HostKit.DSL.Scope.put_providers(unquote(plugins))

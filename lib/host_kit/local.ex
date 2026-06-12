@@ -1,6 +1,7 @@
 defmodule HostKit.Local do
   @moduledoc "Read-only inspection of resources on the local host."
 
+  alias HostKit.Caddy
   alias HostKit.Resources.{Directory, File, User}
   alias HostKit.Systemd
 
@@ -51,6 +52,36 @@ defmodule HostKit.Local do
   end
 
   def read(_resource), do: {:ok, nil}
+
+  @spec read(struct(), map()) :: {:ok, struct() | nil} | {:error, term()}
+  def read(%Caddy.Site{} = desired, context) do
+    sites_dir =
+      get_in(context, [
+        :project,
+        Access.key(:provider_configs),
+        :caddy,
+        Access.key(:config),
+        :sites_dir
+      ])
+
+    case sites_dir do
+      nil -> {:ok, nil}
+      dir -> read_caddy_site(Path.join(dir, caddy_site_filename(desired)), desired)
+    end
+  end
+
+  def read(resource, _context), do: read(resource)
+
+  defp read_caddy_site(path, desired) do
+    case Elixir.File.read(path) do
+      {:ok, content} -> {:ok, %{desired | meta: Map.put(desired.meta, :content, content)}}
+      {:error, :enoent} -> {:ok, nil}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp caddy_site_filename(%Caddy.Site{meta: %{path: path}}), do: path
+  defp caddy_site_filename(%Caddy.Site{name: name}), do: "#{name}.caddy"
 
   defp user_from_passwd(line, %User{} = desired) do
     [_name, _password, _uid, _gid, _gecos, home, shell] =

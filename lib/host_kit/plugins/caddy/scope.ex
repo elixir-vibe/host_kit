@@ -6,8 +6,9 @@ defmodule HostKit.Plugins.Caddy.Scope do
 
   @key {__MODULE__, :site}
 
-  def start_site(name, host) do
-    Process.put(@key, %Site{name: name, host: host})
+  def start_site(name, host, opts) do
+    meta = opts |> Keyword.take([:path]) |> Map.new()
+    Process.put(@key, %Site{name: name, host: host, meta: meta})
   end
 
   def add_encode(formats) when is_list(formats) do

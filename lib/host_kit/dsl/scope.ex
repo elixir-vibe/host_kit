@@ -1,11 +1,12 @@
 defmodule HostKit.DSL.Scope do
   @moduledoc false
 
-  alias HostKit.{Host, Project, Service}
+  alias HostKit.{Host, Project, ProviderConfig, Service}
 
   @project_key {__MODULE__, :project}
   @host_key {__MODULE__, :host}
   @service_key {__MODULE__, :service}
+  @provider_config_key {__MODULE__, :provider_config}
 
   def start_project(name, opts) do
     Process.put(@project_key, Project.new(name, opts))
@@ -17,6 +18,21 @@ defmodule HostKit.DSL.Scope do
 
   def put_providers(providers) do
     update_project(&Project.put_providers(&1, providers))
+  end
+
+  def start_provider_config(name, module) do
+    Process.put(@provider_config_key, %ProviderConfig{name: name, module: module})
+  end
+
+  def put_provider_config(key, value) do
+    config = Process.get(@provider_config_key) || raise "no HostKit provider config in scope"
+    Process.put(@provider_config_key, %{config | config: Map.put(config.config, key, value)})
+    :ok
+  end
+
+  def finish_provider_config do
+    config = Process.delete(@provider_config_key) || raise "no HostKit provider config in scope"
+    update_project(&Project.put_provider_config(&1, config))
   end
 
   def start_host(name, opts) do

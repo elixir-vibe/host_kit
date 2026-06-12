@@ -32,9 +32,14 @@ defmodule HostKit.Provider do
   def resolve(opts_or_providers \\ [])
 
   def resolve(opts) when is_list(opts) do
-    opts
-    |> Keyword.get(:providers, Keyword.get(opts, :plugins, opts))
-    |> Enum.uniq()
+    providers =
+      if Keyword.keyword?(opts) do
+        Keyword.get(opts, :providers, Keyword.get(opts, :plugins, []))
+      else
+        opts
+      end
+
+    Enum.uniq(providers)
   end
 
   @spec dsl_modules([module()]) :: [module()]

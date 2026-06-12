@@ -53,8 +53,12 @@ Providers can contribute DSL modules, resource types, renderers, validators, and
 use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
 
 project :demo, providers: [HostKit.Plugins.Caddy] do
+  provider :caddy, HostKit.Plugins.Caddy do
+    set :sites_dir, "/etc/caddy/sites"
+  end
+
   service :web do
-    caddy_site :web, "example.com" do
+    caddy_site :web, "example.com", path: "web.caddy" do
       encode [:zstd, :gzip]
       reverse_proxy "127.0.0.1:4000"
     end
