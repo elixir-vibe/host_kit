@@ -35,10 +35,23 @@ defmodule HostKit.Plan do
   end
 
   defp change_for(resource, project, opts) do
-    case Keyword.get(opts, :reader) do
-      nil -> desired_change(resource)
-      reader -> compare_with_actual(resource, reader, %{project: project, opts: opts})
+    if ignored?(resource, opts) do
+      build_change(:no_op, resource, nil, :ignored)
+    else
+      case Keyword.get(opts, :reader) do
+        nil -> desired_change(resource)
+        reader -> compare_with_actual(resource, reader, %{project: project, opts: opts})
+      end
     end
+  end
+
+  defp ignored?(resource, opts) do
+    resource_id = Resource.id(resource)
+
+    opts
+    |> Keyword.get(:ignore, [])
+    |> List.wrap()
+    |> Enum.any?(&(&1 == resource_id))
   end
 
   defp desired_change(resource) do
