@@ -45,6 +45,23 @@ project :toys do
 end
 ```
 
+## Plugins
+
+Plugins can contribute DSL modules, resource types, renderers, and validators.
+Systemd and Unitctl are core built-ins; integrations such as Caddy should be plugins.
+
+```elixir
+use HostKit.DSL, plugins: [MyCaddyPlugin]
+
+project :demo, plugins: [MyCaddyPlugin] do
+  service :web do
+    caddy_site "example.com" do
+      reverse_proxy "127.0.0.1:4000"
+    end
+  end
+end
+```
+
 ## Runtime API
 
 ```elixir

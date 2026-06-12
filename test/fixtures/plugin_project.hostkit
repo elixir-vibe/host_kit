@@ -1,0 +1,9 @@
+use HostKit.DSL, plugins: [HostKit.TestPlugin]
+
+project :plugin_demo, plugins: [HostKit.TestPlugin] do
+  service :web do
+    test_site "example.test" do
+      reverse_proxy "127.0.0.1:4000"
+    end
+  end
+end

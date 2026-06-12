@@ -6,10 +6,26 @@ defmodule HostKit.DSL do
   structs and does not apply changes to the host.
   """
 
-  defmacro __using__(_opts) do
+  defmacro __using__(opts) do
+    plugins =
+      opts
+      |> Keyword.get(:plugins, [])
+      |> Enum.map(&Macro.expand(&1, __CALLER__))
+      |> HostKit.Plugin.resolve()
+
+    plugin_imports =
+      plugins
+      |> HostKit.Plugin.dsl_modules()
+      |> Enum.map(fn dsl ->
+        quote do
+          import unquote(dsl)
+        end
+      end)
+
     quote do
       import HostKit.DSL
       import HostKit.DSL.Systemd
+      unquote_splicing(plugin_imports)
     end
   end
 
