@@ -47,7 +47,7 @@ end
 
 ## Providers
 
-Providers can contribute DSL modules, resource types, renderers, validators, and eventually read/plan/apply lifecycle operations. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.
+Providers can contribute DSL modules, resource types, renderers, validators, and read/plan/apply lifecycle operations. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.
 
 ```elixir
 use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
@@ -67,6 +67,8 @@ end
 ```elixir
 {:ok, project} = HostKit.load("infra/config.exs")
 {:ok, plan} = HostKit.plan(project)
+#=> %HostKit.Plan{changes: [%HostKit.Change{action: :create, ...}]}
+
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
 ```
 

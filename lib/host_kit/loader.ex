@@ -15,7 +15,8 @@ defmodule HostKit.Loader do
         other -> {:error, {:expected_project, other}}
       end
     rescue
-      exception -> {:error, {exception, __STACKTRACE__}}
+      exception in [ArgumentError, Code.LoadError, CompileError, RuntimeError, SyntaxError] ->
+        {:error, {exception, __STACKTRACE__}}
     end
   end
 end

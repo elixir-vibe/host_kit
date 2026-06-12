@@ -10,12 +10,21 @@ defmodule HostKit.Provider do
   @callback provider_name() :: atom()
   @callback dsl_modules() :: [module()]
   @callback resource_types() :: [atom()]
+  @callback read(resource :: struct(), context :: map()) ::
+              {:ok, struct() | nil} | :ignore | {:error, term()}
+  @callback plan(resource :: struct(), actual :: struct() | nil, context :: map()) ::
+              {:ok, [HostKit.Change.t()]} | :ignore | {:error, term()}
+  @callback apply(change :: HostKit.Change.t(), context :: map()) ::
+              :ok | :ignore | {:error, term()}
   @callback render(resource :: struct(), context :: map()) ::
               {:ok, iodata()} | :ignore | {:error, term()}
   @callback validate(resource :: struct(), context :: map()) :: :ok | :ignore | {:error, term()}
 
   @optional_callbacks dsl_modules: 0,
                       resource_types: 0,
+                      read: 2,
+                      plan: 3,
+                      apply: 2,
                       render: 2,
                       validate: 2
 
