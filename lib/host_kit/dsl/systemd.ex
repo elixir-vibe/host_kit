@@ -17,6 +17,30 @@ defmodule HostKit.DSL.Systemd do
     end
   end
 
+  defmacro daemon(name, opts \\ [], do: block) do
+    quote do
+      systemd_service unquote(name), unquote(opts) do
+        unquote(block)
+      end
+    end
+  end
+
+  defmacro job(name, opts \\ [], do: block) do
+    quote do
+      systemd_service unquote(name), unquote(opts) do
+        unquote(block)
+      end
+    end
+  end
+
+  defmacro schedule(name, opts \\ [], do: block) do
+    quote do
+      systemd_timer unquote(name), unquote(opts) do
+        unquote(block)
+      end
+    end
+  end
+
   defmacro unit(opts) do
     quote do
       HostKit.DSL.Systemd.Scope.put_unit(unquote(opts))
@@ -24,6 +48,12 @@ defmodule HostKit.DSL.Systemd do
   end
 
   defmacro service(opts) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_service(unquote(opts))
+    end
+  end
+
+  defmacro run(opts) do
     quote do
       HostKit.DSL.Systemd.Scope.put_service(unquote(opts))
     end

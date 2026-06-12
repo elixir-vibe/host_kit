@@ -35,7 +35,7 @@ project :toys do
     system_user "toys-exograph", home: "/var/lib/toys/exograph/home"
     directory "/srv/toys/exograph", owner: "toys-exograph", group: "toys-exograph", mode: 0o755
 
-    systemd_service "toys-exograph.service" do
+    daemon "toys-exograph.service" do
       description "Exograph search"
       after_units ["network-online.target"]
       wants ["network-online.target"]
@@ -187,8 +187,8 @@ project :toys do
     storage :repositories, under: :data, path: "repositories", mode: 0o750, backup: true
     storage :config, under: :config, owner: "root", group: service_user(), writable: false, secret: true
 
-    systemd_service unit_name() do
-      service user: service_user(), read_write_paths: writable_storage_paths()
+    daemon unit_name() do
+      run user: service_user(), read_write_paths: writable_storage_paths()
     end
   end
 end
