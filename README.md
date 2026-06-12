@@ -140,6 +140,14 @@ prod = HostKit.Target.ssh(:prod, host: "elixir.toys", user: "dannote", sudo: tru
 
 {:ok, results} = HostKit.apply(plan, target: prod, confirm: true)
 
+{:ok, conn} = HostKit.Runner.SSH.Connection.open(host: "elixir.toys", user: "dannote")
+try do
+  prod = HostKit.Target.ssh(:prod, runner: {HostKit.Runner.SSH.Connection, conn: conn}, sudo: true)
+  {:ok, remote_plan} = HostKit.plan(project, target: prod, reader: HostKit.Remote)
+after
+  HostKit.Runner.SSH.Connection.close(conn)
+end
+
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
 ```
 
