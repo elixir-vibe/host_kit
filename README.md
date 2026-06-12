@@ -77,5 +77,6 @@ end
 ```sh
 mix host_kit.dump infra/config.exs
 mix host_kit.plan infra/config.exs
+mix host_kit.plan infra/config.exs --local
 mix host_kit.render infra/config.exs systemd_service toys-exograph.service
 ```

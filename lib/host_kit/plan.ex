@@ -22,7 +22,7 @@ defmodule HostKit.Plan do
   def build(%Project{} = project, opts \\ []) do
     resources = Project.resources(project)
 
-    changes = Enum.map(resources, &desired_change/1)
+    changes = Enum.map(resources, &change_for(&1, opts))
 
     {:ok,
      %__MODULE__{
@@ -34,14 +34,67 @@ defmodule HostKit.Plan do
      }}
   end
 
+  defp change_for(resource, opts) do
+    case Keyword.get(opts, :reader) do
+      nil -> desired_change(resource)
+      reader -> compare_with_actual(resource, reader)
+    end
+  end
+
   defp desired_change(resource) do
+    build_change(:create, resource, nil, :desired_state)
+  end
+
+  defp compare_with_actual(resource, reader) do
+    case reader.read(resource) do
+      {:ok, nil} -> build_change(:create, resource, nil, :missing)
+      {:ok, actual} -> diff_change(resource, actual)
+      {:error, reason} -> build_change(:read, resource, nil, {:read_error, reason})
+    end
+  end
+
+  defp diff_change(resource, actual) do
+    if equivalent?(resource, actual) do
+      build_change(:no_op, resource, actual, :in_sync)
+    else
+      build_change(:update, resource, actual, :drift)
+    end
+  end
+
+  defp build_change(action, resource, actual, reason) do
     %Change{
-      action: :create,
+      action: action,
       resource_id: Resource.id(resource),
-      before: nil,
+      before: actual,
       after: resource,
-      reason: :desired_state
+      reason: reason
     }
+  end
+
+  defp equivalent?(%HostKit.Systemd.Service{} = desired, actual) do
+    Map.get(actual.meta, :content) == HostKit.Systemd.Service.render(desired)
+  end
+
+  defp equivalent?(%HostKit.Systemd.Timer{} = desired, actual) do
+    Map.get(actual.meta, :content) == HostKit.Systemd.Timer.render(desired)
+  end
+
+  defp equivalent?(%HostKit.Resources.Directory{} = desired, actual),
+    do: comparable(desired, actual, [:path, :owner, :group, :mode])
+
+  defp equivalent?(%HostKit.Resources.File{} = desired, actual),
+    do: comparable(desired, actual, [:path, :content, :owner, :group, :mode])
+
+  defp equivalent?(%HostKit.Resources.User{} = desired, actual),
+    do: comparable(desired, actual, [:name, :home, :shell, :groups])
+
+  defp equivalent?(desired, actual), do: desired == actual
+
+  defp comparable(desired, actual, fields) do
+    Enum.all?(fields, fn field ->
+      desired_value = Map.get(desired, field)
+      is_nil(desired_value) or desired_value == Map.get(actual, field)
+    end)
   end
 
   defp summarize(changes) do
