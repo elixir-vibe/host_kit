@@ -1,0 +1,28 @@
+use HostKit.DSL
+
+project :toys do
+  host :elixir_toys do
+    hostname("elixir.toys")
+    user("dannote")
+    sudo(true)
+  end
+
+  service :exograph do
+    system_user("toys-exograph", home: "/var/lib/toys/exograph/home")
+    directory("/srv/toys/exograph", owner: "toys-exograph", group: "toys-exograph", mode: 0o755)
+
+    systemd_service "toys-exograph.service" do
+      description("Exograph search")
+      after_units(["network-online.target"])
+      wants(["network-online.target"])
+      service_user("toys-exograph")
+      working_directory("/opt/toys/src/exograph")
+      exec_start(["/usr/local/bin/mix", "exograph.index.hex", "--web", "--port", "4200"])
+      restart(:on_failure)
+      restart_sec(10)
+      hardening(:web_service)
+      read_write_paths(["/srv/toys/exograph", "/var/lib/toys/exograph"])
+      install(wanted_by: "multi-user.target")
+    end
+  end
+end
