@@ -1,0 +1,16 @@
+use HostKit.DSL
+use HostKit.ToysInfra
+
+project :demo do
+  toy_service :exograph do
+    standard_user()
+    standard_dirs()
+
+    directory state_path("home"), owner: service_user(), group: service_user(), mode: 0o755
+
+    systemd_service unit_name() do
+      working_directory source_dir()
+      read_write_paths [data_dir(), state_dir(), source_dir()]
+    end
+  end
+end
