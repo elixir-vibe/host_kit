@@ -151,6 +151,26 @@ end
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
 ```
 
+## Storage volumes
+
+HostKit models storage as named metadata instead of repeated path strings:
+
+```elixir
+volume =
+  HostKit.Storage.volume(:repositories,
+    path: "/srv/toys/forgejo/repositories",
+    owner: "toys-forgejo",
+    group: "toys-forgejo",
+    mode: 0o750,
+    backup: true
+  )
+
+directory HostKit.Storage.directory(volume)
+read_write_paths HostKit.Storage.read_write_paths([volume])
+```
+
+Project-local DSLs can derive these paths from service conventions and later reuse the same volume metadata for systemd sandboxing, Unitctl transient runtimes, and backups.
+
 ## Runtime isolation
 
 HostKit uses shared runtime isolation structs for persistent systemd units and future transient Unitctl workloads:
