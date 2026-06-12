@@ -37,7 +37,7 @@ defmodule HostKit.Plan do
   defp change_for(resource, project, opts) do
     case Keyword.get(opts, :reader) do
       nil -> desired_change(resource)
-      reader -> compare_with_actual(resource, reader, %{project: project})
+      reader -> compare_with_actual(resource, reader, %{project: project, opts: opts})
     end
   end
 
@@ -90,8 +90,8 @@ defmodule HostKit.Plan do
   end
 
   defp equivalent?(%HostKit.Caddy.Site{} = desired, actual) do
-    Map.get(actual.meta, :content) ==
-      IO.iodata_to_binary(HostKit.Plugins.Caddy.render_site(desired))
+    normalize_caddy(Map.get(actual.meta, :content)) ==
+      desired |> HostKit.Plugins.Caddy.render_site() |> IO.iodata_to_binary() |> normalize_caddy()
   end
 
   defp equivalent?(%HostKit.Resources.Directory{} = desired, actual),
@@ -104,6 +104,16 @@ defmodule HostKit.Plan do
     do: comparable(desired, actual, [:name, :home, :shell, :groups])
 
   defp equivalent?(desired, actual), do: desired == actual
+
+  defp normalize_caddy(nil), do: nil
+
+  defp normalize_caddy(content) do
+    content
+    |> String.split("\n")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n")
+  end
 
   defp comparable(desired, actual, fields) do
     Enum.all?(fields, fn field ->

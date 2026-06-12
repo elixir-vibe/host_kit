@@ -8,8 +8,8 @@ defmodule HostKit.CaddyLocalPlanTest do
 
     Elixir.File.write!(Path.join(tmp, "exograph-search.caddy"), """
     search.elixir.toys {
-    \tencode zstd gzip
-    \treverse_proxy 127.0.0.1:4200
+      encode zstd gzip
+      reverse_proxy 127.0.0.1:4200
     }
     """)
 

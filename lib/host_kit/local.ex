@@ -30,7 +30,7 @@ defmodule HostKit.Local do
   def read(%File{path: path} = desired) do
     with {:stat, {:ok, %Elixir.File.Stat{type: :regular}}} <- {:stat, Elixir.File.stat(path)},
          {:metadata, {:ok, metadata}} <- {:metadata, stat_metadata(path)},
-         {:content, {:ok, content}} <- {:content, Elixir.File.read(path)} do
+         {:content, {:ok, content}} <- {:content, read_file(path, %{})} do
       {:ok,
        %File{
          desired
@@ -75,7 +75,48 @@ defmodule HostKit.Local do
     end
   end
 
+  def read(%File{path: path} = desired, context) do
+    with {:stat, {:ok, %Elixir.File.Stat{type: :regular}}} <- {:stat, Elixir.File.stat(path)},
+         {:metadata, {:ok, metadata}} <- {:metadata, stat_metadata(path)},
+         {:content, {:ok, content}} <- {:content, read_file(path, context)} do
+      {:ok,
+       %File{
+         desired
+         | content: content,
+           owner: metadata.owner,
+           group: metadata.group,
+           mode: metadata.mode
+       }}
+    else
+      {:stat, {:ok, %Elixir.File.Stat{type: type}}} -> {:error, {:not_file, path, type}}
+      {:stat, {:error, :enoent}} -> {:ok, nil}
+      {:stat, {:error, reason}} -> {:error, reason}
+      {:metadata, {:error, reason}} -> {:error, reason}
+      {:content, {:error, reason}} -> {:error, reason}
+    end
+  end
+
   def read(resource, _context), do: read(resource)
+
+  defp read_file(path, context) do
+    case Elixir.File.read(path) do
+      {:error, :eacces} -> sudo_read_file(path, context)
+      result -> result
+    end
+  end
+
+  defp sudo_read_file(path, %{opts: opts}) do
+    if Keyword.get(opts, :sudo, false) do
+      case System.cmd("sudo", ["cat", path], stderr_to_stdout: true) do
+        {content, 0} -> {:ok, content}
+        {output, status} -> {:error, {:sudo_cat_failed, status, output}}
+      end
+    else
+      {:error, :eacces}
+    end
+  end
+
+  defp sudo_read_file(_path, _context), do: {:error, :eacces}
 
   defp read_caddy_site(path, desired) do
     case Elixir.File.read(path) do
