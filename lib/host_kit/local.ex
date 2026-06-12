@@ -15,30 +15,35 @@ defmodule HostKit.Local do
   end
 
   def read(%Directory{path: path} = desired) do
-    case Elixir.File.stat(path) do
-      {:ok, %Elixir.File.Stat{type: :directory, mode: mode}} ->
-        {:ok, %Directory{desired | mode: desired.mode || mode}}
-
-      {:ok, %Elixir.File.Stat{type: type}} ->
-        {:error, {:not_directory, path, type}}
-
-      {:error, :enoent} ->
-        {:ok, nil}
-
-      {:error, reason} ->
-        {:error, reason}
+    with {:stat, {:ok, %Elixir.File.Stat{type: :directory}}} <- {:stat, Elixir.File.stat(path)},
+         {:metadata, {:ok, metadata}} <- {:metadata, stat_metadata(path)} do
+      {:ok,
+       %Directory{desired | owner: metadata.owner, group: metadata.group, mode: metadata.mode}}
+    else
+      {:stat, {:ok, %Elixir.File.Stat{type: type}}} -> {:error, {:not_directory, path, type}}
+      {:stat, {:error, :enoent}} -> {:ok, nil}
+      {:stat, {:error, reason}} -> {:error, reason}
+      {:metadata, {:error, reason}} -> {:error, reason}
     end
   end
 
   def read(%File{path: path} = desired) do
-    with {:stat, {:ok, %Elixir.File.Stat{type: :regular, mode: mode}}} <-
-           {:stat, Elixir.File.stat(path)},
+    with {:stat, {:ok, %Elixir.File.Stat{type: :regular}}} <- {:stat, Elixir.File.stat(path)},
+         {:metadata, {:ok, metadata}} <- {:metadata, stat_metadata(path)},
          {:content, {:ok, content}} <- {:content, Elixir.File.read(path)} do
-      {:ok, %File{desired | content: content, mode: desired.mode || mode}}
+      {:ok,
+       %File{
+         desired
+         | content: content,
+           owner: metadata.owner,
+           group: metadata.group,
+           mode: metadata.mode
+       }}
     else
       {:stat, {:ok, %Elixir.File.Stat{type: type}}} -> {:error, {:not_file, path, type}}
       {:stat, {:error, :enoent}} -> {:ok, nil}
       {:stat, {:error, reason}} -> {:error, reason}
+      {:metadata, {:error, reason}} -> {:error, reason}
       {:content, {:error, reason}} -> {:error, reason}
     end
   end
@@ -82,6 +87,36 @@ defmodule HostKit.Local do
 
   defp caddy_site_filename(%Caddy.Site{meta: %{path: path}}), do: path
   defp caddy_site_filename(%Caddy.Site{name: name}), do: "#{name}.caddy"
+
+  defp stat_metadata(path) do
+    with {:error, _reason} <- linux_stat_metadata(path) do
+      bsd_stat_metadata(path)
+    end
+  end
+
+  defp linux_stat_metadata(path) do
+    case System.cmd("stat", ["-c", "%U:%G:%a", path], stderr_to_stdout: true) do
+      {output, 0} -> parse_stat_output(output)
+      {output, status} -> {:error, {:stat_failed, status, output}}
+    end
+  end
+
+  defp bsd_stat_metadata(path) do
+    case System.cmd("stat", ["-f", "%Su:%Sg:%Lp", path], stderr_to_stdout: true) do
+      {output, 0} -> parse_stat_output(output)
+      {output, status} -> {:error, {:stat_failed, status, output}}
+    end
+  end
+
+  defp parse_stat_output(output) do
+    case output |> String.trim() |> String.split(":", parts: 3) do
+      [owner, group, mode] ->
+        {:ok, %{owner: owner, group: group, mode: String.to_integer(mode, 8)}}
+
+      fields ->
+        {:error, {:unexpected_stat_output, fields}}
+    end
+  end
 
   defp user_from_passwd(line, %User{} = desired) do
     [_name, _password, _uid, _gid, _gecos, home, shell] =
