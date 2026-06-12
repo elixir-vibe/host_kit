@@ -17,9 +17,21 @@ defmodule HostKit.Plugins.Caddy.DSL do
     end
   end
 
+  defmacro root(path, opts \\ []) do
+    quote do
+      HostKit.Plugins.Caddy.Scope.add_root(unquote(path), unquote(opts))
+    end
+  end
+
   defmacro encode(formats) do
     quote do
       HostKit.Plugins.Caddy.Scope.add_encode(unquote(formats))
+    end
+  end
+
+  defmacro file_server(opts \\ []) do
+    quote do
+      HostKit.Plugins.Caddy.Scope.add_file_server(unquote(opts))
     end
   end
 

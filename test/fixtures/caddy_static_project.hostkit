@@ -1,0 +1,11 @@
+use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
+
+project :caddy_static_demo, providers: [HostKit.Plugins.Caddy] do
+  service :landing do
+    caddy_site :landing, "elixir.toys", path: "landing.caddy" do
+      root "/srv/toys/www/elixir.toys"
+      encode [:zstd, :gzip]
+      file_server()
+    end
+  end
+end

@@ -1,7 +1,7 @@
 defmodule HostKit.Plugins.Caddy.Scope do
   @moduledoc false
 
-  alias HostKit.Caddy.Directive.{Encode, ReverseProxy}
+  alias HostKit.Caddy.Directive.{Encode, FileServer, ReverseProxy, Root}
   alias HostKit.Caddy.Site
 
   @key {__MODULE__, :site}
@@ -11,8 +11,18 @@ defmodule HostKit.Plugins.Caddy.Scope do
     Process.put(@key, %Site{name: name, host: host, meta: meta})
   end
 
+  def add_root(path, opts) when is_binary(path) do
+    update_site(
+      &append_directive(&1, %Root{path: path, matcher: Keyword.get(opts, :matcher, "*")})
+    )
+  end
+
   def add_encode(formats) when is_list(formats) do
     update_site(&append_directive(&1, %Encode{formats: formats}))
+  end
+
+  def add_file_server(opts) do
+    update_site(&append_directive(&1, %FileServer{browse: Keyword.get(opts, :browse, false)}))
   end
 
   def add_reverse_proxy(upstream) when is_binary(upstream) do

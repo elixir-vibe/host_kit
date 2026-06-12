@@ -3,7 +3,7 @@ defmodule HostKit.Plugins.Caddy do
 
   @behaviour HostKit.Provider
 
-  alias HostKit.Caddy.Directive.{Encode, ReverseProxy}
+  alias HostKit.Caddy.Directive.{Encode, FileServer, ReverseProxy, Root}
   alias HostKit.Caddy.Site
 
   @impl true
@@ -39,9 +39,16 @@ defmodule HostKit.Plugins.Caddy do
     [site.host, " {\n", Enum.map(site.directives, &render_directive/1), "}\n"]
   end
 
+  defp render_directive(%Root{matcher: matcher, path: path}) do
+    ["\troot ", matcher, " ", path, "\n"]
+  end
+
   defp render_directive(%Encode{formats: formats}) do
     ["\tencode", Enum.map(formats, &[" ", to_string(&1)]), "\n"]
   end
+
+  defp render_directive(%FileServer{browse: false}), do: "\tfile_server\n"
+  defp render_directive(%FileServer{browse: true}), do: "\tfile_server browse\n"
 
   defp render_directive(%ReverseProxy{upstreams: upstreams}) do
     ["\treverse_proxy", Enum.map(upstreams, &[" ", &1]), "\n"]
