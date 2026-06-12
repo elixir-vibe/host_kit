@@ -5,6 +5,7 @@ defmodule HostKit.ApplyTest do
   alias HostKit.Change
   alias HostKit.Plan
   alias HostKit.Resources.{Directory, File}
+  alias HostKit.Systemd
 
   test "requires confirmation outside dry-run" do
     plan = %Plan{changes: []}
@@ -56,6 +57,45 @@ defmodule HostKit.ApplyTest do
     assert {:ok, %{mode: file_mode}} = Elixir.File.stat(file)
     assert Bitwise.band(dir_mode, 0o777) == 0o755
     assert Bitwise.band(file_mode, 0o777) == 0o600
+
+    Elixir.File.rm_rf!(root)
+  end
+
+  test "writes systemd units and can skip daemon reload in tests" do
+    root = Path.join(System.tmp_dir!(), "host-kit-systemd-#{System.unique_integer([:positive])}")
+
+    service = %Systemd.Service{
+      name: "demo.service",
+      unit: [description: "Demo"],
+      service: [exec_start: "/usr/bin/env true"],
+      install: [wanted_by: "multi-user.target"]
+    }
+
+    timer = %Systemd.Timer{
+      name: "demo.timer",
+      unit: [description: "Demo timer"],
+      timer: [on_boot_sec: "1min"],
+      install: [wanted_by: "timers.target"]
+    }
+
+    plan = %Plan{
+      changes: [
+        %Change{action: :create, resource_id: {:systemd_service, service.name}, after: service},
+        %Change{action: :create, resource_id: {:systemd_timer, timer.name}, after: timer}
+      ]
+    }
+
+    assert {:ok, [%{status: :applied}, %{status: :applied}]} =
+             Apply.run(plan,
+               confirm: true,
+               systemd_unit_dir: root,
+               systemd_unit_owner: nil,
+               systemd_unit_group: nil,
+               systemd_daemon_reload: false
+             )
+
+    assert Elixir.File.read!(Path.join(root, "demo.service")) =~ "[Service]"
+    assert Elixir.File.read!(Path.join(root, "demo.timer")) =~ "[Timer]"
 
     Elixir.File.rm_rf!(root)
   end

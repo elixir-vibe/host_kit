@@ -3,6 +3,7 @@ defmodule HostKit.Apply do
 
   alias HostKit.{Change, Plan}
   alias HostKit.Resources.{Directory, File}
+  alias HostKit.Systemd
 
   @type result :: %{change: Change.t(), status: :dry_run | :applied | :skipped}
 
@@ -22,14 +23,15 @@ defmodule HostKit.Apply do
   end
 
   defp apply_changes(changes, opts) do
-    Enum.reduce_while(changes, {:ok, []}, fn change, {:ok, results} ->
+    changes
+    |> Enum.reduce_while({:ok, [], false}, fn change, {:ok, results, reload?} ->
       case apply_change(change, opts) do
-        {:ok, result} -> {:cont, {:ok, [result | results]}}
+        {:ok, result} -> {:cont, {:ok, [result | results], reload? or systemd_change?(result)}}
         {:error, reason} -> {:halt, {:error, {change.resource_id, reason}}}
       end
     end)
     |> then(fn
-      {:ok, results} -> {:ok, Enum.reverse(results)}
+      {:ok, results, reload?} -> finish_apply(Enum.reverse(results), reload?, opts)
       error -> error
     end)
   end
@@ -46,6 +48,20 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %File{} = file} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn -> apply_file(file, opts) end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Systemd.Service{} = service} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn ->
+      apply_systemd_unit(service.name, Systemd.Service.render(service), opts)
+    end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Systemd.Timer{} = timer} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn ->
+      apply_systemd_unit(timer.name, Systemd.Timer.render(timer), opts)
+    end)
   end
 
   defp apply_change(%Change{} = change, _opts),
@@ -78,6 +94,48 @@ defmodule HostKit.Apply do
       chmod(path, file.mode, opts)
     end
   end
+
+  defp apply_systemd_unit(name, content, opts) do
+    path = Path.join(Keyword.get(opts, :systemd_unit_dir, "/etc/systemd/system"), name)
+    owner = Keyword.get(opts, :systemd_unit_owner, "root")
+    group = Keyword.get(opts, :systemd_unit_group, "root")
+
+    with :ok <- Elixir.File.mkdir_p(Path.dirname(path)),
+         :ok <- Elixir.File.write(path, IO.iodata_to_binary(content)),
+         :ok <- chown(path, owner, group, opts) do
+      chmod(path, 0o644, opts)
+    end
+  end
+
+  defp finish_apply(results, true, opts) do
+    if Keyword.get(opts, :dry_run, false) do
+      {:ok, results}
+    else
+      with :ok <- daemon_reload(opts) do
+        {:ok, results}
+      end
+    end
+  end
+
+  defp finish_apply(results, false, _opts), do: {:ok, results}
+
+  defp daemon_reload(opts) do
+    if Keyword.get(opts, :systemd_daemon_reload, true) do
+      cmd(opts, "systemctl", ["daemon-reload"])
+    else
+      :ok
+    end
+  end
+
+  defp systemd_change?(%{status: status, change: %{after: %Systemd.Service{}}})
+       when status in [:applied, :dry_run],
+       do: true
+
+  defp systemd_change?(%{status: status, change: %{after: %Systemd.Timer{}}})
+       when status in [:applied, :dry_run],
+       do: true
+
+  defp systemd_change?(_result), do: false
 
   defp chown(_path, nil, nil, _opts), do: :ok
 
