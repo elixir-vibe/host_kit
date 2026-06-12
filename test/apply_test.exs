@@ -84,6 +84,12 @@ defmodule HostKit.ApplyTest do
         send(opts[:test_pid], {:cmd, command, args, Keyword.delete(opts, :test_pid)})
         {"", 0}
       end
+
+      @impl true
+      def mkdir_p(_path, _opts), do: :ok
+
+      @impl true
+      def write_file(_path, _content, _opts), do: :ok
     end
 
     assert {:ok, [%{status: :applied}]} =

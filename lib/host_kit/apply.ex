@@ -85,7 +85,7 @@ defmodule HostKit.Apply do
   end
 
   defp apply_directory(%Directory{path: path} = directory, opts) do
-    with :ok <- Elixir.File.mkdir_p(path),
+    with :ok <- mkdir_p(path, opts),
          :ok <- chown(path, directory.owner, directory.group, opts) do
       chmod(path, directory.mode, opts)
     end
@@ -95,8 +95,8 @@ defmodule HostKit.Apply do
     do: {:error, :file_content_managed_elsewhere}
 
   defp apply_file(%File{path: path, content: content} = file, opts) do
-    with :ok <- Elixir.File.mkdir_p(Path.dirname(path)),
-         :ok <- Elixir.File.write(path, IO.iodata_to_binary(content || "")),
+    with :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, IO.iodata_to_binary(content || ""), opts),
          :ok <- chown(path, file.owner, file.group, opts) do
       chmod(path, file.mode, opts)
     end
@@ -116,8 +116,8 @@ defmodule HostKit.Apply do
     owner = Keyword.get(opts, :systemd_unit_owner, "root")
     group = Keyword.get(opts, :systemd_unit_group, "root")
 
-    with :ok <- Elixir.File.mkdir_p(Path.dirname(path)),
-         :ok <- Elixir.File.write(path, IO.iodata_to_binary(content)),
+    with :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, IO.iodata_to_binary(content), opts),
          :ok <- chown(path, owner, group, opts) do
       chmod(path, 0o644, opts)
     end
@@ -153,6 +153,14 @@ defmodule HostKit.Apply do
 
   defp systemd_change?(_result), do: false
 
+  defp mkdir_p(path, opts) do
+    opts |> runner() |> Runner.mkdir_p(path, [])
+  end
+
+  defp write_file(path, content, opts) do
+    opts |> runner() |> Runner.write_file(path, content, [])
+  end
+
   defp chown(_path, nil, nil, _opts), do: :ok
 
   defp chown(path, owner, group, opts) do
@@ -168,13 +176,14 @@ defmodule HostKit.Apply do
 
   defp cmd(opts, command, args) do
     {command, args} = maybe_sudo(command, args, opts)
-    runner = Keyword.get(opts, :runner, HostKit.Runner.Local)
 
-    case Runner.cmd(runner, command, args, stderr_to_stdout: true) do
+    case Runner.cmd(runner(opts), command, args, stderr_to_stdout: true) do
       {_output, 0} -> :ok
       {output, status} -> {:error, {:command_failed, command, args, status, output}}
     end
   end
+
+  defp runner(opts), do: Keyword.get(opts, :runner, HostKit.Runner.Local)
 
   defp maybe_sudo(command, args, opts) do
     if Keyword.get(opts, :sudo, false), do: {"sudo", [command | args]}, else: {command, args}

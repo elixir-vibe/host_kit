@@ -7,4 +7,14 @@ defmodule HostKit.Runner.Local do
   def cmd(command, args, opts \\ []) do
     System.cmd(command, args, opts)
   end
+
+  @impl true
+  def mkdir_p(path, _opts \\ []) do
+    Elixir.File.mkdir_p(path)
+  end
+
+  @impl true
+  def write_file(path, content, _opts \\ []) do
+    Elixir.File.write(path, content)
+  end
 end

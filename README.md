@@ -130,7 +130,7 @@ HostKit.format_plan(plan)
 # Supported apply resources: users, directories, files, systemd services, and systemd timers.
 {:ok, results} = HostKit.apply(plan, confirm: true, sudo: true)
 
-# Command execution is routed through a runner boundary.
+# Command and filesystem operations are routed through a runner boundary.
 {:ok, results} = HostKit.apply(plan, confirm: true, runner: HostKit.Runner.Local)
 
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
