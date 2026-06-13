@@ -21,6 +21,13 @@ defmodule Mix.Tasks.HostKit.Options do
     |> Enum.map(&parse_resource_id/1)
   end
 
+  def put_repology_cache(plan_opts, opts) do
+    plan_opts
+    |> put_present(:repology_cache_dir, Keyword.get(opts, :repology_cache))
+    |> put_present(:repology_cache_ttl, cache_ttl(opts))
+    |> put_present(:repology_cache, cache_enabled(opts))
+  end
+
   defp local_target_opts(opts) do
     if Keyword.get(opts, :local, false) do
       [reader: HostKit.Local, sudo: Keyword.get(opts, :sudo, false)]
@@ -55,6 +62,17 @@ defmodule Mix.Tasks.HostKit.Options do
       {:error, reason} ->
         Mix.raise("could not connect to remote target #{host}: #{inspect(reason)}")
     end
+  end
+
+  defp cache_ttl(opts) do
+    case Keyword.get(opts, :repology_cache_ttl) do
+      nil -> nil
+      seconds -> seconds * 1000
+    end
+  end
+
+  defp cache_enabled(opts) do
+    if Keyword.get(opts, :repology_no_cache, false), do: false, else: nil
   end
 
   defp remote_options(host, opts) do

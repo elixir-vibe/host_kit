@@ -24,6 +24,9 @@ defmodule Mix.Tasks.HostKit.Apply do
           ignore: :keep,
           package_lock: :string,
           plan: :string,
+          repology_cache: :string,
+          repology_cache_ttl: :integer,
+          repology_no_cache: :boolean,
           dry_run: :boolean,
           confirm: :boolean
         ],
@@ -122,6 +125,7 @@ defmodule Mix.Tasks.HostKit.Apply do
     target_opts
     |> Keyword.put(:ignore, Options.ignored_resources(opts))
     |> put_present(:package_lock, Keyword.get(opts, :package_lock))
+    |> Options.put_repology_cache(opts)
   end
 
   defp apply_opts(opts, target_opts) do

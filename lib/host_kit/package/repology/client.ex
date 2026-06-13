@@ -1,7 +1,7 @@
 defmodule HostKit.Package.Repology.Client do
   @moduledoc "HTTP client for the Repology API."
 
-  alias HostKit.Package.Repology.Record
+  alias HostKit.Package.Repology.{Record, Records}
 
   @default_base_url "https://repology.org/api/v1"
   @default_site_url "https://repology.org"
@@ -78,14 +78,7 @@ defmodule HostKit.Package.Repology.Client do
           {:ok, [String.t()]} | {:error, error()}
   def package_names(project, repo_match, opts \\ []) do
     with {:ok, records} <- project(project, opts) do
-      names =
-        records
-        |> Enum.filter(&repo_match?(&1.repo, repo_match))
-        |> Enum.flat_map(&record_package_names/1)
-        |> Enum.uniq()
-        |> Enum.sort()
-
-      {:ok, names}
+      {:ok, Records.package_names(records, repo_match)}
     end
   end
 
@@ -124,14 +117,6 @@ defmodule HostKit.Package.Repology.Client do
 
   defp decode_body(body) when is_binary(body), do: Jason.decode!(body)
   defp decode_body(body), do: body
-
-  defp record_package_names(%Record{binnames: names}) when names != [], do: names
-  defp record_package_names(%Record{binname: name}) when is_binary(name), do: [name]
-  defp record_package_names(%Record{srcname: name}) when is_binary(name), do: [name]
-  defp record_package_names(_record), do: []
-
-  defp repo_match?(repo, %Regex{} = regex), do: Regex.match?(regex, repo)
-  defp repo_match?(repo, match) when is_binary(match), do: repo == match
 
   defp normalize_exception(%Req.TransportError{} = error), do: {:request_error, error}
   defp normalize_exception(error), do: error

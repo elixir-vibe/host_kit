@@ -24,7 +24,10 @@ defmodule Mix.Tasks.HostKit.Plan do
           out: :string,
           ignore: :keep,
           package_lock: :string,
-          write_package_lock: :string
+          write_package_lock: :string,
+          repology_cache: :string,
+          repology_cache_ttl: :integer,
+          repology_no_cache: :boolean
         ]
       )
 
@@ -125,6 +128,7 @@ defmodule Mix.Tasks.HostKit.Plan do
     plan_opts
     |> put_present(:package_lock, Keyword.get(opts, :package_lock))
     |> put_present(:package_lock_write, Keyword.get(opts, :write_package_lock))
+    |> Options.put_repology_cache(opts)
   end
 
   defp put_present(opts, _key, nil), do: opts

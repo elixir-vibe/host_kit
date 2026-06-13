@@ -173,7 +173,7 @@ defmodule HostKit.Package.Resolver do
   end
 
   defp repology_client(opts),
-    do: Keyword.get(opts, :repology_client, HostKit.Package.Repology.Client)
+    do: Keyword.get(opts, :repology_client, HostKit.Package.Repology.CachedClient)
 
   defp repology_opts(opts) do
     opts
@@ -183,6 +183,9 @@ defmodule HostKit.Package.Resolver do
       :repology_user_agent,
       :repology_timeout,
       :repology_rate_limit,
+      :repology_cache,
+      :repology_cache_dir,
+      :repology_cache_ttl,
       :req_options
     ])
     |> Enum.map(fn
@@ -191,6 +194,9 @@ defmodule HostKit.Package.Resolver do
       {:repology_user_agent, value} -> {:user_agent, value}
       {:repology_timeout, value} -> {:timeout, value}
       {:repology_rate_limit, value} -> {:rate_limit, value}
+      {:repology_cache, value} -> {:cache, value}
+      {:repology_cache_dir, value} -> {:cache_dir, value}
+      {:repology_cache_ttl, value} -> {:cache_ttl, value}
       other -> other
     end)
   end
