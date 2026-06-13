@@ -80,6 +80,7 @@ defmodule Mix.Tasks.HostKit.Options do
     |> put_present(:user, Keyword.get(opts, :user))
     |> put_present(:port, Keyword.get(opts, :port))
     |> put_present(:identity_file, Keyword.get(opts, :identity_file))
+    |> put_present(:password, Keyword.get(opts, :password))
     |> put_silently_accept_hosts(opts)
   end
 

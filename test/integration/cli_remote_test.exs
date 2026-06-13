@@ -4,8 +4,17 @@ defmodule HostKit.CLIRemoteIntegrationTest do
   import ExUnit.CaptureIO
 
   @moduletag :integration
+
   @tag timeout: 300_000
   test "plans and applies a remote plan artifact over SSH" do
+    if is_nil(System.find_executable("limactl")) do
+      IO.puts("Skipping Lima CLI integration: limactl not available")
+    else
+      run_lima_cli_integration()
+    end
+  end
+
+  defp run_lima_cli_integration do
     vm = System.get_env("HOSTKIT_LIMA_VM", "hostkit-test")
     ssh = lima_ssh_config(vm)
     unique = System.unique_integer([:positive])

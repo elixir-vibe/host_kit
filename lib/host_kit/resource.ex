@@ -34,7 +34,6 @@ defmodule HostKit.Resource do
                       HostKit.Workspace.Egress
                     ])
   @artifact_module_names @artifact_modules |> Enum.map(&Atom.to_string/1) |> MapSet.new()
-
   @spec id(struct()) :: term()
   def id(resource) do
     Code.ensure_loaded?(resource.__struct__)
@@ -84,9 +83,48 @@ defmodule HostKit.Resource do
     Map.new(entries, fn [key, value] -> {load(key), load(value)} end)
   end
 
-  def load(%{"$type" => "atom", "value" => value}), do: String.to_existing_atom(value)
+  def load(%{"$type" => "atom", "value" => value}), do: load_atom(value)
   def load(values) when is_list(values), do: Enum.map(values, &load/1)
   def load(value), do: value
+
+  defp load_atom("autoconf"), do: :autoconf
+  defp load_atom("ca_certificates"), do: :ca_certificates
+  defp load_atom("capability"), do: :capability
+  defp load_atom("create"), do: :create
+  defp load_atom("curl"), do: :curl
+  defp load_atom("cxx_compiler"), do: :cxx_compiler
+  defp load_atom("delete"), do: :delete
+  defp load_atom("directory"), do: :directory
+  defp load_atom("drift"), do: :drift
+  defp load_atom("elixir"), do: :elixir
+  defp load_atom("erlang"), do: :erlang
+  defp load_atom("file"), do: :file
+  defp load_atom("gcc"), do: :gcc
+  defp load_atom("git"), do: :git
+  defp load_atom("in_sync"), do: :in_sync
+  defp load_atom("lock"), do: :lock
+  defp load_atom("m4"), do: :m4
+  defp load_atom("make"), do: :make
+  defp load_atom("missing"), do: :missing
+  defp load_atom("mise"), do: :mise
+  defp load_atom("ncurses_dev"), do: :ncurses_dev
+  defp load_atom("no_op"), do: :no_op
+  defp load_atom("openssl_dev"), do: :openssl_dev
+  defp load_atom("package"), do: :package
+  defp load_atom("perl"), do: :perl
+  defp load_atom("read"), do: :read
+  defp load_atom("semantic"), do: :semantic
+  defp load_atom("systemd_service"), do: :systemd_service
+  defp load_atom("systemd_timer"), do: :systemd_timer
+  defp load_atom("unzip"), do: :unzip
+  defp load_atom("update"), do: :update
+  defp load_atom("xsltproc"), do: :xsltproc
+
+  defp load_atom(value) do
+    String.to_existing_atom(value)
+  rescue
+    ArgumentError -> value
+  end
 
   defp allowed_artifact_module!(module) when is_atom(module) do
     if MapSet.member?(@artifact_modules, module) do

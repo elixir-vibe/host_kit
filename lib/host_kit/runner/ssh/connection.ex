@@ -141,6 +141,7 @@ defmodule HostKit.Runner.SSH.Connection do
     ])
     |> Enum.map(fn
       {:user, user} -> {:user, to_charlist(user)}
+      {:password, password} -> {:password, to_charlist(password)}
       {:user_dir, dir} -> {:user_dir, to_charlist(dir)}
       pair -> pair
     end)

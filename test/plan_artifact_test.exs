@@ -44,6 +44,14 @@ defmodule HostKit.Plan.ArtifactTest do
     assert loaded.opts == []
   end
 
+  test "loads user atoms as strings instead of creating atoms" do
+    assert HostKit.Resource.load(%{
+             "$type" => "atom",
+             "value" => "hostkit_user_atom_not_existing"
+           }) ==
+             "hostkit_user_atom_not_existing"
+  end
+
   test "rejects unsupported artifact modules" do
     artifact = %Artifact{
       project: %{
