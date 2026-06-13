@@ -18,7 +18,7 @@ defmodule HostKit.Agent.SystemdTest do
              "/opt/host_kit/bin/host_kit agent --config /etc/host_kit/config.exs"
 
     assert service.service[:restart] == "on-failure"
-    assert service.install[:wanted_by] == ["multi-user.target"]
+    assert service.install[:wanted_by] == "multi-user.target"
     assert service.meta.hostkit_agent == true
     assert HostKit.Systemd.Service.validate(service) == :ok
   end

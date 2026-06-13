@@ -17,6 +17,18 @@ defmodule HostKit.Systemd.Service do
             depends_on: [],
             meta: %{}
 
+  @spec new(String.t(), keyword()) :: t()
+  def new(name, opts \\ []) do
+    %__MODULE__{
+      name: name,
+      unit: opts |> Keyword.get(:unit, []) |> normalize_values(),
+      service: opts |> Keyword.get(:service, []) |> normalize_values(),
+      install: opts |> Keyword.get(:install, []) |> normalize_values(),
+      depends_on: Keyword.get(opts, :depends_on, []),
+      meta: Keyword.get(opts, :meta, %{})
+    }
+  end
+
   def id(%__MODULE__{name: name}), do: {:systemd_service, name}
 
   @spec unit_file(t()) :: struct()
@@ -41,4 +53,15 @@ defmodule HostKit.Systemd.Service do
     |> unit_file()
     |> Systemd.UnitFile.validate(:service)
   end
+
+  defp normalize_values(values) do
+    Enum.map(values, fn {key, value} -> {key, normalize_value(key, value)} end)
+  end
+
+  defp normalize_value(key, values) when key in [:after, :wants, :requires, :wanted_by],
+    do: HostKit.Systemd.Target.names(values)
+
+  defp normalize_value(:exec_start, argv) when is_list(argv), do: Enum.join(argv, " ")
+  defp normalize_value(:restart, :on_failure), do: "on-failure"
+  defp normalize_value(_key, value), do: value
 end

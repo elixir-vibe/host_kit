@@ -3,28 +3,21 @@ defmodule HostKit.Agent.Systemd do
 
   @spec service(keyword()) :: HostKit.Systemd.Service.t()
   def service(opts) do
-    name = Keyword.get(opts, :name, "host-kit.service")
-    exec_start = Keyword.fetch!(opts, :exec_start)
-
-    %HostKit.Systemd.Service{
-      name: name,
+    HostKit.Systemd.Service.new(Keyword.get(opts, :name, "host-kit.service"),
       unit: [
         description: Keyword.get(opts, :description, "HostKit agent"),
-        after: ["network-online.target"]
+        after: :network_online
       ],
       service: [
         type: "simple",
-        exec_start: normalize_exec_start(exec_start),
-        restart: "on-failure",
+        exec_start: Keyword.fetch!(opts, :exec_start),
+        restart: :on_failure,
         standard_output: "journal",
         standard_error: "journal",
         syslog_identifier: Keyword.get(opts, :identifier, "host-kit")
       ],
-      install: [wanted_by: ["multi-user.target"]],
+      install: [wanted_by: :multi_user],
       meta: %{hostkit_agent: true}
-    }
+    )
   end
-
-  defp normalize_exec_start(argv) when is_list(argv), do: Enum.join(argv, " ")
-  defp normalize_exec_start(command) when is_binary(command), do: command
 end
