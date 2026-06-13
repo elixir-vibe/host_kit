@@ -106,7 +106,7 @@ defmodule HostKit.Remote do
 
   defp read_command(path, context) do
     prefix = if sudo?(context), do: "sudo ", else: ""
-    "#{prefix}base64 #{shell_escape(path)}"
+    "#{prefix}base64 #{HostKit.Shell.escape(path)}"
   end
 
   defp decode_content(content) do
@@ -149,6 +149,4 @@ defmodule HostKit.Remote do
   end
 
   defp sudo?(%{opts: opts}), do: Keyword.get(opts, :sudo, false)
-
-  defp shell_escape(value), do: "'" <> String.replace(to_string(value), "'", "'\\''") <> "'"
 end

@@ -38,7 +38,23 @@ defmodule HostKit.ElixirAppRecipeTest do
              &match?(%HostKit.Resources.EnvFile{path: "/etc/hostkit/hello.env"}, &1)
            )
 
-    assert Enum.any?(resources, &match?(%HostKit.Resources.Command{name: "hello_checkout"}, &1))
+    assert Enum.any?(
+             resources,
+             &match?(%HostKit.Resources.Command{name: "hello_checkout", exec: {"git", _}}, &1)
+           )
+
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Command{
+               name: "hello_deps",
+               exec: {"mix", ["deps.get", "--only", "prod"]},
+               runtime: {:mise, :beam}
+             } ->
+               true
+
+             _resource ->
+               false
+           end)
+
     assert Enum.any?(resources, &match?(%HostKit.Systemd.Service{name: "hello.service"}, &1))
     assert Enum.any?(resources, &match?(%HostKit.Caddy.Site{host: "hello.example.com"}, &1))
   end

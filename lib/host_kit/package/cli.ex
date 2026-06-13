@@ -25,7 +25,7 @@ defmodule HostKit.Package.CLI do
 
   defp read_package(:apt, package, opts) do
     command =
-      "dpkg-query -W -f='${db:Status-Status}\\t${Version}' #{shell_escape(package.system_name)}"
+      "dpkg-query -W -f='${db:Status-Status}\\t${Version}' #{HostKit.Shell.escape(package.system_name)}"
 
     case sh(opts, command) do
       {:ok, output} -> package_status(package, output)
@@ -34,7 +34,7 @@ defmodule HostKit.Package.CLI do
   end
 
   defp read_package(:dnf, package, opts) do
-    command = "rpm -q --qf '%{VERSION}-%{RELEASE}' #{shell_escape(package.system_name)}"
+    command = "rpm -q --qf '%{VERSION}-%{RELEASE}' #{HostKit.Shell.escape(package.system_name)}"
 
     case sh(opts, command) do
       {:ok, output} -> {:ok, installed(package, String.trim(output))}
@@ -43,7 +43,7 @@ defmodule HostKit.Package.CLI do
   end
 
   defp read_package(:pacman, package, opts) do
-    command = "pacman -Q #{shell_escape(package.system_name)}"
+    command = "pacman -Q #{HostKit.Shell.escape(package.system_name)}"
 
     case sh(opts, command) do
       {:ok, output} -> {:ok, installed(package, output |> String.trim() |> package_version())}
@@ -53,7 +53,7 @@ defmodule HostKit.Package.CLI do
 
   defp read_package(:apk, package, opts) do
     command =
-      "apk info -e #{shell_escape(package.system_name)} >/dev/null && apk info -v #{shell_escape(package.system_name)} | head -n 1"
+      "apk info -e #{HostKit.Shell.escape(package.system_name)} >/dev/null && apk info -v #{HostKit.Shell.escape(package.system_name)} | head -n 1"
 
     case sh(opts, command) do
       {:ok, output} -> {:ok, installed(package, output |> String.trim() |> apk_version(package))}
@@ -83,7 +83,7 @@ defmodule HostKit.Package.CLI do
 
       sh_ok(
         opts,
-        "#{refresh}pacman -S --noconfirm --needed -- #{shell_escape(package.system_name)}"
+        "#{refresh}pacman -S --noconfirm --needed -- #{HostKit.Shell.escape(package.system_name)}"
       )
     end
   end
@@ -119,22 +119,22 @@ defmodule HostKit.Package.CLI do
   end
 
   defp package_spec(:apt, %{system_name: system_name, version: nil}),
-    do: shell_escape(system_name)
+    do: HostKit.Shell.escape(system_name)
 
   defp package_spec(:apt, %{system_name: system_name, version: version}),
-    do: shell_escape("#{system_name}=#{version}")
+    do: HostKit.Shell.escape("#{system_name}=#{version}")
 
   defp package_spec(:dnf, %{system_name: system_name, version: nil}),
-    do: shell_escape(system_name)
+    do: HostKit.Shell.escape(system_name)
 
   defp package_spec(:dnf, %{system_name: system_name, version: version}),
-    do: shell_escape("#{system_name}-#{version}")
+    do: HostKit.Shell.escape("#{system_name}-#{version}")
 
   defp package_spec(:apk, %{system_name: system_name, version: nil}),
-    do: shell_escape(system_name)
+    do: HostKit.Shell.escape(system_name)
 
   defp package_spec(:apk, %{system_name: system_name, version: version}),
-    do: shell_escape("#{system_name}=#{version}")
+    do: HostKit.Shell.escape("#{system_name}=#{version}")
 
   defp sh_ok(opts, command) do
     case sh(opts, command) do
@@ -152,6 +152,4 @@ defmodule HostKit.Package.CLI do
       {output, status} -> {:error, {status, output}}
     end
   end
-
-  defp shell_escape(value), do: "'" <> String.replace(to_string(value), "'", "'\\''") <> "'"
 end

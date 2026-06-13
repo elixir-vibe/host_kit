@@ -82,7 +82,10 @@ defmodule HostKit.Runner.SSH.Connection do
 
     case cmd(
            "sh",
-           ["-c", "printf %s #{shell_escape(encoded)} | base64 -d > #{shell_escape(path)}"],
+           [
+             "-c",
+             "printf %s #{HostKit.Shell.escape(encoded)} | base64 -d > #{HostKit.Shell.escape(path)}"
+           ],
            opts
          ) do
       {_output, 0} -> :ok
@@ -169,24 +172,10 @@ defmodule HostKit.Runner.SSH.Connection do
   end
 
   defp cd_prefix(nil), do: ""
-  defp cd_prefix(path), do: "cd #{shell_escape(path)} &&"
+  defp cd_prefix(path), do: "cd #{HostKit.Shell.escape(path)} &&"
 
   defp env_prefix(nil), do: ""
+  defp env_prefix(env), do: HostKit.Shell.env(env)
 
-  defp env_prefix(env) when is_map(env) do
-    env |> Map.to_list() |> env_prefix()
-  end
-
-  defp env_prefix(env) when is_list(env) do
-    Enum.map_join(env, " ", fn {key, value} -> "#{key}=#{shell_escape(value)}" end)
-  end
-
-  defp shell_join(parts), do: Enum.map_join(parts, " ", &shell_escape/1)
-
-  defp shell_escape(value) do
-    value
-    |> to_string()
-    |> String.replace("'", "'\\''")
-    |> then(&"'#{&1}'")
-  end
+  defp shell_join(parts), do: HostKit.Shell.join(parts)
 end

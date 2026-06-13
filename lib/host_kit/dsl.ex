@@ -557,6 +557,12 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro git(name, args, opts \\ []) do
+    quote do
+      command(unquote(name), Keyword.put(unquote(opts), :exec, ["git" | unquote(args)]))
+    end
+  end
+
   defmacro mise(opts \\ [], do: block) do
     quote do
       HostKit.DSL.Scope.start_mise(unquote(opts))

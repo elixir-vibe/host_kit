@@ -6,6 +6,17 @@ defmodule HostKit.Recipes.ElixirApp do
   @default_erlang "27.2"
   @default_elixir "1.18.2-otp-27"
 
+  defmacro mix(name, args, opts \\ []) do
+    quote do
+      command(
+        unquote(name),
+        unquote(opts)
+        |> Keyword.put_new(:runtime, {:mise, :beam})
+        |> Keyword.put(:exec, ["mix" | unquote(args)])
+      )
+    end
+  end
+
   defrecipe elixir_app(name, opts) do
     app = __MODULE__.assigns(name, opts)
 
@@ -29,34 +40,35 @@ defmodule HostKit.Recipes.ElixirApp do
         set("SECRET_KEY_BASE", app.phoenix.secret_key_base)
       end
 
-      command(app.commands.checkout.name,
-        exec: app.commands.checkout.exec,
+      git(
+        app.commands.checkout.name,
+        ["clone", "--branch", app.source.ref, app.source.repo, app.paths.source],
         creates: app.paths.source,
         timeout: 120_000
       )
 
-      command(app.commands.deps.name,
+      mix(
+        app.commands.deps.name,
+        ["deps.get", "--only", "prod"],
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
-        exec: app.commands.deps.exec,
-        runtime: {:mise, :beam},
         timeout: 300_000
       )
 
-      command(app.commands.assets.name,
+      mix(
+        app.commands.assets.name,
+        ["assets.deploy"],
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
-        exec: app.commands.assets.exec,
-        runtime: {:mise, :beam},
         unless: "test ! -f mix.exs || ! grep -q assets.deploy mix.exs",
         timeout: 300_000
       )
 
-      command(app.commands.release.name,
+      mix(
+        app.commands.release.name,
+        ["release"],
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
-        exec: app.commands.release.exec,
-        runtime: {:mise, :beam},
         creates: app.paths.release_bin,
         timeout: 300_000
       )
@@ -143,20 +155,13 @@ defmodule HostKit.Recipes.ElixirApp do
     }
   end
 
-  defp commands(app, paths) do
+  defp commands(app, _paths) do
     %{
-      checkout: %{
-        name: command_name(app, :checkout),
-        exec: ["git", "clone", "--branch", app.source.ref, app.source.repo, paths.source]
-      },
-      deps: mix_command(app, :deps, ["deps.get", "--only", "prod"]),
-      assets: mix_command(app, :assets, ["assets.deploy"]),
-      release: mix_command(app, :release, ["release"])
+      checkout: %{name: command_name(app, :checkout)},
+      deps: %{name: command_name(app, :deps)},
+      assets: %{name: command_name(app, :assets)},
+      release: %{name: command_name(app, :release)}
     }
-  end
-
-  defp mix_command(app, step, args) do
-    %{name: command_name(app, step), exec: ["mix" | args]}
   end
 
   defp command_name(app, step), do: "#{app.name}_#{step}"
