@@ -33,7 +33,7 @@ defmodule HostKit.Runner.SSH.Connection do
   def cmd(command, args, opts) do
     opts
     |> Keyword.fetch!(:conn)
-    |> exec(shell_join([command | args]), opts)
+    |> exec(command_line(command, args, opts), opts)
   end
 
   @impl true
@@ -158,6 +158,27 @@ defmodule HostKit.Runner.SSH.Connection do
       path ->
         Keyword.put(ssh_opts, :key_cb, {HostKit.Runner.SSH.IdentityKey, identity_file: path})
     end
+  end
+
+  defp command_line(command, args, opts) do
+    command = shell_join([command | args])
+
+    [cd_prefix(Keyword.get(opts, :cd)), env_prefix(Keyword.get(opts, :env)), command]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join(" ")
+  end
+
+  defp cd_prefix(nil), do: ""
+  defp cd_prefix(path), do: "cd #{shell_escape(path)} &&"
+
+  defp env_prefix(nil), do: ""
+
+  defp env_prefix(env) when is_map(env) do
+    env |> Map.to_list() |> env_prefix()
+  end
+
+  defp env_prefix(env) when is_list(env) do
+    Enum.map_join(env, " ", fn {key, value} -> "#{key}=#{shell_escape(value)}" end)
   end
 
   defp shell_join(parts), do: Enum.map_join(parts, " ", &shell_escape/1)

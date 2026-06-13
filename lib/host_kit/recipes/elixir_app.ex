@@ -30,7 +30,7 @@ defmodule HostKit.Recipes.ElixirApp do
       end
 
       command(app.commands.checkout.name,
-        run: app.commands.checkout.run,
+        exec: app.commands.checkout.exec,
         creates: app.paths.source,
         timeout: 120_000
       )
@@ -38,14 +38,16 @@ defmodule HostKit.Recipes.ElixirApp do
       command(app.commands.deps.name,
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
-        run: app.commands.deps.run,
+        exec: app.commands.deps.exec,
+        runtime: {:mise, :beam},
         timeout: 300_000
       )
 
       command(app.commands.assets.name,
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
-        run: app.commands.assets.run,
+        exec: app.commands.assets.exec,
+        runtime: {:mise, :beam},
         unless: "test ! -f mix.exs || ! grep -q assets.deploy mix.exs",
         timeout: 300_000
       )
@@ -53,7 +55,8 @@ defmodule HostKit.Recipes.ElixirApp do
       command(app.commands.release.name,
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
-        run: app.commands.release.run,
+        exec: app.commands.release.exec,
+        runtime: {:mise, :beam},
         creates: app.paths.release_bin,
         timeout: 300_000
       )
@@ -141,38 +144,23 @@ defmodule HostKit.Recipes.ElixirApp do
   end
 
   defp commands(app, paths) do
-    mise = mise_command(app)
-
     %{
       checkout: %{
         name: command_name(app, :checkout),
-        run: "git clone --branch #{sh(app.source.ref)} #{sh(app.source.repo)} #{sh(paths.source)}"
+        exec: ["git", "clone", "--branch", app.source.ref, app.source.repo, paths.source]
       },
-      deps: %{
-        name: command_name(app, :deps),
-        run: "#{mise} mix deps.get --only prod"
-      },
-      assets: %{
-        name: command_name(app, :assets),
-        run: "#{mise} mix assets.deploy"
-      },
-      release: %{
-        name: command_name(app, :release),
-        run: "#{mise} mix release"
-      }
+      deps: mix_command(app, :deps, ["deps.get", "--only", "prod"]),
+      assets: mix_command(app, :assets, ["assets.deploy"]),
+      release: mix_command(app, :release, ["release"])
     }
   end
 
-  defp mise_command(app) do
-    tools = "erlang@#{app.runtime.erlang} elixir@#{app.runtime.elixir}"
-
-    "MISE_NO_CONFIG=1 MISE_SYSTEM_DATA_DIR=/usr/local/share/mise /usr/local/bin/mise exec #{tools} --"
+  defp mix_command(app, step, args) do
+    %{name: command_name(app, step), exec: ["mix" | args]}
   end
 
   defp command_name(app, step), do: "#{app.name}_#{step}"
 
   defp secret_key_base(:generate), do: Base.encode64(:crypto.strong_rand_bytes(64))
   defp secret_key_base(value), do: value
-
-  defp sh(value), do: "'" <> String.replace(to_string(value), "'", "'\\''") <> "'"
 end

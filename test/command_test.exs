@@ -1,7 +1,7 @@
 defmodule HostKit.CommandTest do
   use ExUnit.Case, async: false
 
-  test "command resources apply shell steps and honor creates" do
+  test "command resources apply argv steps and honor creates" do
     root = Path.join(System.tmp_dir!(), "hostkit-command-#{System.unique_integer([:positive])}")
     path = Path.join(root, "hello.txt")
 
@@ -15,7 +15,9 @@ defmodule HostKit.CommandTest do
           resources: [
             HostKit.Resources.Directory.new(root),
             HostKit.Resources.Command.new(:write_hello,
-              run: "printf hello > #{path}",
+              exec: ["sh", "-c", "printf \"%s\" \"$HOSTKIT_MESSAGE\" > hello.txt"],
+              cwd: root,
+              env: %{"HOSTKIT_MESSAGE" => "hello"},
               creates: path
             )
           ]

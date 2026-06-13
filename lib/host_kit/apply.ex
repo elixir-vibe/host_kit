@@ -176,37 +176,70 @@ defmodule HostKit.Apply do
   end
 
   defp apply_command(%Command{} = command, opts) do
-    Ops.cmd(opts, "sh", ["-c", command_script(command)], command_opts(command))
+    with :ok <- command_creates(command, opts),
+         :ok <- command_unless(command, opts) do
+      {executable, args, command_opts} = command_exec(command, opts)
+      Ops.cmd(opts, executable, args, command_opts)
+    else
+      :skip -> :ok
+    end
   end
 
-  defp command_opts(%Command{timeout: nil}), do: []
-  defp command_opts(%Command{timeout: timeout}), do: [timeout: timeout]
+  defp command_creates(%Command{creates: nil}, _opts), do: :ok
 
-  defp command_script(%Command{} = command) do
-    command
-    |> command_parts()
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.join("\n")
+  defp command_creates(%Command{creates: path}, opts) do
+    case Ops.cmd(opts, "test", ["-e", path]) do
+      :ok -> :skip
+      {:error, _reason} -> :ok
+    end
   end
 
-  defp command_parts(%Command{} = command) do
-    [
-      if(command.creates,
-        do: "if test -e #{shell_escape(command.creates)}; then exit 0; fi",
-        else: ""
-      ),
-      if(command.unless, do: "if ( #{command.unless} ); then exit 0; fi", else: ""),
-      if(command.cwd, do: "cd #{shell_escape(command.cwd)}", else: ""),
-      command_env(command.env) <> command.run
-    ]
+  defp command_unless(%Command{unless: nil}, _opts), do: :ok
+
+  defp command_unless(%Command{unless: shell}, opts) do
+    case Ops.cmd(opts, "sh", ["-c", shell]) do
+      :ok -> :skip
+      {:error, _reason} -> :ok
+    end
   end
 
-  defp command_env(env) when map_size(env) == 0, do: ""
+  defp command_exec(%Command{exec: {command, args}, runtime: nil} = resource, _opts) do
+    {command, args, command_opts(resource)}
+  end
 
-  defp command_env(env) do
-    env
-    |> Enum.map_join(" ", fn {key, value} -> "#{key}=#{shell_escape(value)}" end)
-    |> Kernel.<>(" ")
+  defp command_exec(%Command{exec: {command, args}, runtime: {:mise, name}} = resource, opts) do
+    mise = find_mise!(name, opts)
+    tool_args = Enum.map(mise.tools, &"#{&1.name}@#{&1.version}")
+
+    command_opts =
+      resource
+      |> command_opts()
+      |> Keyword.update(:env, mise_env(mise), &Map.merge(mise_env(mise), &1))
+
+    {mise.path, ["exec"] ++ tool_args ++ ["--", command | args], command_opts}
+  end
+
+  defp command_opts(%Command{} = command) do
+    []
+    |> maybe_put(:cd, command.cwd)
+    |> maybe_put(:env, command.env)
+    |> maybe_put(:timeout, command.timeout)
+  end
+
+  defp maybe_put(opts, _key, nil), do: opts
+  defp maybe_put(opts, _key, value) when value == %{}, do: opts
+  defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp find_mise!(name, opts) do
+    opts
+    |> Keyword.fetch!(:project)
+    |> HostKit.Project.resources()
+    |> Enum.find(&match?(%Mise{name: ^name}, &1)) ||
+      raise ArgumentError, "unknown mise runtime #{inspect(name)}"
+  end
+
+  defp mise_env(%Mise{system_data_dir: system_data_dir}) do
+    %{"MISE_NO_CONFIG" => "1", "MISE_SYSTEM_DATA_DIR" => system_data_dir}
   end
 
   defp apply_egress(%HostKit.Workspace.Egress{user: user} = egress, opts) do
@@ -320,8 +353,6 @@ defmodule HostKit.Apply do
   end
 
   defp runner(opts), do: Keyword.get(opts, :runner, HostKit.Runner.Local)
-
-  defp shell_escape(value), do: "'" <> String.replace(to_string(value), "'", "'\\''") <> "'"
 
   defp skipped(change), do: %{change: change, status: :skipped}
 end

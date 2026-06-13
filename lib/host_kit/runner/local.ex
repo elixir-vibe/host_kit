@@ -5,7 +5,14 @@ defmodule HostKit.Runner.Local do
 
   @impl true
   def cmd(command, args, opts \\ []) do
-    System.cmd(command, args, opts)
+    System.cmd(command, args, normalize_opts(opts))
+  end
+
+  defp normalize_opts(opts) do
+    case Keyword.fetch(opts, :env) do
+      {:ok, env} when is_map(env) -> Keyword.put(opts, :env, Map.to_list(env))
+      _other -> opts
+    end
   end
 
   @impl true

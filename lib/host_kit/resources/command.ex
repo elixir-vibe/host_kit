@@ -1,9 +1,13 @@
 defmodule HostKit.Resources.Command do
   @moduledoc "Declarative command step used for build/bootstrap workflows."
 
+  @type exec :: {String.t(), [String.t()]}
+  @type runtime :: nil | {:mise, atom()}
+
   @type t :: %__MODULE__{
           name: atom() | String.t(),
-          run: String.t(),
+          exec: exec(),
+          runtime: runtime(),
           cwd: String.t() | nil,
           env: %{String.t() => String.t()},
           creates: String.t() | nil,
@@ -14,7 +18,8 @@ defmodule HostKit.Resources.Command do
         }
 
   defstruct name: nil,
-            run: nil,
+            exec: nil,
+            runtime: nil,
             cwd: nil,
             env: %{},
             creates: nil,
@@ -27,7 +32,8 @@ defmodule HostKit.Resources.Command do
   def new(name, opts) do
     %__MODULE__{
       name: name,
-      run: Keyword.fetch!(opts, :run),
+      exec: opts |> Keyword.fetch!(:exec) |> normalize_exec(),
+      runtime: Keyword.get(opts, :runtime),
       cwd: Keyword.get(opts, :cwd),
       env: opts |> Keyword.get(:env, %{}) |> normalize_env(),
       creates: Keyword.get(opts, :creates),
@@ -39,6 +45,9 @@ defmodule HostKit.Resources.Command do
   end
 
   def id(%__MODULE__{name: name}), do: {:command, name}
+
+  defp normalize_exec({command, args}), do: {to_string(command), Enum.map(args, &to_string/1)}
+  defp normalize_exec([command | args]), do: normalize_exec({command, args})
 
   defp normalize_env(env) when is_map(env) do
     Map.new(env, fn {key, value} -> {to_string(key), to_string(value)} end)
