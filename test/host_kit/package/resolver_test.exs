@@ -81,7 +81,7 @@ defmodule HostKit.Package.ResolverTest do
 
     assert resolved.system_name == "libssl-dev"
     assert resolved.source == :semantic
-    assert resolved.meta.resolution.source == :repology
+    assert resolved.meta.resolution.source == :repology_api
     assert resolved.meta.resolution.project == "openssl"
     assert resolved.meta.resolution.repo == "debian_13"
   end

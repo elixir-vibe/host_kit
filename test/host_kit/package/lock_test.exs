@@ -66,5 +66,7 @@ defmodule HostKit.Package.LockTest do
              )
 
     assert resolved.system_name == "libssl-dev"
+    assert resolved.meta.resolution.source == :lock
+    assert resolved.meta.resolution.repo == "debian_13"
   end
 end

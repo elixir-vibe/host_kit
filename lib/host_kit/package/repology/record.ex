@@ -18,7 +18,8 @@ defmodule HostKit.Package.Repology.Record do
           summary: String.t() | nil,
           categories: [String.t()],
           licenses: [String.t()],
-          maintainers: [String.t()]
+          maintainers: [String.t()],
+          meta: map()
         }
 
   defstruct repo: nil,
@@ -33,5 +34,6 @@ defmodule HostKit.Package.Repology.Record do
             summary: nil,
             categories: [],
             licenses: [],
-            maintainers: []
+            maintainers: [],
+            meta: %{}
 end

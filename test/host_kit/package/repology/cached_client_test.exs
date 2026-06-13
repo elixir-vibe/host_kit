@@ -55,10 +55,12 @@ defmodule HostKit.Package.Repology.CachedClientTest do
       rate_limit: false
     ]
 
-    assert {:ok, [%Record{srcname: "openssl"}]} = CachedClient.project(:openssl, opts)
+    assert {:ok, [%Record{srcname: "openssl", meta: %{source: :api}}]} =
+             CachedClient.project(:openssl, opts)
+
     assert_received {:project, :openssl}
 
-    assert {:ok, [%Record{srcname: "openssl"}]} =
+    assert {:ok, [%Record{srcname: "openssl", meta: %{source: :cache}}]} =
              CachedClient.project(:openssl, Keyword.put(opts, :base_client, FailingClient))
 
     refute_received {:project, :openssl}
@@ -78,7 +80,7 @@ defmodule HostKit.Package.Repology.CachedClientTest do
     assert {:ok, [%Record{}]} = CachedClient.project(:curl, opts)
     assert_received {:project, :curl}
 
-    assert {:ok, [%Record{srcname: "curl"}]} =
+    assert {:ok, [%Record{srcname: "curl", meta: %{source: :stale_cache}}]} =
              CachedClient.project(:curl, Keyword.put(opts, :base_client, FailingClient))
   end
 

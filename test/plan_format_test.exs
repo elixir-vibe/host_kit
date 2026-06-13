@@ -43,7 +43,7 @@ defmodule HostKit.PlanFormatTest do
       meta: %{
         resolution: %Resolution{
           package: "libssl-dev",
-          source: :repology,
+          source: :repology_cache,
           project: "openssl",
           repo: "debian_13"
         }
@@ -66,7 +66,7 @@ defmodule HostKit.PlanFormatTest do
              Plan: 1 to create, 0 to update, 0 to delete, 0 read errors, 0 unchanged
              + package.openssl_dev
                create missing
-               resolves to libssl-dev via repology (openssl/debian_13)
+               resolves to libssl-dev via repology cache (openssl/debian_13)
              """)
   end
 end

@@ -213,7 +213,8 @@ defmodule HostKit.Package.Resolver do
          repology_resolution(
            resolution,
            capability,
-           inferred_project(records, to_string(capability))
+           inferred_project(records, to_string(capability)),
+           records
          )}
 
       :none ->
@@ -241,7 +242,8 @@ defmodule HostKit.Package.Resolver do
 
     case choice do
       {:ok, resolution} ->
-        {:ok, repology_resolution(resolution, capability, inferred_project(records, project))}
+        {:ok,
+         repology_resolution(resolution, capability, inferred_project(records, project), records)}
 
       :none ->
         {:error, {:package_resolution_not_found, capability, repo_match}}
@@ -281,7 +283,7 @@ defmodule HostKit.Package.Resolver do
          %{
            resolution
            | capability: capability,
-             source: :repology,
+             source: repology_source(records),
              project: inferred_project(records, package_name)
          }}
 
@@ -340,8 +342,20 @@ defmodule HostKit.Package.Resolver do
 
   defp dev_capability?(_capability), do: false
 
-  defp repology_resolution(%Resolution{} = resolution, capability, project) do
-    %{resolution | capability: capability, source: :repology, project: project}
+  defp repology_resolution(%Resolution{} = resolution, capability, project, records) do
+    %{resolution | capability: capability, source: repology_source(records), project: project}
+  end
+
+  defp repology_source(records) do
+    records
+    |> Enum.map(&get_in(&1.meta, [:source]))
+    |> Enum.find(& &1)
+    |> case do
+      :cache -> :repology_cache
+      :stale_cache -> :repology_stale_cache
+      :api -> :repology_api
+      _other -> :repology_api
+    end
   end
 
   defp inferred_project(records, fallback) do
@@ -394,11 +408,26 @@ defmodule HostKit.Package.Resolver do
 
   defp package_from_lock(package, capability, repo_match, lock) do
     case HostKit.Package.Lock.get(lock, capability, repo_match) do
-      {:ok, system_name} -> {:ok, %{package | system_name: system_name}}
-      :error -> :error
-      {:error, reason} -> {:error, reason}
+      {:ok, system_name} ->
+        resolution = %Resolution{
+          capability: capability,
+          package: system_name,
+          source: :lock,
+          repo: lock_repo(lock, repo_match)
+        }
+
+        {:ok, apply_resolution(package, resolution)}
+
+      :error ->
+        :error
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
+
+  defp lock_repo(_lock, repo) when is_binary(repo), do: repo
+  defp lock_repo(%HostKit.Package.Lock{target: target}, _repo), do: target
 
   defp apply_resolution(package, %Resolution{} = resolution) do
     %{

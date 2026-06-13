@@ -61,12 +61,17 @@ defmodule HostKit.Plan.Format do
       "\n  resolves to ",
       resolution.package,
       " via ",
-      Atom.to_string(resolution.source),
+      format_resolution_source(resolution.source),
       resolution_context(resolution)
     ]
   end
 
   defp format_details(_change), do: []
+
+  defp format_resolution_source(:repology_api), do: "repology api"
+  defp format_resolution_source(:repology_cache), do: "repology cache"
+  defp format_resolution_source(:repology_stale_cache), do: "stale repology cache"
+  defp format_resolution_source(source) when is_atom(source), do: Atom.to_string(source)
 
   defp resolution_context(%Resolution{project: project, repo: repo}) do
     case {project, repo} do

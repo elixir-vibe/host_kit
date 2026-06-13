@@ -7,10 +7,19 @@ defmodule HostKit.Package.Repology.Cache do
   @spec fetch(term(), keyword(), (-> {:ok, term()} | {:error, term()})) ::
           {:ok, term()} | {:error, term()}
   def fetch(key, opts, fun) do
+    case fetch_with_source(key, opts, fun) do
+      {:ok, value, _source} -> {:ok, value}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec fetch_with_source(term(), keyword(), (-> {:ok, term()} | {:error, term()})) ::
+          {:ok, term(), atom()} | {:error, term()}
+  def fetch_with_source(key, opts, fun) do
     if enabled?(opts) do
       fetch_cached(key, opts, fun)
     else
-      fun.()
+      with {:ok, value} <- fun.(), do: {:ok, value, :api}
     end
   end
 
@@ -19,7 +28,7 @@ defmodule HostKit.Package.Repology.Cache do
 
     case read(path, opts) do
       {:ok, value, :fresh} ->
-        {:ok, value}
+        {:ok, value, :cache}
 
       {:ok, value, :stale} ->
         refresh(path, fun, {:ok, value})
@@ -33,11 +42,11 @@ defmodule HostKit.Package.Repology.Cache do
     case fun.() do
       {:ok, value} ->
         :ok = write(path, value)
-        {:ok, value}
+        {:ok, value, :api}
 
       {:error, _reason} = error ->
         case fallback do
-          {:ok, value} -> {:ok, value}
+          {:ok, value} -> {:ok, value, :stale_cache}
           :miss -> error
         end
     end
