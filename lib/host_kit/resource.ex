@@ -21,6 +21,7 @@ defmodule HostKit.Resource do
                       HostKit.ProviderConfig,
                       HostKit.Proxy,
                       HostKit.Resources.Capability,
+                      HostKit.Resources.Command,
                       HostKit.Resources.Directory,
                       HostKit.Resources.EnvFile,
                       HostKit.Resources.File,

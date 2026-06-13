@@ -3,7 +3,7 @@ defmodule HostKit.Apply do
 
   alias HostKit.{Change, Firewall, Plan, Provider, Proxy, Resources, Runner, Systemd}
   alias HostKit.Package.Manager
-  alias Resources.{Directory, EnvFile, File, Mise, Package, User}
+  alias Resources.{Command, Directory, EnvFile, File, Mise, Package, User}
   alias Runner.Ops
 
   @type result :: %{change: Change.t(), status: :dry_run | :applied | :skipped}
@@ -73,6 +73,11 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %File{} = file} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn -> apply_file(file, opts) end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Command{} = command} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> apply_command(command, opts) end)
   end
 
   defp apply_change(%Change{action: action, after: %EnvFile{} = env_file} = change, opts)
@@ -168,6 +173,40 @@ defmodule HostKit.Apply do
          :ok <- Ops.chown(path, env_file.owner, env_file.group, opts) do
       Ops.chmod(path, env_file.mode, opts)
     end
+  end
+
+  defp apply_command(%Command{} = command, opts) do
+    Ops.cmd(opts, "sh", ["-c", command_script(command)], command_opts(command))
+  end
+
+  defp command_opts(%Command{timeout: nil}), do: []
+  defp command_opts(%Command{timeout: timeout}), do: [timeout: timeout]
+
+  defp command_script(%Command{} = command) do
+    command
+    |> command_parts()
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n")
+  end
+
+  defp command_parts(%Command{} = command) do
+    [
+      if(command.creates,
+        do: "if test -e #{shell_escape(command.creates)}; then exit 0; fi",
+        else: ""
+      ),
+      if(command.unless, do: "if ( #{command.unless} ); then exit 0; fi", else: ""),
+      if(command.cwd, do: "cd #{shell_escape(command.cwd)}", else: ""),
+      command_env(command.env) <> command.run
+    ]
+  end
+
+  defp command_env(env) when map_size(env) == 0, do: ""
+
+  defp command_env(env) do
+    env
+    |> Enum.map_join(" ", fn {key, value} -> "#{key}=#{shell_escape(value)}" end)
+    |> Kernel.<>(" ")
   end
 
   defp apply_egress(%HostKit.Workspace.Egress{user: user} = egress, opts) do
@@ -281,6 +320,8 @@ defmodule HostKit.Apply do
   end
 
   defp runner(opts), do: Keyword.get(opts, :runner, HostKit.Runner.Local)
+
+  defp shell_escape(value), do: "'" <> String.replace(to_string(value), "'", "'\\''") <> "'"
 
   defp skipped(change), do: %{change: change, status: :skipped}
 end

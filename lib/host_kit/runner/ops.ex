@@ -18,11 +18,16 @@ defmodule HostKit.Runner.Ops do
     cmd(opts, "chmod", [Integer.to_string(mode, 8), path])
   end
 
-  @spec cmd(keyword(), String.t(), [String.t()]) :: :ok | {:error, term()}
-  def cmd(opts, command, args) do
+  @spec cmd(keyword(), String.t(), [String.t()], keyword()) :: :ok | {:error, term()}
+  def cmd(opts, command, args, command_opts \\ []) do
     {command, args} = maybe_sudo(command, args, opts)
 
-    case Runner.cmd(runner(opts), command, args, stderr_to_stdout: true) do
+    case Runner.cmd(
+           runner(opts),
+           command,
+           args,
+           Keyword.merge([stderr_to_stdout: true], command_opts)
+         ) do
       {_output, 0} -> :ok
       {output, status} -> {:error, {:command_failed, command, args, status, output}}
     end

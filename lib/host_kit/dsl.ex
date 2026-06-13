@@ -13,6 +13,11 @@ defmodule HostKit.DSL do
       |> Enum.map(&Macro.expand(&1, __CALLER__))
       |> HostKit.Provider.resolve()
 
+    recipes =
+      opts
+      |> Keyword.get(:recipes, [])
+      |> Enum.map(&Macro.expand(&1, __CALLER__))
+
     provider_imports =
       plugins
       |> HostKit.Provider.dsl_modules()
@@ -22,11 +27,19 @@ defmodule HostKit.DSL do
         end
       end)
 
+    recipe_imports =
+      Enum.map(recipes, fn recipe ->
+        quote do
+          import unquote(recipe)
+        end
+      end)
+
     quote do
       HostKit.DSL.Scope.put_default_providers(unquote(plugins))
       import HostKit.DSL
       import HostKit.DSL.Systemd
       unquote_splicing(provider_imports)
+      unquote_splicing(recipe_imports)
     end
   end
 
@@ -535,6 +548,12 @@ defmodule HostKit.DSL do
   defmacro file(path, opts \\ []) do
     quote do
       HostKit.DSL.Scope.add_resource(HostKit.Resources.File.new(unquote(path), unquote(opts)))
+    end
+  end
+
+  defmacro command(name, opts) do
+    quote do
+      HostKit.DSL.Scope.add_resource(HostKit.Resources.Command.new(unquote(name), unquote(opts)))
     end
   end
 
