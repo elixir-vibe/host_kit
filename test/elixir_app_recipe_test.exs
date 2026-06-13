@@ -65,7 +65,15 @@ defmodule HostKit.ElixirAppRecipeTest do
                false
            end)
 
-    assert Enum.any?(resources, &match?(%HostKit.Systemd.Service{name: "hello.service"}, &1))
+    assert Enum.any?(resources, fn
+             %HostKit.Systemd.Service{name: "hello.service", service: service} ->
+               service |> Keyword.get(:exec_start) |> List.wrap() |> hd() =~
+                 "/_build/prod/rel/hello/bin/hello"
+
+             _resource ->
+               false
+           end)
+
     assert Enum.any?(resources, &match?(%HostKit.Caddy.Site{host: "hello.example.com"}, &1))
   end
 end

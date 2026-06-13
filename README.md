@@ -91,11 +91,17 @@ mix host_kit.apply --host app \
 
 ## Interactive notebook
 
-Deploy a real Caddy-backed static site from Livebook, with Kino inputs for SSH target/auth, optional Let's Encrypt HTTPS for a real hostname, plan review, explicit apply, and HTTP verification:
+Deploy real services from Livebook with Kino inputs for SSH target/auth, plan review, explicit apply, and HTTP verification:
 
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Felixir-vibe%2Fhost_kit%2Fblob%2Fmaster%2Fnotebooks%2Flearn%2Fdeploy_caddy_site.livemd)
+Static Caddy site:
 
-The notebook is self-contained and its deployment DSL cell is also exercised by the integration test suite.
+[![Run Caddy notebook in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Felixir-vibe%2Fhost_kit%2Fblob%2Fmaster%2Fnotebooks%2Flearn%2Fdeploy_caddy_site.livemd)
+
+Phoenix app from Git, with pinned source revision and source-aware build stamps:
+
+[![Run Phoenix notebook in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Felixir-vibe%2Fhost_kit%2Fblob%2Fmaster%2Fnotebooks%2Flearn%2Fdeploy_phoenix_app.livemd)
+
+The notebooks are self-contained and their deployment DSL cells are also exercised by the integration test suite.
 
 ## Documentation
 
@@ -108,6 +114,7 @@ The notebook is self-contained and its deployment DSL cell is also exercised by 
 - [Observability and monitors](guides/operations/observability-and-monitors.md)
 - [Timers and jobs](guides/operations/timers-and-jobs.md)
 - [Deploy a Caddy site Livebook](notebooks/learn/deploy_caddy_site.livemd)
+- [Deploy a Phoenix app Livebook](notebooks/learn/deploy_phoenix_app.livemd)
 - [CLI reference](guides/reference/cli.md)
 - [Full DSL/reference notes](guides/reference/full-reference.md)
 - [Changelog](CHANGELOG.md)

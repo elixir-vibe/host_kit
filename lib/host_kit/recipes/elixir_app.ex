@@ -163,7 +163,8 @@ defmodule HostKit.Recipes.ElixirApp do
       app_dir: app_dir,
       env: "/etc/hostkit/#{app.name}.env",
       service_unit: "#{app.name}.service",
-      release_bin: Path.join([app_dir, "_build/prod/rel", app.release_name, "bin/server"])
+      release_bin:
+        Path.join([app_dir, "_build/prod/rel", app.release_name, "bin", app.release_name])
     }
   end
 
