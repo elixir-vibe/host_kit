@@ -10,7 +10,10 @@ defmodule HostKit.MixProject do
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
-      dialyzer: [plt_add_apps: [:mix, :ssh]]
+      dialyzer: [plt_add_apps: [:mix, :ssh]],
+      package: package(),
+      description: description(),
+      docs: docs()
     ]
   end
 
@@ -37,11 +40,53 @@ defmodule HostKit.MixProject do
       {:req, "~> 0.5"},
       {:hammer, "~> 7.0"},
       {:dotenvy, "~> 1.1"},
+      {:ex_doc, "~> 0.38", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},
       {:ex_slop, "~> 0.1", only: [:dev, :test], runtime: false},
       {:reach, "~> 2.3", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp description do
+    "Elixir-native host management with inspectable plans, package locks, systemd isolation, and remote bootstrap."
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/elixir-vibe/host_kit"},
+      files:
+        ~w(lib guides examples scripts .formatter.exs mix.exs README.md CHANGELOG.md LICENSE*)
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      source_url: "https://github.com/elixir-vibe/host_kit",
+      extras: [
+        "README.md",
+        "CHANGELOG.md",
+        "guides/introduction/getting-started.md",
+        "guides/introduction/conventions-and-paths.md",
+        "guides/deployment/remote-bootstrap.md",
+        "guides/deployment/systemd-isolation.md",
+        "guides/deployment/firewall-and-networking.md",
+        "guides/workspaces/workspaces-and-tenants.md",
+        "guides/operations/observability-and-monitors.md",
+        "guides/operations/timers-and-jobs.md",
+        "guides/reference/cli.md",
+        "guides/reference/full-reference.md"
+      ],
+      groups_for_extras: [
+        Introduction: ~r/guides\/introduction\//,
+        Deployment: ~r/guides\/deployment\//,
+        Workspaces: ~r/guides\/workspaces\//,
+        Operations: ~r/guides\/operations\//,
+        Reference: ~r/guides\/reference\//
+      ]
     ]
   end
 
