@@ -86,7 +86,7 @@ defmodule HostKit.Workspace do
     with {:ok, service} <-
            workspace_service(project, owner, workspace, Keyword.get(opts, :service, :agent)),
          {:ok, socket} <- agent_socket(service) do
-      HostKit.Workspace.Agent.Client.exec(socket, argv, opts)
+      workspace_agent_client(opts).exec(socket, argv, opts)
     end
   end
 
@@ -101,8 +101,7 @@ defmodule HostKit.Workspace do
              Keyword.get(opts, :service, :agent)
            ),
          {:ok, socket} <- agent_socket(service),
-         {:ok, workspace_results} <-
-           HostKit.Workspace.Agent.Client.run_checks(socket, checks, opts) do
+         {:ok, workspace_results} <- workspace_agent_client(opts).run_checks(socket, checks, opts) do
       {:cont, {:ok, results ++ workspace_results}}
     else
       {:error, :workspace_service_not_found} ->
@@ -122,6 +121,9 @@ defmodule HostKit.Workspace do
       end
     end)
   end
+
+  defp workspace_agent_client(opts),
+    do: Keyword.get(opts, :client, HostKit.Workspace.Agent.LocalClient)
 
   defp agent_socket(service) do
     case service.meta[:agent_socket] do

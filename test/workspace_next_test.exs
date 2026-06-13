@@ -23,7 +23,7 @@ defmodule HostKit.WorkspaceNextTest do
     assert rendered =~ "tcp dport 443 accept"
   end
 
-  test "unix client delegates JSON requests over transport errors" do
+  test "unix client uses Erlang term transport and reports transport errors" do
     assert {:error, _reason} =
              HostKit.Workspace.Agent.UnixClient.status("/tmp/missing.sock", timeout: 10)
   end
