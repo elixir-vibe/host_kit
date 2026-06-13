@@ -285,7 +285,7 @@ Workspaces can declare the default sandbox agent service as ordinary HostKit res
 
 ```elixir
 workspace :blog, owner: :alice do
-  workspace_agent port: 4173
+  agent port: 4173
 end
 ```
 

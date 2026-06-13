@@ -1,7 +1,7 @@
 defmodule HostKit.WorkspaceAgentTest do
   use ExUnit.Case, async: true
 
-  test "workspace_agent expands to ordinary HostKit resources" do
+  test "agent expands to ordinary HostKit resources inside workspace" do
     source = """
     use HostKit.DSL
 
@@ -10,7 +10,7 @@ defmodule HostKit.WorkspaceAgentTest do
       prefixes user: "hk-", unit: "hk-ws-"
 
       workspace :blog, owner: :alice do
-        workspace_agent port: 4173
+        agent port: 4173
       end
     end
     """

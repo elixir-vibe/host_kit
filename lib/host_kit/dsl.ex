@@ -239,7 +239,7 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro workspace_agent(opts \\ []) do
+  defmacro agent(opts \\ []) do
     quote do
       service Keyword.get(unquote(opts), :service, :agent) do
         system_user(service_user())
@@ -269,6 +269,12 @@ defmodule HostKit.DSL do
           network_policy(deny: :all, allow: [:loopback])
         end
       end
+    end
+  end
+
+  defmacro workspace_agent(opts \\ []) do
+    quote do
+      agent(unquote(opts))
     end
   end
 
