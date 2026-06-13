@@ -21,6 +21,7 @@ defmodule Mix.Tasks.HostKit.Plan do
           sudo: :boolean,
           require: :keep,
           format: :string,
+          out: :string,
           ignore: :keep,
           package_lock: :string,
           write_package_lock: :string
@@ -32,8 +33,25 @@ defmodule Mix.Tasks.HostKit.Plan do
 
     Options.with_target_opts(opts, fn target_opts ->
       {:ok, plan} = HostKit.plan(project, plan_opts(opts, target_opts))
+      maybe_write_artifact(plan, opts)
       IO.puts(format_plan(plan, opts))
     end)
+  end
+
+  defp maybe_write_artifact(plan, opts) do
+    case Keyword.get(opts, :out) do
+      nil ->
+        :ok
+
+      path ->
+        case HostKit.Plan.Artifact.save(path, plan) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Mix.raise("could not write HostKit plan artifact: #{inspect(reason)}")
+        end
+    end
   end
 
   defp format_plan(plan, opts) do

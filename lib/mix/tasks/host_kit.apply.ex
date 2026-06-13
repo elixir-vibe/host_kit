@@ -22,23 +22,40 @@ defmodule Mix.Tasks.HostKit.Apply do
           require: :keep,
           ignore: :keep,
           package_lock: :string,
+          plan: :string,
           dry_run: :boolean,
           confirm: :boolean
         ],
         aliases: [dry_run: :dry_run]
       )
 
-    path = List.first(positional) || "infra/config.exs"
-    project = HostKit.load!(path, require: Keyword.get_values(opts, :require))
-
     Options.with_target_opts(opts, fn target_opts ->
-      {:ok, plan} = HostKit.plan(project, plan_opts(opts, target_opts))
+      plan = load_plan(opts, positional, target_opts)
 
       case HostKit.apply(plan, apply_opts(opts, target_opts)) do
         {:ok, results} -> print_results(results)
         {:error, reason} -> Mix.raise("HostKit apply failed: #{inspect(reason)}")
       end
     end)
+  end
+
+  defp load_plan(opts, positional, target_opts) do
+    case Keyword.get(opts, :plan) do
+      nil ->
+        path = List.first(positional) || "infra/config.exs"
+        project = HostKit.load!(path, require: Keyword.get_values(opts, :require))
+        {:ok, plan} = HostKit.plan(project, plan_opts(opts, target_opts))
+        plan
+
+      artifact_path ->
+        case HostKit.Plan.Artifact.load(artifact_path) do
+          {:ok, plan} ->
+            plan
+
+          {:error, reason} ->
+            Mix.raise("could not load HostKit plan artifact: #{inspect(reason)}")
+        end
+    end
   end
 
   defp print_results(results) do
