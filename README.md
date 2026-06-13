@@ -237,12 +237,16 @@ host :prod, hostname: "elixir.toys" do
 end
 ```
 
-Extract or render policies with:
+Extract, render, plan, and apply policies with:
 
 ```elixir
 HostKit.Firewall.policies(project)
 HostKit.Firewall.Nftables.render(policy)
+HostKit.plan(project, reader: HostKit.Local)
+HostKit.apply(plan, confirm: true, nft_reload: true)
 ```
+
+Firewall policy is written to `/etc/nftables.d/hostkit.nft` by default and validated with `nft -c -f` before optional reload.
 
 ## Named listeners
 

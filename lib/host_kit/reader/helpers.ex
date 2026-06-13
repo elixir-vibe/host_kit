@@ -22,6 +22,14 @@ defmodule HostKit.Reader.Helpers do
     end
   end
 
+  def read_firewall(%HostKit.Firewall{path: path} = desired, read_fun) do
+    case read_fun.(%File{path: path, content: ""}) do
+      {:ok, nil} -> {:ok, nil}
+      {:ok, actual} -> {:ok, %{desired | meta: Map.put(desired.meta, :content, actual.content)}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def read_env_file(%HostKit.Resources.EnvFile{path: path} = desired, read_fun) do
     desired_file = %File{
       path: path,

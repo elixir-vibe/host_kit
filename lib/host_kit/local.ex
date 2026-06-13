@@ -1,7 +1,7 @@
 defmodule HostKit.Local do
   @moduledoc "Read-only inspection of resources on the local host."
 
-  alias HostKit.Caddy
+  alias HostKit.{Caddy, Firewall}
   alias HostKit.Reader.Helpers
   alias HostKit.Resources.{Directory, EnvFile, File, User}
   alias HostKit.Systemd
@@ -51,6 +51,10 @@ defmodule HostKit.Local do
 
   def read(%EnvFile{} = desired) do
     Helpers.read_env_file(desired, &read/1)
+  end
+
+  def read(%Firewall{} = desired) do
+    Helpers.read_firewall(desired, &read/1)
   end
 
   def read(%Systemd.Service{name: name} = desired) do
@@ -119,6 +123,10 @@ defmodule HostKit.Local do
 
   def read(%EnvFile{} = desired, context) do
     Helpers.read_env_file(desired, &read(&1, context))
+  end
+
+  def read(%Firewall{} = desired, context) do
+    Helpers.read_firewall(desired, &read(&1, context))
   end
 
   def read(resource, _context), do: read(resource)

@@ -197,9 +197,9 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro firewall(do: block) do
+  defmacro firewall(opts \\ [], do: block) do
     quote do
-      HostKit.DSL.Scope.start_firewall()
+      HostKit.DSL.Scope.start_firewall(unquote(opts))
       unquote(block)
       HostKit.DSL.Scope.finish_firewall()
     end

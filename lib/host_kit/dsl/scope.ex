@@ -37,9 +37,13 @@ defmodule HostKit.DSL.Scope do
     end
   end
 
-  def start_firewall do
+  def start_firewall(opts \\ []) do
     scope = if Process.get(@host_key), do: :host, else: :project
-    Process.put(@firewall_key, %HostKit.Firewall{scope: scope})
+
+    Process.put(@firewall_key, %HostKit.Firewall{
+      scope: scope,
+      path: Keyword.get(opts, :path, "/etc/nftables.d/hostkit.nft")
+    })
   end
 
   def finish_firewall do

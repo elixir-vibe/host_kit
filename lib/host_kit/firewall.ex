@@ -8,13 +8,22 @@ defmodule HostKit.Firewall do
           rules: [Rule.t()],
           scope: :project | :host,
           name: atom() | nil,
+          path: String.t(),
+          depends_on: [term()],
           meta: map()
         }
 
   defstruct rules: [],
             scope: :project,
             name: nil,
+            path: "/etc/nftables.d/hostkit.nft",
+            depends_on: [],
             meta: %{}
+
+  def id(%__MODULE__{path: path}), do: {:firewall, path}
+
+  @spec render(t()) :: String.t()
+  def render(%__MODULE__{} = firewall), do: HostKit.Firewall.Nftables.render(firewall)
 
   @spec allow(keyword()) :: Rule.t()
   def allow(opts) do

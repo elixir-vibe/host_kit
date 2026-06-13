@@ -1,7 +1,7 @@
 defmodule HostKit.Apply do
   @moduledoc "Applies supported HostKit plan changes."
 
-  alias HostKit.{Change, Plan, Runner}
+  alias HostKit.{Change, Firewall, Plan, Runner}
   alias HostKit.Resources.{Directory, EnvFile, File, User}
   alias HostKit.Systemd
 
@@ -76,6 +76,11 @@ defmodule HostKit.Apply do
     end)
   end
 
+  defp apply_change(%Change{action: action, after: %Firewall{} = firewall} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> apply_firewall(firewall, opts) end)
+  end
+
   defp apply_change(%Change{} = change, _opts),
     do: {:error, {:unsupported_resource, change.resource_id}}
 
@@ -122,6 +127,32 @@ defmodule HostKit.Apply do
          :ok <- write_file(path, content, opts),
          :ok <- chown(path, env_file.owner, env_file.group, opts) do
       chmod(path, env_file.mode, opts)
+    end
+  end
+
+  defp apply_firewall(%Firewall{path: path} = firewall, opts) do
+    with :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, Firewall.render(firewall), opts),
+         :ok <- chown(path, "root", "root", opts),
+         :ok <- chmod(path, 0o644, opts),
+         :ok <- validate_firewall(path, opts) do
+      reload_firewall(opts)
+    end
+  end
+
+  defp validate_firewall(path, opts) do
+    if Keyword.get(opts, :nft_validate, true) do
+      cmd(opts, "nft", ["-c", "-f", path])
+    else
+      :ok
+    end
+  end
+
+  defp reload_firewall(opts) do
+    if Keyword.get(opts, :nft_reload, false) do
+      cmd(opts, "nft", ["-f", Keyword.get(opts, :nft_config, "/etc/nftables.conf")])
+    else
+      :ok
     end
   end
 
