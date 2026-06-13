@@ -18,6 +18,23 @@ defmodule HostKit.Logs.Config do
           meta: map()
         }
 
+  @fields [
+    :driver,
+    :source,
+    :identifier,
+    :format,
+    :retention,
+    :max_use,
+    :rotate,
+    :ship,
+    :sensitive,
+    :stdout,
+    :stderr,
+    :attributes,
+    :resource_id,
+    :meta
+  ]
+
   defstruct driver: nil,
             source: nil,
             identifier: nil,
@@ -32,4 +49,12 @@ defmodule HostKit.Logs.Config do
             resource_id: nil,
             attributes: %{},
             meta: %{}
+
+  @spec new(map() | keyword()) :: t()
+  def new(attrs) do
+    attrs
+    |> Map.new()
+    |> Map.take(@fields)
+    |> then(&struct!(__MODULE__, &1))
+  end
 end

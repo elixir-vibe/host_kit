@@ -97,24 +97,10 @@ defmodule HostKit.Logs do
   end
 
   defp config_struct(config, resource) do
-    config = normalize_config(config)
-
-    %Config{
-      driver: Map.get(config, :driver),
-      source: Map.get(config, :source),
-      identifier: Map.get(config, :identifier),
-      format: Map.get(config, :format),
-      retention: Map.get(config, :retention),
-      max_use: Map.get(config, :max_use),
-      rotate: Map.get(config, :rotate, []),
-      ship: Map.get(config, :ship),
-      sensitive: Map.get(config, :sensitive, false),
-      stdout: Map.get(config, :stdout),
-      stderr: Map.get(config, :stderr),
-      attributes: Map.get(config, :attributes, %{}),
-      resource_id: HostKit.Resource.id(resource),
-      meta: Map.get(config, :meta, %{})
-    }
+    config
+    |> normalize_config()
+    |> Map.put(:resource_id, HostKit.Resource.id(resource))
+    |> Config.new()
   end
 
   defp normalize_config(false), do: %{enabled: false}
