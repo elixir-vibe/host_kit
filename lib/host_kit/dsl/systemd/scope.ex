@@ -30,6 +30,20 @@ defmodule HostKit.DSL.Systemd.Scope do
     Process.delete(@timer_key) || raise "no systemd timer in scope"
   end
 
+  def active?, do: Process.get(@service_key) != nil or Process.get(@timer_key) != nil
+
+  def put_monitor(type, opts) do
+    update_current(fn resource ->
+      check =
+        HostKit.Monitor.check(
+          type,
+          Keyword.put(opts, :resource_id, HostKit.Resource.id(resource))
+        )
+
+      update_in(resource.meta[:monitor], &(List.wrap(&1) ++ [check]))
+    end)
+  end
+
   def put_unit(values), do: update_current(&%{&1 | unit: merge_directives(&1.unit, values)})
   def put_unit(key, value), do: update_current(&%{&1 | unit: put_directive(&1.unit, key, value)})
 

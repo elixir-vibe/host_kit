@@ -37,6 +37,17 @@ defmodule HostKit.Plugins.Caddy.Scope do
     Process.delete(@key) || raise "no caddy site in scope"
   end
 
+  def active?, do: Process.get(@key) != nil
+
+  def put_monitor(type, opts) do
+    update_site(fn site ->
+      check =
+        HostKit.Monitor.check(type, Keyword.put(opts, :resource_id, HostKit.Resource.id(site)))
+
+      update_in(site.meta[:monitor], &(List.wrap(&1) ++ [check]))
+    end)
+  end
+
   defp append_directive(%Site{} = site, directive) do
     %{site | directives: site.directives ++ [directive]}
   end

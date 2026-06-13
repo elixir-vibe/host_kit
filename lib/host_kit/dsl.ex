@@ -189,6 +189,31 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro monitor(type, opts \\ []) do
+    quote do
+      cond do
+        HostKit.DSL.Systemd.Scope.active?() ->
+          HostKit.DSL.Systemd.Scope.put_monitor(unquote(type), unquote(opts))
+
+        Code.ensure_loaded?(HostKit.Plugins.Caddy.Scope) and HostKit.Plugins.Caddy.Scope.active?() ->
+          HostKit.Plugins.Caddy.Scope.put_monitor(unquote(type), unquote(opts))
+
+        true ->
+          HostKit.DSL.Scope.update_last_resource(fn resource ->
+            resource_id = HostKit.Resource.id(resource)
+
+            check =
+              HostKit.Monitor.check(
+                unquote(type),
+                Keyword.put(unquote(opts), :resource_id, resource_id)
+              )
+
+            update_in(resource.meta[:monitor], &(List.wrap(&1) ++ [check]))
+          end)
+      end
+    end
+  end
+
   defmacro system_user(name, opts \\ []) do
     quote do
       HostKit.DSL.Scope.add_resource(%HostKit.Resources.User{

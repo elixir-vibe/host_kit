@@ -151,6 +151,25 @@ defmodule HostKit.DSL.Scope do
     :ok
   end
 
+  def update_last_resource(fun) do
+    service = Process.get(@service_key) || raise "resources must be declared inside service/2"
+
+    case service.resources do
+      [] ->
+        raise "no HostKit resource in scope"
+
+      resources ->
+        {last, rest_reversed} = resources |> Enum.reverse() |> List.pop_at(0)
+
+        Process.put(@service_key, %{
+          service
+          | resources: Enum.reverse(rest_reversed, [fun.(last)])
+        })
+
+        :ok
+    end
+  end
+
   defp storage_opts(opts) do
     opts = Keyword.put_new(opts, :owner, service_user())
     opts = Keyword.put_new(opts, :group, Keyword.fetch!(opts, :owner))

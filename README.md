@@ -194,6 +194,28 @@ project :toys do
 end
 ```
 
+## Monitoring metadata
+
+Declarations can carry monitoring intent for a later monitoring service or config generator:
+
+```elixir
+daemon unit_name() do
+  run exec_start: ["/usr/bin/env", "true"]
+  monitor :systemd, expect: [state: :active], severity: :critical
+end
+
+caddy_site :web, "web.example.com" do
+  reverse_proxy "127.0.0.1:4000"
+  monitor :http, url: "https://web.example.com", expect: [status: 200]
+end
+```
+
+Extract checks with:
+
+```elixir
+HostKit.Monitor.checks(project)
+```
+
 ## File modes
 
 Mode values can be raw octal, semantic aliases, tuples, keywords, or capability lists:
