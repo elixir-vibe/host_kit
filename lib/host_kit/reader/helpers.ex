@@ -1,6 +1,10 @@
 defmodule HostKit.Reader.Helpers do
   @moduledoc false
 
+  def read_run_resource(desired, opts) do
+    if HostKit.RunStamp.current?(desired, opts), do: {:ok, desired}, else: {:ok, nil}
+  end
+
   alias HostKit.Caddy
   alias HostKit.Resources.{Directory, File, User}
   alias HostKit.Systemd

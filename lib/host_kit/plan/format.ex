@@ -56,6 +56,27 @@ defmodule HostKit.Plan.Format do
     |> Enum.intersperse("\n")
   end
 
+  defp format_details(%Change{after: %HostKit.Resources.Command{} = command}) do
+    [
+      "\n  exec: ",
+      format_exec(command.exec),
+      format_runtime(command.runtime),
+      format_paths("inputs", command.inputs),
+      format_paths("outputs", command.outputs),
+      format_stamp(command)
+    ]
+  end
+
+  defp format_details(%Change{after: %HostKit.Resources.Shell{} = shell}) do
+    [
+      "\n  bash commands: ",
+      Enum.map_join(shell.script.commands, ", ", & &1.name),
+      format_paths("inputs", shell.inputs),
+      format_paths("outputs", shell.outputs),
+      format_stamp(shell)
+    ]
+  end
+
   defp format_details(%Change{after: %{meta: %{resolution: %Resolution{} = resolution}}}) do
     [
       "\n  resolves to ",
@@ -67,6 +88,22 @@ defmodule HostKit.Plan.Format do
   end
 
   defp format_details(_change), do: []
+
+  defp format_exec({command, args}), do: Enum.join([command | args], " ")
+
+  defp format_runtime(nil), do: []
+  defp format_runtime({kind, name}), do: ["\n  runtime: ", to_string(kind), ".", to_string(name)]
+
+  defp format_paths(_label, []), do: []
+  defp format_paths(label, paths), do: ["\n  ", label, ": ", Enum.join(paths, ", ")]
+
+  defp format_stamp(resource) do
+    if HostKit.RunStamp.stamp_required?(resource) do
+      ["\n  stamp: ", HostKit.RunStamp.stamp_path(resource)]
+    else
+      []
+    end
+  end
 
   defp format_resolution_source(:repology_api), do: "repology api"
   defp format_resolution_source(:repology_cache), do: "repology cache"

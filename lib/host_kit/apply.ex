@@ -181,10 +181,14 @@ defmodule HostKit.Apply do
   end
 
   defp apply_command(%Command{} = command, opts) do
-    with :ok <- command_creates(command, opts),
+    with :ok <- command_current(command, opts),
+         :ok <- command_creates(command, opts),
          :ok <- command_unless(command, opts) do
       {executable, args, command_opts} = command_exec(command, opts)
-      Ops.cmd(opts, executable, args, command_opts)
+
+      with :ok <- Ops.cmd(opts, executable, args, command_opts) do
+        HostKit.RunStamp.write(command, opts)
+      end
     else
       :skip -> :ok
     end
@@ -201,15 +205,28 @@ defmodule HostKit.Apply do
       timeout: shell.timeout
     }
 
-    apply_command(command, opts)
+    with :ok <- command_current(shell, opts),
+         :ok <- apply_command(command, opts) do
+      HostKit.RunStamp.write(shell, opts)
+    else
+      :skip -> :ok
+    end
+  end
+
+  defp command_current(resource, opts) do
+    if HostKit.RunStamp.current?(resource, opts), do: :skip, else: :ok
   end
 
   defp command_creates(%{creates: nil}, _opts), do: :ok
 
-  defp command_creates(%{creates: path}, opts) do
-    case Ops.cmd(opts, "test", ["-e", path]) do
-      :ok -> :skip
-      {:error, _reason} -> :ok
+  defp command_creates(%{creates: path} = resource, opts) do
+    if HostKit.RunStamp.stamp_required?(resource) do
+      :ok
+    else
+      case Ops.cmd(opts, "test", ["-e", path]) do
+        :ok -> :skip
+        {:error, _reason} -> :ok
+      end
     end
   end
 

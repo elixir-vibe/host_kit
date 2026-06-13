@@ -29,22 +29,26 @@ defmodule HostKit.CommandAnalysis do
   end
 
   @spec required_commands(struct()) :: [String.t()]
-  def required_commands(%Command{exec: {command, _args}, runtime: {:mise, _name}}), do: [command]
-  def required_commands(%Command{exec: {command, _args}}), do: [command]
+  def required_commands(resource), do: Enum.map(required_command_refs(resource), & &1.name)
 
-  def required_commands(%Shell{script: %HostKit.ShellScript{commands: commands}}),
-    do: Enum.map(commands, & &1.name)
+  def required_command_refs(%Command{exec: {command, _args}, runtime: {:mise, _name}}),
+    do: [%{name: command}]
 
-  def required_commands(_resource), do: []
+  def required_command_refs(%Command{exec: {command, _args}}), do: [%{name: command}]
+
+  def required_command_refs(%Shell{script: %HostKit.ShellScript{commands: commands}}),
+    do: commands
+
+  def required_command_refs(_resource), do: []
 
   defp required_command_diagnostics(resource, provided) do
     resource
-    |> required_commands()
-    |> Enum.reject(&MapSet.member?(provided, &1))
+    |> required_command_refs()
+    |> Enum.reject(&MapSet.member?(provided, &1.name))
     |> Enum.map(&missing_command(resource, &1))
   end
 
-  defp missing_command(resource, command) do
+  defp missing_command(resource, %{name: command} = command_ref) do
     %Diagnostic{
       severity: :error,
       code: :missing_command_provider,
@@ -53,7 +57,12 @@ defmodule HostKit.CommandAnalysis do
       file: get_in(resource.meta, [:source, :file]),
       line: get_in(resource.meta, [:source, :line]),
       column: get_in(resource.meta, [:source, :column]),
-      details: %{command: command, required_by: Resource.id(resource)},
+      details: %{
+        command: command,
+        required_by: Resource.id(resource),
+        shell_line: Map.get(command_ref, :line),
+        shell_column: Map.get(command_ref, :column)
+      },
       hint:
         "Add `package :#{String.replace(command, "-", "_")}` or a resource with `provides: [\"#{command}\"]`."
     }

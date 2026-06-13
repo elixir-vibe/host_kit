@@ -12,6 +12,9 @@ defmodule HostKit.Resources.Command do
           env: %{String.t() => String.t()},
           creates: String.t() | nil,
           unless: String.t() | nil,
+          inputs: [String.t()],
+          outputs: [String.t()],
+          stamp: String.t() | nil,
           timeout: non_neg_integer() | nil,
           depends_on: [term()],
           meta: map()
@@ -24,6 +27,9 @@ defmodule HostKit.Resources.Command do
             env: %{},
             creates: nil,
             unless: nil,
+            inputs: [],
+            outputs: [],
+            stamp: nil,
             timeout: nil,
             depends_on: [],
             meta: %{}
@@ -38,6 +44,9 @@ defmodule HostKit.Resources.Command do
       env: opts |> Keyword.get(:env, %{}) |> HostKit.Env.Normalize.string_map(),
       creates: Keyword.get(opts, :creates),
       unless: Keyword.get(opts, :unless),
+      inputs: opts |> Keyword.get(:inputs, []) |> List.wrap() |> Enum.map(&to_string/1),
+      outputs: opts |> Keyword.get(:outputs, []) |> List.wrap() |> Enum.map(&to_string/1),
+      stamp: Keyword.get(opts, :stamp),
       timeout: Keyword.get(opts, :timeout),
       depends_on: Keyword.get(opts, :depends_on, []),
       meta: Keyword.get(opts, :meta, %{})

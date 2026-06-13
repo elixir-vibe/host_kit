@@ -3,7 +3,7 @@ defmodule HostKit.Local do
 
   alias HostKit.{Caddy, Firewall, Proxy}
   alias HostKit.Reader.Helpers
-  alias HostKit.Resources.{Directory, EnvFile, File, Mise, Package, User}
+  alias HostKit.Resources.{Command, Directory, EnvFile, File, Mise, Package, Shell, User}
   alias HostKit.Systemd
 
   @spec read(struct()) :: {:ok, struct() | nil} | {:error, term()}
@@ -68,6 +68,10 @@ defmodule HostKit.Local do
   def read(%Package{} = desired) do
     HostKit.Package.read(desired, %{opts: []})
   end
+
+  def read(%Command{} = desired), do: Helpers.read_run_resource(desired, [])
+
+  def read(%Shell{} = desired), do: Helpers.read_run_resource(desired, [])
 
   def read(%Systemd.Service{name: name} = desired) do
     read_systemd_unit("/etc/systemd/system/#{name}", desired)
@@ -152,6 +156,12 @@ defmodule HostKit.Local do
   def read(%Package{} = desired, context) do
     HostKit.Package.read(desired, context)
   end
+
+  def read(%Command{} = desired, context),
+    do: Helpers.read_run_resource(desired, Map.get(context, :opts, []))
+
+  def read(%Shell{} = desired, context),
+    do: Helpers.read_run_resource(desired, Map.get(context, :opts, []))
 
   def read(resource, _context), do: read(resource)
 
