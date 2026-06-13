@@ -12,7 +12,7 @@ defmodule HostKit.Resources.Command do
           env: %{String.t() => String.t()},
           creates: String.t() | nil,
           unless: String.t() | nil,
-          inputs: [String.t() | {:source, atom() | String.t()}],
+          inputs: [String.t() | HostKit.Source.Ref.t()],
           outputs: [String.t()],
           stamp: String.t() | nil,
           timeout: non_neg_integer() | nil,
@@ -44,7 +44,11 @@ defmodule HostKit.Resources.Command do
       env: opts |> Keyword.get(:env, %{}) |> HostKit.Env.Normalize.string_map(),
       creates: Keyword.get(opts, :creates),
       unless: Keyword.get(opts, :unless),
-      inputs: opts |> Keyword.get(:inputs, []) |> List.wrap() |> Enum.map(&normalize_input/1),
+      inputs:
+        opts
+        |> Keyword.get(:inputs, [])
+        |> List.wrap()
+        |> Enum.map(&HostKit.Source.Ref.normalize_input/1),
       outputs: opts |> Keyword.get(:outputs, []) |> List.wrap() |> Enum.map(&to_string/1),
       stamp: Keyword.get(opts, :stamp),
       timeout: Keyword.get(opts, :timeout),
@@ -62,7 +66,4 @@ defmodule HostKit.Resources.Command do
 
   defp normalize_exec({command, args}), do: {to_string(command), Enum.map(args, &to_string/1)}
   defp normalize_exec([command | args]), do: normalize_exec({command, args})
-
-  defp normalize_input({:source, name}), do: {:source, name}
-  defp normalize_input(input), do: to_string(input)
 end

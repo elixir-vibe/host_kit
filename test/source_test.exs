@@ -32,6 +32,26 @@ defmodule HostKit.SourceTest do
     assert Source.app_path(source) == "/opt/app/source/examples/hello_phoenix"
   end
 
+  test "source identity is an internal struct" do
+    source = %Source{
+      name: :app,
+      uri: "https://github.com/elixir-vibe/host_kit.git",
+      ref: "main",
+      ref_kind: :branch,
+      revision: "abc123",
+      checkout: "/opt/app/source",
+      meta: %{tree: "def456"}
+    }
+
+    assert %HostKit.Source.Identity{
+             type: :git,
+             uri: "https://github.com/elixir-vibe/host_kit.git",
+             ref_kind: :branch,
+             revision: "abc123",
+             tree: "def456"
+           } = Source.identity(source)
+  end
+
   test "git source requires a git command provider" do
     source = Source.new(:app, git: fixture_repo_uri(), ref: "main", checkout: "/tmp/app")
 

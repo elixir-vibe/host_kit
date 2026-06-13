@@ -56,7 +56,7 @@ defmodule HostKit.ElixirAppRecipeTest do
                name: "hello_deps",
                exec: {"mix", ["deps.get", "--only", "prod"]},
                runtime: {:mise, :beam},
-               inputs: [{:source, "hello_source"}, "mix.exs", "mix.lock"],
+               inputs: [%HostKit.Source.Ref{name: "hello_source"}, "mix.exs", "mix.lock"],
                outputs: ["deps"]
              } ->
                true

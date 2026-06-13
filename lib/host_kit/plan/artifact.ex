@@ -90,7 +90,8 @@ defmodule HostKit.Plan.Artifact do
     resources
     |> Enum.filter(&match?(%HostKit.Resources.Source{}, &1))
     |> Map.new(fn source ->
-      {to_string(source.name), HostKit.Resources.Source.identity(source)}
+      {to_string(source.name),
+       source |> HostKit.Resources.Source.identity() |> HostKit.Source.Identity.dump()}
     end)
   end
 

@@ -15,7 +15,7 @@ defmodule HostKit.RunStampTest do
     command =
       HostKit.Resources.Command.new(:build,
         exec: ["true"],
-        inputs: [{:source, :app}]
+        inputs: [HostKit.Source.Ref.new(:app)]
       )
 
     stamp = HostKit.RunStamp.desired(command, resources: [source])

@@ -32,6 +32,8 @@ defmodule HostKit.Resource do
                       HostKit.Resources.Source,
                       HostKit.Resources.User,
                       HostKit.Secret,
+                      HostKit.Source.Identity,
+                      HostKit.Source.Ref,
                       HostKit.Service,
                       HostKit.ShellScript,
                       HostKit.Systemd.Service,

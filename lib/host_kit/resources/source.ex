@@ -52,15 +52,15 @@ defmodule HostKit.Resources.Source do
   def app_path(%__MODULE__{checkout: checkout, path: path}), do: Path.join(checkout, path)
 
   def identity(%__MODULE__{} = source) do
-    %{
-      "type" => Atom.to_string(source.type),
-      "uri" => source.uri,
-      "ref" => source.ref,
-      "ref_kind" => Atom.to_string(source.ref_kind),
-      "revision" => source.revision,
-      "tree" => Map.get(source.meta, :tree),
-      "checkout" => source.checkout,
-      "path" => source.path
+    %HostKit.Source.Identity{
+      type: source.type,
+      uri: source.uri,
+      ref: source.ref,
+      ref_kind: source.ref_kind,
+      revision: source.revision,
+      tree: Map.get(source.meta, :tree),
+      checkout: source.checkout,
+      path: source.path
     }
   end
 

@@ -149,10 +149,12 @@ defmodule HostKit.RunStamp do
   defp source_inputs(inputs, opts) do
     inputs
     |> Enum.filter(&source_input?/1)
-    |> Map.new(fn {:source, name} -> {to_string(name), source_identity(name, opts)} end)
+    |> Map.new(fn %HostKit.Source.Ref{name: name} ->
+      {to_string(name), name |> source_identity(opts) |> HostKit.Source.Identity.dump()}
+    end)
   end
 
-  defp source_input?({:source, _name}), do: true
+  defp source_input?(%HostKit.Source.Ref{}), do: true
   defp source_input?(_input), do: false
 
   defp source_identity(name, opts) do
@@ -161,7 +163,7 @@ defmodule HostKit.RunStamp do
     |> Enum.find(&match?(%HostKit.Resources.Source{name: ^name}, &1))
     |> case do
       %HostKit.Resources.Source{} = source -> current_or_desired_source_identity(source, opts)
-      nil -> %{"missing" => true}
+      nil -> %HostKit.Source.Identity{type: :missing, ref_kind: :unknown, path: "."}
     end
   end
 
