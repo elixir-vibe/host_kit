@@ -3,6 +3,38 @@ defmodule HostKit.Resource do
 
   @callback id(struct()) :: term()
 
+  @artifact_modules MapSet.new([
+                      HostKit.Addr.AbsResource,
+                      HostKit.Addr.Resource,
+                      HostKit.Caddy.Directive.Encode,
+                      HostKit.Caddy.Directive.FileServer,
+                      HostKit.Caddy.Directive.ReverseProxy,
+                      HostKit.Caddy.Directive.Root,
+                      HostKit.Caddy.Site,
+                      HostKit.Change,
+                      HostKit.Conventions,
+                      HostKit.Firewall,
+                      HostKit.Firewall.Rule,
+                      HostKit.Host,
+                      HostKit.Package.Resolution,
+                      HostKit.Project,
+                      HostKit.ProviderConfig,
+                      HostKit.Proxy,
+                      HostKit.Resources.Capability,
+                      HostKit.Resources.Directory,
+                      HostKit.Resources.EnvFile,
+                      HostKit.Resources.File,
+                      HostKit.Resources.Mise,
+                      HostKit.Resources.Package,
+                      HostKit.Resources.User,
+                      HostKit.Service,
+                      HostKit.Systemd.Service,
+                      HostKit.Systemd.Timer,
+                      HostKit.Tenant,
+                      HostKit.Workspace.Egress
+                    ])
+  @artifact_module_names @artifact_modules |> Enum.map(&Atom.to_string/1) |> MapSet.new()
+
   @spec id(struct()) :: term()
   def id(resource) do
     Code.ensure_loaded?(resource.__struct__)
@@ -16,6 +48,8 @@ defmodule HostKit.Resource do
 
   @spec dump(term()) :: term()
   def dump(%module{} = struct) do
+    module = allowed_artifact_module!(module)
+
     %{
       "$type" => "struct",
       "module" => Atom.to_string(module),
@@ -40,7 +74,7 @@ defmodule HostKit.Resource do
 
   @spec load(term()) :: term()
   def load(%{"$type" => "struct", "module" => module, "fields" => fields}) do
-    module = existing_module!(module)
+    module = allowed_artifact_module!(module)
     struct(module, load(fields))
   end
 
@@ -54,8 +88,19 @@ defmodule HostKit.Resource do
   def load(values) when is_list(values), do: Enum.map(values, &load/1)
   def load(value), do: value
 
-  defp existing_module!("Elixir.HostKit" <> _rest = module), do: String.to_existing_atom(module)
+  defp allowed_artifact_module!(module) when is_atom(module) do
+    if MapSet.member?(@artifact_modules, module) do
+      module
+    else
+      raise ArgumentError, "unsupported HostKit artifact module #{inspect(module)}"
+    end
+  end
 
-  defp existing_module!(module),
-    do: raise(ArgumentError, "unsupported HostKit artifact module #{inspect(module)}")
+  defp allowed_artifact_module!(module) when is_binary(module) do
+    if MapSet.member?(@artifact_module_names, module) do
+      String.to_existing_atom(module)
+    else
+      raise ArgumentError, "unsupported HostKit artifact module #{inspect(module)}"
+    end
+  end
 end

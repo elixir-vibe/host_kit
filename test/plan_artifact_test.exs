@@ -44,6 +44,22 @@ defmodule HostKit.Plan.ArtifactTest do
     assert loaded.opts == []
   end
 
+  test "rejects unsupported artifact modules" do
+    artifact = %Artifact{
+      project: %{
+        "$type" => "struct",
+        "module" => "Elixir.HostKit.Agent.State",
+        "fields" => %{"last_plan" => nil}
+      },
+      resources: [],
+      changes: [],
+      summary: %{}
+    }
+
+    assert {:error, %ArgumentError{message: message}} = Artifact.to_plan(artifact)
+    assert message =~ "unsupported HostKit artifact module"
+  end
+
   test "rejects unsupported artifact versions" do
     assert {:error,
             %JSONCodec.Error{path: [:version], reason: :unsupported_plan_artifact_version}} =
