@@ -10,9 +10,8 @@ defmodule HostKit.BootstrapIntegrationTest do
     def cmd(command, args, opts) do
       vm = Keyword.get(opts, :vm, System.get_env("HOSTKIT_LIMA_VM", "hostkit-test"))
 
-      System.cmd(limactl(), ["shell", vm, "--", command | args],
-        stderr_to_stdout: true,
-        env: env()
+      System.cmd(limactl(), ["shell", vm, "--" | guest_command(command, args, opts)],
+        stderr_to_stdout: true
       )
     end
 
@@ -33,10 +32,9 @@ defmodule HostKit.BootstrapIntegrationTest do
 
       command = if Keyword.get(opts, :sudo, false), do: ["sudo", "tee", path], else: ["tee", path]
 
-      case System.cmd(limactl(), ["shell", vm, "--" | command],
+      case System.cmd(limactl(), ["shell", vm, "--" | guest_command(command, opts)],
              input: IO.iodata_to_binary(content),
-             stderr_to_stdout: true,
-             env: env()
+             stderr_to_stdout: true
            ) do
         {_output, 0} -> :ok
         {output, status} -> {:error, {:command_failed, "write_file", [path], status, output}}
@@ -45,12 +43,18 @@ defmodule HostKit.BootstrapIntegrationTest do
 
     defp limactl, do: System.get_env("LIMACTL", "limactl")
 
-    defp env do
-      [{"MISE_IGNORED_CONFIG_PATHS", "/Users/dannote/.config/mise/config.toml"}]
+    defp guest_command(command, args, opts) do
+      guest_command([command | args], opts)
+    end
+
+    defp guest_command(command, opts) do
+      env = Keyword.get(opts, :env, []) ++ [{"MISE_NO_CONFIG", "1"}]
+      ["env" | Enum.map(env, fn {key, value} -> "#{key}=#{value}" end)] ++ command
     end
   end
 
-  test "HostKit installs packages and mise on a Lima target" do
+  @tag timeout: 1_200_000
+  test "HostKit installs packages and BEAM tools with mise on a Lima target" do
     vm = System.get_env("HOSTKIT_LIMA_VM", "hostkit-test")
     unique = System.unique_integer([:positive])
     mise_path = "/tmp/hostkit-integration/mise-#{unique}/bin/mise"
@@ -58,18 +62,28 @@ defmodule HostKit.BootstrapIntegrationTest do
 
     cleanup(vm, Path.dirname(Path.dirname(mise_path)))
 
+    assert {:ok, package_repo} =
+             HostKit.Package.TargetRepo.detect(runner: {LimaRunner, vm: vm}, sudo: true)
+
+    package_lock = package_lock(package_repo)
+
+    erlang_version = System.get_env("HOSTKIT_ERLANG_VERSION", "29.0.2")
+    elixir_version = System.get_env("HOSTKIT_ELIXIR_VERSION", "1.20.1")
+
     project = %HostKit.Project{
       name: :bootstrap,
       services: [
         %HostKit.Service{
           name: :base,
           resources: [
-            HostKit.Resources.Package.new(:ca_certificates, as: "ca-certificates"),
             HostKit.Resources.Mise.new(
               path: mise_path,
               system_data_dir: system_data_dir,
-              packages: false,
-              tools: []
+              packages: :auto,
+              tools: [
+                %{name: :erlang, version: erlang_version, opts: []},
+                %{name: :elixir, version: elixir_version, opts: []}
+              ]
             )
           ]
         }
@@ -80,7 +94,9 @@ defmodule HostKit.BootstrapIntegrationTest do
              HostKit.plan(project,
                reader: HostKit.Remote,
                runner: {LimaRunner, vm: vm},
-               sudo: true
+               sudo: true,
+               package_lock: package_lock,
+               package_repo: package_repo
              )
 
     assert {:ok, results} =
@@ -92,9 +108,48 @@ defmodule HostKit.BootstrapIntegrationTest do
 
     assert Enum.any?(results, &(&1.status == :applied))
     assert {_, 0} = LimaRunner.cmd("test", ["-x", mise_path], vm: vm)
+
+    assert {version_output, 0} =
+             LimaRunner.cmd(
+               mise_path,
+               [
+                 "exec",
+                 "erlang@#{erlang_version}",
+                 "elixir@#{elixir_version}",
+                 "--",
+                 "elixir",
+                 "--version"
+               ],
+               vm: vm,
+               sudo: true,
+               env: [{"MISE_NO_CONFIG", "1"}, {"MISE_SYSTEM_DATA_DIR", system_data_dir}]
+             )
+
+    assert version_output =~ elixir_version
   after
     vm = System.get_env("HOSTKIT_LIMA_VM", "hostkit-test")
     cleanup(vm, "/tmp/hostkit-integration")
+  end
+
+  defp package_lock(package_repo) do
+    [
+      ca_certificates: "ca-certificates",
+      curl: "curl",
+      git: "git",
+      autoconf: "autoconf",
+      make: "make",
+      gcc: "gcc",
+      cxx_compiler: "g++",
+      perl: "perl",
+      m4: "m4",
+      openssl_dev: "libssl-dev",
+      ncurses_dev: "libncurses-dev",
+      unzip: "unzip",
+      xsltproc: "xsltproc"
+    ]
+    |> Enum.reduce(%HostKit.Package.Lock{}, fn {name, package}, lock ->
+      HostKit.Package.Lock.put(lock, name, package, package_repo)
+    end)
   end
 
   defp cleanup(vm, path) do

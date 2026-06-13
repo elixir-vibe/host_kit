@@ -38,7 +38,7 @@ defmodule HostKit.Mise.CLI do
   end
 
   defp install_mise(%MiseResource{path: path, version: version}, opts) do
-    env = ["MISE_INSTALL_PATH=#{shell_escape(path)}", "MISE_QUIET=1"]
+    env = ["MISE_INSTALL_PATH=#{shell_escape(path)}", "MISE_QUIET=1", "MISE_NO_CONFIG=1"]
     env = if version, do: ["MISE_VERSION=#{shell_escape(version)}" | env], else: env
 
     Ops.cmd(opts, "sh", ["-c", "curl -fsSL https://mise.run | #{Enum.join(env, " ")} sh"])
@@ -51,7 +51,7 @@ defmodule HostKit.Mise.CLI do
 
     Ops.cmd(opts, "sh", [
       "-c",
-      "MISE_SYSTEM_DATA_DIR=#{shell_escape(mise.system_data_dir)} #{shell_escape(mise.path)} install --system #{tools}"
+      "#{mise_env(mise)} #{shell_escape(mise.path)} install --system #{tools}"
     ])
   end
 
@@ -77,7 +77,7 @@ defmodule HostKit.Mise.CLI do
   end
 
   defp mise_env(%MiseResource{system_data_dir: system_data_dir}),
-    do: "MISE_SYSTEM_DATA_DIR=#{shell_escape(system_data_dir)}"
+    do: "MISE_NO_CONFIG=1 MISE_SYSTEM_DATA_DIR=#{shell_escape(system_data_dir)}"
 
   defp tool_arg(%{name: name, version: version}), do: "#{name}@#{version}"
   defp tool_key(%{name: name, version: version}), do: {name, version}
