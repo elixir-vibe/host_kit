@@ -10,6 +10,8 @@ defmodule HostKit.WorkspaceAgentServerTest do
       HostKit.Workspace.Agent.Server.start_link(socket: socket, workspace: dir, name: nil)
 
     assert {:ok, %{status: :ok}} = HostKit.Workspace.Agent.UnixClient.status(socket, [])
+    assert {:ok, %File.Stat{mode: mode}} = File.stat(socket)
+    assert Bitwise.band(mode, 0o777) == 0o600
 
     assert {:ok, %{exit_status: 0, stdout: output}} =
              HostKit.Workspace.Agent.UnixClient.exec(socket, ["pwd"], [])

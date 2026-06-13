@@ -5,6 +5,9 @@ defmodule HostKit.Plugins.Caddy do
 
   alias HostKit.Caddy.Directive.{Encode, FileServer, ReverseProxy, Root}
   alias HostKit.Caddy.Site
+  alias HostKit.Change
+  alias HostKit.Reader.Helpers
+  alias HostKit.Runner.Ops
 
   @impl true
   def provider_name, do: :caddy
@@ -14,6 +17,28 @@ defmodule HostKit.Plugins.Caddy do
 
   @impl true
   def resource_types, do: [Site]
+
+  @impl true
+  def apply(%Change{action: action, after: %Site{} = site}, context)
+      when action in [:create, :update] do
+    config = provider_config(context)
+
+    path =
+      Path.join(
+        Map.get(config, :sites_dir, "/etc/caddy/sites"),
+        Helpers.caddy_site_filename(site)
+      )
+
+    opts = Map.get(context, :opts, [])
+
+    with :ok <- HostKit.Runner.mkdir_p(Ops.runner(opts), Path.dirname(path), opts),
+         :ok <- HostKit.Runner.write_file(Ops.runner(opts), path, render_site(site), opts),
+         :ok <- Ops.chown(path, Map.get(config, :owner), Map.get(config, :group), opts) do
+      Ops.chmod(path, Map.get(config, :mode, 0o644), opts)
+    end
+  end
+
+  def apply(_change, _context), do: :ignore
 
   @impl true
   def render(%Site{} = site, _context) do
@@ -45,6 +70,17 @@ defmodule HostKit.Plugins.Caddy do
   def render_site(%Site{} = site) do
     [site.host, " {\n", Enum.map(site.directives, &render_directive/1), "}\n"]
   end
+
+  defp provider_config(%{project: project}) do
+    project.provider_configs
+    |> Map.get(:caddy)
+    |> case do
+      nil -> %{}
+      config -> config.config
+    end
+  end
+
+  defp provider_config(_context), do: %{}
 
   defp render_directive(%Root{matcher: matcher, path: path}) do
     ["\troot ", matcher, " ", path, "\n"]

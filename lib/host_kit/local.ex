@@ -3,7 +3,7 @@ defmodule HostKit.Local do
 
   alias HostKit.{Caddy, Firewall, Proxy}
   alias HostKit.Reader.Helpers
-  alias HostKit.Resources.{Directory, EnvFile, File, User}
+  alias HostKit.Resources.{Directory, EnvFile, File, Mise, Package, User}
   alias HostKit.Systemd
 
   @spec read(struct()) :: {:ok, struct() | nil} | {:error, term()}
@@ -59,6 +59,14 @@ defmodule HostKit.Local do
 
   def read(%Proxy{} = desired) do
     read_proxy(desired, %{})
+  end
+
+  def read(%Mise{} = desired) do
+    HostKit.Mise.read(desired, %{opts: []})
+  end
+
+  def read(%Package{} = desired) do
+    HostKit.Package.read(desired, %{opts: []})
   end
 
   def read(%Systemd.Service{name: name} = desired) do
@@ -135,6 +143,14 @@ defmodule HostKit.Local do
 
   def read(%Proxy{} = desired, context) do
     read_proxy(desired, context)
+  end
+
+  def read(%Mise{} = desired, context) do
+    HostKit.Mise.read(desired, context)
+  end
+
+  def read(%Package{} = desired, context) do
+    HostKit.Package.read(desired, context)
   end
 
   def read(resource, _context), do: read(resource)

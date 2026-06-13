@@ -34,14 +34,15 @@ defmodule HostKit.Firewall.Nftables do
   defp render_rule(%Rule{action: :deny, target: target}), do: "#{source_match(target)} drop"
 
   def render_egress(%HostKit.Workspace.Egress{} = egress) do
-    allow =
-      egress.allow |> List.wrap() |> Enum.map_join("\n", &render_egress_allow(egress.user, &1))
+    allow = Enum.map(List.wrap(egress.allow), &render_egress_allow(egress.user, &1))
+    deny = render_egress_deny(egress.user, egress.deny)
+    rules = Enum.join(allow ++ deny, "\n")
 
     """
     table inet hostkit_egress {
       chain output {
         type filter hook output priority 0; policy accept;
-    #{indent(allow, 4)}
+    #{indent(rules, 4)}
       }
     }
     """
@@ -53,6 +54,18 @@ defmodule HostKit.Firewall.Nftables do
 
   defp render_egress_allow(user, value),
     do: "meta skuid #{user} ip daddr #{HostKit.Net.Addr.to_string(value)} accept"
+
+  defp render_egress_deny(_user, nil), do: []
+  defp render_egress_deny(user, :all), do: ["meta skuid #{user} drop"]
+
+  defp render_egress_deny(user, :private) do
+    Enum.map(["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"], fn cidr ->
+      "meta skuid #{user} ip daddr #{cidr} drop"
+    end)
+  end
+
+  defp render_egress_deny(user, value),
+    do: ["meta skuid #{user} ip daddr #{HostKit.Net.Addr.to_string(value)} drop"]
 
   defp source_match(nil), do: ""
   defp source_match(:any), do: ""

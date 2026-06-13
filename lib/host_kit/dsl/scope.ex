@@ -9,6 +9,7 @@ defmodule HostKit.DSL.Scope do
   @workspace_key {__MODULE__, :workspace}
   @inside_key {__MODULE__, :inside}
   @provider_config_key {__MODULE__, :provider_config}
+  @mise_key {__MODULE__, :mise}
   @observability_key {__MODULE__, :observability}
   @firewall_key {__MODULE__, :firewall}
   @proxy_key {__MODULE__, :proxy}
@@ -71,6 +72,21 @@ defmodule HostKit.DSL.Scope do
 
   def start_provider_config(name, module) do
     Process.put(@provider_config_key, %ProviderConfig{name: name, module: module})
+  end
+
+  def start_mise(opts) do
+    Process.put(@mise_key, HostKit.Resources.Mise.new(opts))
+  end
+
+  def add_mise_tool(name, version, opts) do
+    mise = Process.get(@mise_key) || raise "no HostKit mise in scope"
+    Process.put(@mise_key, HostKit.Resources.Mise.add_tool(mise, name, version, opts))
+    :ok
+  end
+
+  def finish_mise do
+    mise = Process.delete(@mise_key) || raise "no HostKit mise in scope"
+    add_resource(mise)
   end
 
   def put_provider_config(key, value) do

@@ -3,6 +3,7 @@ defmodule HostKit.Plan do
 
   alias HostKit.Addr
   alias HostKit.{Change, Project, Resource}
+  alias HostKit.Package.Resolver, as: PackageResolver
 
   @type t :: %__MODULE__{
           project: Project.t(),
@@ -20,19 +21,37 @@ defmodule HostKit.Plan do
 
   @spec build(Project.t(), keyword()) :: {:ok, t()}
   def build(%Project{} = project, opts \\ []) do
-    resources = Project.resources(project)
+    with {:ok, resources} <- resolve_resources(Project.resources(project), opts) do
+      changes = Enum.map(resources, &change_for(&1, project, opts))
 
-    changes = Enum.map(resources, &change_for(&1, project, opts))
-
-    {:ok,
-     %__MODULE__{
-       project: project,
-       resources: resources,
-       changes: changes,
-       summary: summarize(changes),
-       opts: opts
-     }}
+      {:ok,
+       %__MODULE__{
+         project: project,
+         resources: resources,
+         changes: changes,
+         summary: summarize(changes),
+         opts: opts
+       }}
+    end
   end
+
+  defp resolve_resources(resources, opts) do
+    Enum.reduce_while(resources, {:ok, []}, fn resource, {:ok, resolved} ->
+      case resolve_resource(resource, opts) do
+        {:ok, resource} -> {:cont, {:ok, [resource | resolved]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> then(fn
+      {:ok, resources} -> {:ok, Enum.reverse(resources)}
+      error -> error
+    end)
+  end
+
+  defp resolve_resource(%HostKit.Resources.Package{} = package, opts),
+    do: PackageResolver.resolve(package, opts)
+
+  defp resolve_resource(resource, _opts), do: {:ok, resource}
 
   defp change_for(resource, project, opts) do
     if ignored?(resource, opts) do
@@ -119,6 +138,17 @@ defmodule HostKit.Plan do
   defp equivalent?(%HostKit.Proxy{} = desired, actual) do
     Map.get(actual.meta, :content) == HostKit.Proxy.render(desired)
   end
+
+  defp equivalent?(%HostKit.Resources.Mise{} = desired, actual) do
+    installed = MapSet.new(Map.get(actual.meta, :installed_tools, []))
+    desired.tools |> Enum.map(&{&1.name, &1.version}) |> MapSet.new() |> MapSet.subset?(installed)
+  end
+
+  defp equivalent?(%HostKit.Resources.Package{version: nil}, actual),
+    do: Map.get(actual.meta, :installed) == true
+
+  defp equivalent?(%HostKit.Resources.Package{version: version}, actual),
+    do: Map.get(actual.meta, :installed) == true and Map.get(actual.meta, :version) == version
 
   defp equivalent?(%HostKit.Caddy.Site{} = desired, actual) do
     normalize_caddy(Map.get(actual.meta, :content)) ==

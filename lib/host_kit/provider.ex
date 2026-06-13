@@ -51,6 +51,11 @@ defmodule HostKit.Provider do
     |> Enum.uniq()
   end
 
+  @spec apply([module()], HostKit.Change.t(), map()) :: :ok | {:error, term()}
+  def apply(providers, change, context \\ %{}) do
+    Enum.find_value(providers, {:error, :no_applier}, &apply_with(&1, change, context))
+  end
+
   @spec render([module()], struct(), map()) :: {:ok, iodata()} | {:error, term()}
   def render(providers, resource, context \\ %{}) do
     Enum.find_value(providers, {:error, :no_renderer}, &render_with(&1, resource, context))
@@ -61,6 +66,15 @@ defmodule HostKit.Provider do
     errors = Enum.flat_map(providers, &validate_with(&1, resource, context))
 
     if errors == [], do: :ok, else: {:error, errors}
+  end
+
+  defp apply_with(provider, change, context) do
+    if exports?(provider, :apply, 2) do
+      case provider.apply(change, context) do
+        :ignore -> nil
+        result -> result
+      end
+    end
   end
 
   defp render_with(provider, resource, context) do

@@ -505,9 +505,35 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro package(name, opts \\ []) do
+    quote do
+      HostKit.DSL.Scope.add_resource(HostKit.Resources.Package.new(unquote(name), unquote(opts)))
+    end
+  end
+
+  defmacro packages(names, opts \\ []) do
+    quote do
+      Enum.each(unquote(names), &package(&1, unquote(opts)))
+    end
+  end
+
   defmacro file(path, opts \\ []) do
     quote do
       HostKit.DSL.Scope.add_resource(HostKit.Resources.File.new(unquote(path), unquote(opts)))
+    end
+  end
+
+  defmacro mise(opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Scope.start_mise(unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.finish_mise()
+    end
+  end
+
+  defmacro mise_tool(name, version, opts \\ []) do
+    quote do
+      HostKit.DSL.Scope.add_mise_tool(unquote(name), unquote(version), unquote(opts))
     end
   end
 end

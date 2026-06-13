@@ -44,6 +44,24 @@ defmodule HostKit.CaddyProviderTest do
            } in handlers
   end
 
+  test "caddy provider applies site files" do
+    tmp =
+      Path.join(System.tmp_dir!(), "host-kit-caddy-apply-#{System.unique_integer([:positive])}")
+
+    Elixir.File.mkdir_p!(tmp)
+    on_exit(fn -> Elixir.File.rm_rf(tmp) end)
+
+    previous = System.get_env("HOST_KIT_CADDY_TEST_SITES_DIR")
+    System.put_env("HOST_KIT_CADDY_TEST_SITES_DIR", tmp)
+    on_exit(fn -> restore_env(previous) end)
+
+    project = HostKit.load!(fixture_path("caddy_local_project.hostkit"))
+    {:ok, plan} = HostKit.plan(project)
+
+    assert {:ok, _results} = HostKit.apply(plan, confirm: true)
+    assert File.read!(Path.join(tmp, "exograph-search.caddy")) =~ "reverse_proxy 127.0.0.1:4200"
+  end
+
   test "caddy DSL is unavailable without provider import" do
     source = """
     defmodule HostKit.CaddyWithoutProviderFixture do
@@ -61,6 +79,9 @@ defmodule HostKit.CaddyProviderTest do
 
     assert_raise CompileError, fn -> Code.compile_string(source) end
   end
+
+  defp restore_env(nil), do: System.delete_env("HOST_KIT_CADDY_TEST_SITES_DIR")
+  defp restore_env(value), do: System.put_env("HOST_KIT_CADDY_TEST_SITES_DIR", value)
 
   defp fixture_path(name), do: Path.expand("fixtures/#{name}", __DIR__)
 end

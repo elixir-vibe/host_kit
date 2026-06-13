@@ -13,6 +13,9 @@ defmodule HostKit.Providers.Caddy do
   defdelegate resource_types, to: HostKit.Plugins.Caddy
 
   @impl true
+  defdelegate apply(change, context), to: HostKit.Plugins.Caddy
+
+  @impl true
   defdelegate render(resource, context), to: HostKit.Plugins.Caddy
 
   @impl true

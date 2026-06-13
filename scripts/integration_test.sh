@@ -16,13 +16,42 @@ if ! command -v "$LIMACTL" >/dev/null 2>&1; then
   fi
 fi
 
+ensure_vm_running() {
+  status="$($LIMACTL list 2>/dev/null | awk -v name="$VM_NAME" '$1 == name { print $2 }')"
+
+  case "$status" in
+    Running)
+      ;;
+    Stopped)
+      "$LIMACTL" start "$VM_NAME" >/dev/null
+      ;;
+    "")
+      echo "Lima VM '$VM_NAME' not found. Create it first or set HOSTKIT_LIMA_VM." >&2
+      exit 1
+      ;;
+    *)
+      echo "Lima VM '$VM_NAME' is $status, expected Running." >&2
+      exit 1
+      ;;
+  esac
+}
+
+ensure_mix() {
+  if ! "$LIMACTL" shell "$VM_NAME" -- sh -lc "command -v mix >/dev/null 2>&1"; then
+    echo "mix not found in Lima VM '$VM_NAME'. Install Elixir 1.20+ in the VM and rerun." >&2
+    exit 127
+  fi
+}
+
 copy_repo() {
   repo="$1"
   "$LIMACTL" shell "$VM_NAME" -- sh -lc "rm -rf $REMOTE_BASE/$repo && mkdir -p $REMOTE_BASE/$repo"
-  tar -C "$WORKSPACE_DIR/$repo" --exclude=_build --exclude=deps --exclude=doc -cf - . |
-    "$LIMACTL" shell "$VM_NAME" -- tar -C "$REMOTE_BASE/$repo" -xf -
+  COPYFILE_DISABLE=1 tar -C "$WORKSPACE_DIR/$repo" --exclude=_build --exclude=deps --exclude=doc -cf - . |
+    "$LIMACTL" shell "$VM_NAME" -- sh -lc "tar -C $REMOTE_BASE/$repo -xf -"
 }
 
+ensure_vm_running
+ensure_mix
 copy_repo systemdkit
 copy_repo unitctl
 copy_repo host_kit

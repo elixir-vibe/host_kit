@@ -73,6 +73,30 @@ project :demo, providers: [HostKit.Providers.Caddy] do
 end
 ```
 
+## Host bootstrap packages and mise-managed runtimes
+
+HostKit can install OS packages through the target package manager. The DSL is distribution-neutral by default and can be pinned to a manager when needed.
+
+```elixir
+service :bootstrap do
+  package :ca_certificates
+  package :build_essential, package: "build-essential", manager: :apt, update: true
+end
+```
+
+HostKit can also bootstrap `mise` and install system-wide tool versions. This is intended for host bootstrap and workspace agents; application services should still prefer packaged release artifacts where possible.
+
+```elixir
+service :bootstrap do
+  mise path: "/usr/local/bin/mise", system_data_dir: "/usr/local/share/mise" do
+    mise_tool :erlang, "29.0.2"
+    mise_tool :elixir, "1.20.1"
+  end
+end
+```
+
+This applies through the `mise` CLI contract: it installs the binary with `mise.run` when missing, then runs `mise install --system` with `MISE_SYSTEM_DATA_DIR` set.
+
 ## Project-local DSLs
 
 Use `HostKit.ProjectDSL` in consuming projects to build local conventions without baking them into HostKit.

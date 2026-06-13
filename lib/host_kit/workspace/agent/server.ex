@@ -16,6 +16,8 @@ defmodule HostKit.Workspace.Agent.Server do
     {:ok, listen} =
       :gen_tcp.listen(0, [:binary, active: false, packet: 4, ifaddr: {:local, socket}])
 
+    File.chmod!(socket, Keyword.get(opts, :socket_mode, 0o600))
+
     state = %{
       socket: socket,
       listen: listen,

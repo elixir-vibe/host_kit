@@ -21,6 +21,17 @@ defmodule HostKit.WorkspaceNextTest do
     rendered = HostKit.Firewall.Nftables.render_egress(service.meta.egress)
     assert rendered =~ "udp dport 53 accept"
     assert rendered =~ "tcp dport 443 accept"
+    assert rendered =~ "ip daddr 10.0.0.0/8 drop"
+    assert rendered =~ "ip daddr 172.16.0.0/12 drop"
+    assert rendered =~ "ip daddr 192.168.0.0/16 drop"
+  end
+
+  test "egress deny all drops other workspace traffic after allow rules" do
+    egress = %HostKit.Workspace.Egress{user: "hk-alice-blog-preview", allow: [:dns], deny: :all}
+
+    rendered = HostKit.Firewall.Nftables.render_egress(egress)
+    assert rendered =~ "meta skuid hk-alice-blog-preview udp dport 53 accept"
+    assert rendered =~ "meta skuid hk-alice-blog-preview drop"
   end
 
   test "unix client uses Erlang term transport and reports transport errors" do
