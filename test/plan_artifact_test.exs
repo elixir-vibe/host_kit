@@ -25,6 +25,12 @@ defmodule HostKit.Plan.ArtifactTest do
       Path.join(System.tmp_dir!(), "host-kit-plan-#{System.unique_integer([:positive])}.json")
 
     assert :ok = Artifact.save(path, plan)
+    assert {:ok, json} = path |> File.read!() |> Jason.decode()
+    refute Map.has_key?(json, "plan")
+
+    assert [%{"$type" => "struct", "module" => "Elixir.HostKit.Resources.Package"}] =
+             json["resources"]
+
     assert {:ok, loaded} = Artifact.load(path)
     assert loaded.project == plan.project
     assert loaded.resources == plan.resources

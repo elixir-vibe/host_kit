@@ -3,18 +3,24 @@ defmodule HostKit.Plan.Artifact do
 
   use JSONCodec, fast_path: :json
 
-  alias HostKit.Plan
+  alias HostKit.{Change, Plan, Resource}
 
   @version 1
 
   defstruct version: @version,
             target: nil,
-            plan: nil
+            project: nil,
+            resources: [],
+            changes: [],
+            summary: %{}
 
   @type t :: %__MODULE__{
           version: pos_integer(),
           target: String.t() | nil,
-          plan: String.t()
+          project: term(),
+          resources: [term()],
+          changes: [term()],
+          summary: term()
         }
 
   codec(:version, transform: :validate_version!)
@@ -23,23 +29,26 @@ defmodule HostKit.Plan.Artifact do
   def from_plan(%Plan{} = plan, opts \\ []) do
     %__MODULE__{
       target: Keyword.get(opts, :target),
-      plan: encode_plan(plan)
+      project: Resource.dump(plan.project),
+      resources: Resource.dump(plan.resources),
+      changes: Enum.map(plan.changes, &dump_change/1),
+      summary: Resource.dump(plan.summary)
     }
   end
 
   @spec to_plan(t()) :: {:ok, Plan.t()} | {:error, term()}
-  def to_plan(%__MODULE__{plan: encoded}) when is_binary(encoded) do
-    with {:ok, binary} <- Base.url_decode64(encoded, padding: false) do
-      case :erlang.binary_to_term(binary, [:safe]) do
-        %Plan{} = plan -> {:ok, plan}
-        other -> {:error, {:invalid_plan_artifact_payload, other}}
-      end
-    end
+  def to_plan(%__MODULE__{} = artifact) do
+    {:ok,
+     %Plan{
+       project: Resource.load(artifact.project),
+       resources: Resource.load(artifact.resources),
+       changes: Enum.map(artifact.changes, &load_change/1),
+       summary: Resource.load(artifact.summary),
+       opts: []
+     }}
   rescue
-    ArgumentError -> {:error, :invalid_plan_artifact_payload}
+    error in [ArgumentError] -> {:error, error}
   end
-
-  def to_plan(%__MODULE__{}), do: {:error, :invalid_plan_artifact_payload}
 
   @spec load(Path.t()) :: {:ok, Plan.t()} | {:error, term()}
   def load(path) do
@@ -68,10 +77,23 @@ defmodule HostKit.Plan.Artifact do
       reason: :unsupported_plan_artifact_version
   end
 
-  defp encode_plan(%Plan{} = plan) do
-    plan
-    |> Map.replace!(:opts, [])
-    |> :erlang.term_to_binary()
-    |> Base.url_encode64(padding: false)
+  defp dump_change(%Change{} = change) do
+    %{
+      "action" => Resource.dump(change.action),
+      "resource_id" => Resource.dump(change.resource_id),
+      "before" => Resource.dump(change.before),
+      "after" => Resource.dump(change.after),
+      "reason" => Resource.dump(change.reason)
+    }
+  end
+
+  defp load_change(%{} = change) do
+    %Change{
+      action: Resource.load(Map.fetch!(change, "action")),
+      resource_id: Resource.load(Map.fetch!(change, "resource_id")),
+      before: Resource.load(Map.fetch!(change, "before")),
+      after: Resource.load(Map.fetch!(change, "after")),
+      reason: Resource.load(Map.fetch!(change, "reason"))
+    }
   end
 end
