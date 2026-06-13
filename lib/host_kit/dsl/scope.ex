@@ -6,6 +6,7 @@ defmodule HostKit.DSL.Scope do
   @project_key {__MODULE__, :project}
   @host_key {__MODULE__, :host}
   @service_key {__MODULE__, :service}
+  @workspace_key {__MODULE__, :workspace}
   @provider_config_key {__MODULE__, :provider_config}
   @observability_key {__MODULE__, :observability}
   @firewall_key {__MODULE__, :firewall}
@@ -97,13 +98,38 @@ defmodule HostKit.DSL.Scope do
 
   def start_service(name, opts) do
     service = Service.new(name, opts)
-    path_name = Keyword.get(opts, :path, Keyword.get(opts, :as, name))
-    Process.put(@service_key, %{service | meta: Map.put(service.meta, :path_name, path_name)})
+    base_name = Keyword.get(opts, :path, Keyword.get(opts, :as, name))
+    path_name = service_path(base_name)
+    identity_name = service_identity(base_name)
+
+    meta =
+      service.meta
+      |> Map.put(:path_name, path_name)
+      |> Map.put(:identity_name, identity_name)
+      |> maybe_put_workspace()
+
+    Process.put(@service_key, %{service | meta: meta})
   end
 
   def finish_service do
     service = Process.delete(@service_key) || raise "no HostKit service in scope"
     update_project(&Project.add_service(&1, service))
+  end
+
+  def start_workspace(name, opts) do
+    workspace = %{
+      name: name,
+      owner: Keyword.fetch!(opts, :owner),
+      path_name: Keyword.get(opts, :path, name),
+      identity: Keyword.get(opts, :identity)
+    }
+
+    Process.put(@workspace_key, workspace)
+  end
+
+  def finish_workspace do
+    Process.delete(@workspace_key) || raise "no HostKit workspace in scope"
+    :ok
   end
 
   def put_root(name, path), do: update_project(&Project.put_convention_root(&1, name, path))
@@ -126,11 +152,16 @@ defmodule HostKit.DSL.Scope do
   end
 
   def service_user do
-    prefixed(:user, service_path_name())
+    prefixed(:user, service_identity_name())
   end
 
   def unit_name(suffix \\ ".service") do
-    prefixed(:unit, service_path_name()) <> suffix
+    prefixed(:unit, service_identity_name()) <> suffix
+  end
+
+  def service_identity_name do
+    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    Map.get(service.meta, :identity_name, service_path_name())
   end
 
   def root_path(root, child \\ nil) do
@@ -240,6 +271,33 @@ defmodule HostKit.DSL.Scope do
 
   defp put_firewall_value(%{meta: meta} = parent, firewall) do
     %{parent | meta: Map.put(meta, :firewall, firewall)}
+  end
+
+  defp service_path(name) do
+    case Process.get(@workspace_key) do
+      nil ->
+        name
+
+      workspace ->
+        Path.join([to_string(workspace.owner), to_string(workspace.path_name), to_string(name)])
+    end
+  end
+
+  defp service_identity(name) do
+    case Process.get(@workspace_key) do
+      nil ->
+        name
+
+      workspace ->
+        Enum.join([workspace.owner, workspace.path_name, name], "-") |> String.replace("/", "-")
+    end
+  end
+
+  defp maybe_put_workspace(meta) do
+    case Process.get(@workspace_key) do
+      nil -> meta
+      workspace -> Map.put(meta, :workspace, Map.take(workspace, [:name, :owner]))
+    end
   end
 
   defp storage_opts(opts) do

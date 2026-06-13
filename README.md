@@ -257,6 +257,30 @@ HostKit.apply(plan, confirm: true, nft_reload: true)
 
 Firewall policy is written to `/etc/nftables.d/hostkit.nft` by default and validated with `nft -c -f` before optional reload.
 
+## Workspace scope
+
+`workspace` scopes ordinary HostKit DSL for user sandboxes while keeping resources inspectable:
+
+```elixir
+workspace :blog, owner: :alice do
+  service :preview do
+    directory root_path(:data), mode: :private_dir
+
+    daemon unit_name() do
+      run exec_start: ["mix", "phx.server"]
+      listen :http, port: 4000, on: :loopback
+    end
+  end
+end
+```
+
+Inside a workspace, services get workspace metadata plus separate path and identity names:
+
+```elixir
+root_path(:data) # .../alice/blog/preview
+unit_name()      # prefix-alice-blog-preview.service
+```
+
 ## Named listeners
 
 Services can declare named listeners and reuse them from provider declarations:

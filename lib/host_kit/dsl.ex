@@ -111,6 +111,14 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro workspace(name, opts, do: block) do
+    quote do
+      HostKit.DSL.Scope.start_workspace(unquote(name), unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.finish_workspace()
+    end
+  end
+
   defmacro path_name(value) do
     quote do
       HostKit.DSL.Scope.set_service_path_name(unquote(value))
