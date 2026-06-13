@@ -5,15 +5,7 @@ defmodule HostKit.Telemetry do
   alias HostKit.Telemetry.Signal
 
   @spec config(keyword()) :: map()
-  def config(value) when is_boolean(value), do: value
-
-  def config(opts) do
-    opts
-    |> Map.new(fn
-      {:attributes, attrs} -> {:attributes, Map.new(attrs)}
-      pair -> pair
-    end)
-  end
+  def config(value), do: HostKit.Observability.config(value)
 
   @spec signals(Project.t()) :: [Signal.t()]
   def signals(%Project{} = project) do
@@ -24,14 +16,14 @@ defmodule HostKit.Telemetry do
   end
 
   defp service_signals(service, project_defaults) do
-    service_defaults = merge(project_defaults, telemetry_config(service.meta, %{}))
+    service_defaults = merge_config(project_defaults, telemetry_config(service.meta, %{}))
     Enum.flat_map(service.resources, &resource_signals(&1, service_defaults))
   end
 
   defp resource_signals(resource, service_defaults) do
     case telemetry_config(resource.meta, :inherit) do
       :inherit -> inherited_signal(service_defaults, resource)
-      resource_config -> [signal(merge(service_defaults, resource_config), resource)]
+      resource_config -> [signal(merge_config(service_defaults, resource_config), resource)]
     end
   end
 
@@ -78,18 +70,8 @@ defmodule HostKit.Telemetry do
   defp normalize_config(config) when is_list(config), do: config(config)
   defp normalize_config(config) when is_map(config), do: config
 
-  defp merge(base, false) when is_map(base), do: %{enabled: false}
-  defp merge(%{enabled: false}, _override), do: %{enabled: false}
-  defp merge(base, true) when is_map(base), do: Map.merge(base, normalize_config(true))
-
-  defp merge(base, override) when is_map(base) do
-    override = normalize_config(override)
-
-    Map.merge(base, override, fn
-      :attributes, left, right -> Map.merge(left, right)
-      _key, _left, right -> right
-    end)
-  end
+  defp merge_config(base, override),
+    do: HostKit.Observability.merge(base, override, &normalize_config/1)
 
   defp enabled_signals(config) do
     [:logs, :metrics, :traces]
