@@ -89,6 +89,7 @@ defmodule HostKit.Plan.Format do
       Atom.to_string(source.ref_kind),
       ")",
       format_source_revision(source.revision),
+      format_mutable_source(source),
       "\n  checkout: ",
       source.checkout,
       format_source_path(source.path)
@@ -111,6 +112,11 @@ defmodule HostKit.Plan.Format do
 
   defp format_source_revision(nil), do: []
   defp format_source_revision(revision), do: ["\n  resolved: ", revision]
+
+  defp format_mutable_source(%{ref_kind: :branch}),
+    do: ["\n  warning: mutable ref; resolved revision is pinned in this plan"]
+
+  defp format_mutable_source(_source), do: []
 
   defp format_source_path("."), do: []
   defp format_source_path(path), do: ["\n  path: ", path]

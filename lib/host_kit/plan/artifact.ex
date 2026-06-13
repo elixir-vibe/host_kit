@@ -11,6 +11,7 @@ defmodule HostKit.Plan.Artifact do
             target: nil,
             project: nil,
             resources: [],
+            sources: %{},
             changes: [],
             summary: %{}
 
@@ -19,6 +20,7 @@ defmodule HostKit.Plan.Artifact do
           target: map() | nil,
           project: term(),
           resources: [term()],
+          sources: map(),
           changes: [term()],
           summary: term()
         }
@@ -31,6 +33,7 @@ defmodule HostKit.Plan.Artifact do
       target: Keyword.get(opts, :target_metadata, %{}),
       project: Resource.dump(plan.project),
       resources: Resource.dump(plan.resources),
+      sources: source_identities(plan.resources),
       changes: Enum.map(plan.changes, &dump_change/1),
       summary: Resource.dump(plan.summary)
     }
@@ -81,6 +84,14 @@ defmodule HostKit.Plan.Artifact do
       expected: @version,
       got: version,
       reason: :unsupported_plan_artifact_version
+  end
+
+  defp source_identities(resources) do
+    resources
+    |> Enum.filter(&match?(%HostKit.Resources.Source{}, &1))
+    |> Map.new(fn source ->
+      {to_string(source.name), HostKit.Resources.Source.identity(source)}
+    end)
   end
 
   defp dump_change(%Change{} = change) do

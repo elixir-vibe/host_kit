@@ -1,6 +1,30 @@
 defmodule HostKit.RunStampTest do
   use ExUnit.Case, async: false
 
+  test "run stamps include source identities" do
+    source = %HostKit.Resources.Source{
+      name: :app,
+      uri: "https://github.com/example/app.git",
+      ref: "main",
+      ref_kind: :branch,
+      revision: "abc123",
+      checkout: "/opt/app/source",
+      meta: %{tree: "def456"}
+    }
+
+    command =
+      HostKit.Resources.Command.new(:build,
+        exec: ["true"],
+        inputs: [{:source, :app}]
+      )
+
+    stamp = HostKit.RunStamp.desired(command, resources: [source])
+
+    assert stamp["inputs"] == []
+    assert stamp["source_inputs"]["app"]["revision"] == "abc123"
+    assert stamp["source_inputs"]["app"]["tree"] == "def456"
+  end
+
   test "run resources can be current via input/output stamp" do
     root = Path.join(System.tmp_dir!(), "hostkit-run-stamp-#{System.unique_integer([:positive])}")
     input = Path.join(root, "input.txt")

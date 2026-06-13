@@ -44,6 +44,35 @@ defmodule HostKit.Plan.ArtifactTest do
     assert loaded.opts == []
   end
 
+  test "includes source identities" do
+    source = %HostKit.Resources.Source{
+      name: :app,
+      uri: "https://github.com/elixir-vibe/host_kit.git",
+      ref: "main",
+      ref_kind: :branch,
+      revision: "abc123",
+      checkout: "/opt/app/source",
+      path: "examples/hello",
+      meta: %{tree: "def456"}
+    }
+
+    plan = %HostKit.Plan{project: %HostKit.Project{name: :demo}, resources: [source]}
+    artifact = Artifact.from_plan(plan)
+
+    assert artifact.sources == %{
+             "app" => %{
+               "type" => "git",
+               "uri" => "https://github.com/elixir-vibe/host_kit.git",
+               "ref" => "main",
+               "ref_kind" => "branch",
+               "revision" => "abc123",
+               "tree" => "def456",
+               "checkout" => "/opt/app/source",
+               "path" => "examples/hello"
+             }
+           }
+  end
+
   test "serializes secret references without resolved secret values" do
     env_var = "HOSTKIT_PLAN_ARTIFACT_SECRET_#{System.unique_integer([:positive])}"
     System.put_env(env_var, "super-secret-value")

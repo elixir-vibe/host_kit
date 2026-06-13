@@ -8,7 +8,7 @@ defmodule HostKit.Resources.Shell do
           env: %{String.t() => String.t()},
           creates: String.t() | nil,
           unless: String.t() | nil,
-          inputs: [String.t()],
+          inputs: [String.t() | {:source, atom() | String.t()}],
           outputs: [String.t()],
           stamp: String.t() | nil,
           timeout: non_neg_integer() | nil,
@@ -37,7 +37,7 @@ defmodule HostKit.Resources.Shell do
       env: opts |> Keyword.get(:env, %{}) |> HostKit.Env.Normalize.string_map(),
       creates: Keyword.get(opts, :creates),
       unless: Keyword.get(opts, :unless),
-      inputs: opts |> Keyword.get(:inputs, []) |> List.wrap() |> Enum.map(&to_string/1),
+      inputs: opts |> Keyword.get(:inputs, []) |> List.wrap() |> Enum.map(&normalize_input/1),
       outputs: opts |> Keyword.get(:outputs, []) |> List.wrap() |> Enum.map(&to_string/1),
       stamp: Keyword.get(opts, :stamp),
       timeout: Keyword.get(opts, :timeout),
@@ -50,4 +50,7 @@ defmodule HostKit.Resources.Shell do
 
   defp normalize_script(%HostKit.ShellScript{} = script), do: script
   defp normalize_script(source) when is_binary(source), do: HostKit.ShellScript.parse!(source)
+
+  defp normalize_input({:source, name}), do: {:source, name}
+  defp normalize_input(input), do: to_string(input)
 end

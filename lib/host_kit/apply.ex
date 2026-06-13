@@ -10,7 +10,11 @@ defmodule HostKit.Apply do
 
   @spec run(Plan.t(), keyword()) :: {:ok, [result()]} | {:error, term()}
   def run(%Plan{} = plan, opts \\ []) do
-    opts = opts |> Keyword.put_new(:project, plan.project) |> maybe_put_package_manager(plan)
+    opts =
+      plan.opts
+      |> Keyword.merge(opts)
+      |> Keyword.put_new(:project, plan.project)
+      |> maybe_put_package_manager(plan)
 
     with :ok <- confirm(opts) do
       apply_changes(plan.changes, opts)

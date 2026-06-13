@@ -55,7 +55,9 @@ defmodule HostKit.ElixirAppRecipeTest do
              %HostKit.Resources.Command{
                name: "hello_deps",
                exec: {"mix", ["deps.get", "--only", "prod"]},
-               runtime: {:mise, :beam}
+               runtime: {:mise, :beam},
+               inputs: [{:source, "hello_source"}, "mix.exs", "mix.lock"],
+               outputs: ["deps"]
              } ->
                true
 

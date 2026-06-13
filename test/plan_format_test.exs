@@ -65,6 +65,7 @@ defmodule HostKit.PlanFormatTest do
                uri: https://github.com/elixir-vibe/host_kit.git
                ref: main (branch)
                resolved: abc123
+               warning: mutable ref; resolved revision is pinned in this plan
                checkout: /opt/app/source
                path: examples/hello
              """)

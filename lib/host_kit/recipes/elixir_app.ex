@@ -59,6 +59,8 @@ defmodule HostKit.Recipes.ElixirApp do
         ~SH"deps.get --only prod",
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
+        inputs: [{:source, app.commands.source.name}, "mix.exs", "mix.lock"],
+        outputs: ["deps"],
         timeout: 300_000
       )
 
@@ -77,6 +79,8 @@ defmodule HostKit.Recipes.ElixirApp do
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
         creates: app.paths.release_bin,
+        inputs: [{:source, app.commands.source.name}, "mix.exs", "mix.lock", "lib", "config"],
+        outputs: [app.paths.release_bin],
         timeout: 300_000
       )
 

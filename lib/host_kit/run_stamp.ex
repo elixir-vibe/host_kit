@@ -107,7 +107,8 @@ defmodule HostKit.RunStamp do
       "cwd" => resource.cwd,
       "env" => resource.env,
       "creates" => resource.creates,
-      "inputs" => resource.inputs,
+      "inputs" => dump_inputs(path_inputs(resource.inputs)),
+      "source_inputs" => source_inputs(resource.inputs, opts),
       "outputs" => resource.outputs,
       "input_digest" => input_digest(resource, opts)
     }
@@ -116,11 +117,17 @@ defmodule HostKit.RunStamp do
   defp input_digest(%{inputs: []}, _opts), do: nil
 
   defp input_digest(%{inputs: inputs, cwd: cwd}, opts) do
-    script = input_digest_script(inputs, cwd)
+    inputs = path_inputs(inputs)
 
-    case Runner.cmd(runner(opts), "sh", ["-c", script], stderr_to_stdout: true) do
-      {digest, 0} -> String.trim(digest)
-      {_output, _status} -> :missing_or_unreadable_inputs
+    if inputs == [] do
+      nil
+    else
+      script = input_digest_script(inputs, cwd)
+
+      case Runner.cmd(runner(opts), "sh", ["-c", script], stderr_to_stdout: true) do
+        {digest, 0} -> String.trim(digest)
+        {_output, _status} -> :missing_or_unreadable_inputs
+      end
     end
   end
 
@@ -133,6 +140,40 @@ defmodule HostKit.RunStamp do
     patterns = Enum.map_join(inputs, " ", &HostKit.Shell.escape/1)
 
     "find #{patterns} -type f -print0 2>/dev/null | sort -z | xargs -0 sha256sum 2>/dev/null | sha256sum | awk '{print $1}'"
+  end
+
+  defp path_inputs(inputs), do: Enum.filter(inputs, &is_binary/1)
+
+  defp dump_inputs(inputs), do: inputs
+
+  defp source_inputs(inputs, opts) do
+    inputs
+    |> Enum.filter(&source_input?/1)
+    |> Map.new(fn {:source, name} -> {to_string(name), source_identity(name, opts)} end)
+  end
+
+  defp source_input?({:source, _name}), do: true
+  defp source_input?(_input), do: false
+
+  defp source_identity(name, opts) do
+    opts
+    |> Keyword.get(:resources, [])
+    |> Enum.find(&match?(%HostKit.Resources.Source{name: ^name}, &1))
+    |> case do
+      %HostKit.Resources.Source{} = source -> current_or_desired_source_identity(source, opts)
+      nil -> %{"missing" => true}
+    end
+  end
+
+  defp current_or_desired_source_identity(source, opts) do
+    case HostKit.Source.Git.read(source, opts) do
+      {:ok, %HostKit.Resources.Source{revision: revision} = actual}
+      when revision == source.revision ->
+        HostKit.Resources.Source.identity(actual)
+
+      _other ->
+        HostKit.Resources.Source.identity(source)
+    end
   end
 
   defp dump_runtime(nil), do: nil

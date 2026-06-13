@@ -35,15 +35,20 @@ defmodule HostKit.Source.Git do
       true ->
         with {:ok, current_uri} <- git_output(desired, ["remote", "get-url", "origin"], opts),
              {:ok, revision} <- git_output(desired, ["rev-parse", "HEAD"], opts),
+             {:ok, tree} <- git_output(desired, ["rev-parse", "HEAD^{tree}"], opts),
              {:ok, status} <- git_output(desired, ["status", "--porcelain"], opts) do
+          revision = String.trim(revision)
+          tree = String.trim(tree)
+
           {:ok,
            %{
              desired
              | uri: String.trim(current_uri),
-               revision: String.trim(revision),
+               revision: revision,
                meta:
                  desired.meta
-                 |> Map.put(:current_revision, String.trim(revision))
+                 |> Map.put(:current_revision, revision)
+                 |> Map.put(:tree, tree)
                  |> Map.put(:dirty, String.trim(status) != "")
                  |> Map.put(:status, status)
            }}
