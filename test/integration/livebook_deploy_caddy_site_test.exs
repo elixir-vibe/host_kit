@@ -62,9 +62,7 @@ defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
              )
 
     assert {_, 0} = sudo_cmd(host, runner, ["systemctl", "restart", caddy_service_name])
-
-    assert {"active\n", 0} =
-             sudo_cmd(host, runner, ["systemctl", "is-active", caddy_service_name])
+    assert {:ok, "active\n"} = wait_until_active(host, runner, caddy_service_name)
 
     assert {body, 0} =
              HostKit.Runner.cmd(runner, "curl", ["-fsS", "http://127.0.0.1:#{port}"],
@@ -89,6 +87,7 @@ defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
       target_sudo: host.sudo,
       ssh_opts: host.meta[:ssh] || [],
       site_address: ":#{port}",
+      acme_email: "admin@example.test",
       site_root: site_root,
       caddy_config_path: caddy_config_path,
       caddy_config_dir: Path.dirname(caddy_config_path),
@@ -99,6 +98,21 @@ defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
 
     {project, _binding} = Code.eval_string(notebook_dsl!(), binding)
     project
+  end
+
+  defp wait_until_active(host, runner, service_name, attempts \\ 20)
+
+  defp wait_until_active(_host, _runner, _service_name, 0), do: {:error, :not_active}
+
+  defp wait_until_active(host, runner, service_name, attempts) do
+    case sudo_cmd(host, runner, ["systemctl", "is-active", service_name]) do
+      {"active\n", 0} ->
+        {:ok, "active\n"}
+
+      _other ->
+        Process.sleep(250)
+        wait_until_active(host, runner, service_name, attempts - 1)
+    end
   end
 
   defp sudo_cmd(%HostKit.Host{sudo: true}, runner, [command | args]) do

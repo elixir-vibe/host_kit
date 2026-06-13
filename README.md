@@ -91,7 +91,7 @@ mix host_kit.apply --host app \
 
 ## Interactive notebook
 
-Deploy a real Caddy-backed static site from Livebook, with Kino inputs for SSH target/auth, plan review, explicit apply, and HTTP verification:
+Deploy a real Caddy-backed static site from Livebook, with Kino inputs for SSH target/auth, optional Let's Encrypt HTTPS for a real hostname, plan review, explicit apply, and HTTP verification:
 
 [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Felixir-vibe%2Fhost_kit%2Fblob%2Fmaster%2Fnotebooks%2Flearn%2Fdeploy_caddy_site.livemd)
 
