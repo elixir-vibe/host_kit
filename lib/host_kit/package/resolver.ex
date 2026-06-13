@@ -363,6 +363,7 @@ defmodule HostKit.Package.Resolver do
     case load_lock(opts) do
       {:ok, lock} -> package_from_lock(package, capability, repo_match, lock)
       :error -> :error
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -375,7 +376,7 @@ defmodule HostKit.Package.Resolver do
         case HostKit.Package.Lock.load(Keyword.fetch!(opts, :package_lock)) do
           {:ok, lock} -> {:ok, lock}
           {:error, :enoent} -> :error
-          {:error, _reason} -> :error
+          {:error, reason} -> {:error, reason}
         end
 
       true ->
@@ -387,6 +388,7 @@ defmodule HostKit.Package.Resolver do
     case HostKit.Package.Lock.get(lock, capability, repo_match) do
       {:ok, system_name} -> {:ok, %{package | system_name: system_name}}
       :error -> :error
+      {:error, reason} -> {:error, reason}
     end
   end
 

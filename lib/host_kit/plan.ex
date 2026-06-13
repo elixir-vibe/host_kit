@@ -3,8 +3,8 @@ defmodule HostKit.Plan do
 
   alias HostKit.Addr
   alias HostKit.{Change, Project, Resource}
-  alias HostKit.Package.Resolver, as: PackageResolver
-  alias HostKit.Resources.Capability
+  alias HostKit.Package.{Manager, Resolver}
+  alias HostKit.Resources.{Capability, Package}
 
   @type t :: %__MODULE__{
           project: Project.t(),
@@ -22,7 +22,10 @@ defmodule HostKit.Plan do
 
   @spec build(Project.t(), keyword()) :: {:ok, t()}
   def build(%Project{} = project, opts \\ []) do
-    with {:ok, resources} <- resolve_resources(Project.resources(project), opts),
+    resources = Project.resources(project)
+    opts = maybe_put_package_manager(resources, opts)
+
+    with {:ok, resources} <- resolve_resources(resources, opts),
          :ok <- maybe_write_package_lock(resources, opts) do
       changes = Enum.map(resources, &change_for(&1, project, opts))
 
@@ -37,6 +40,23 @@ defmodule HostKit.Plan do
     end
   end
 
+  defp maybe_put_package_manager(resources, opts) do
+    if Keyword.has_key?(opts, :reader) and package_resources_present?(resources) and
+         not Keyword.has_key?(opts, :package_manager) do
+      case Manager.detect(opts) do
+        {:ok, manager} -> Keyword.put(opts, :package_manager, manager)
+        {:error, _reason} -> opts
+      end
+    else
+      opts
+    end
+  end
+
+  defp package_resources_present?(resources), do: Enum.any?(resources, &package_resource?/1)
+  defp package_resource?(%Package{}), do: true
+  defp package_resource?(%Capability{}), do: true
+  defp package_resource?(_resource), do: false
+
   defp resolve_resources(resources, opts) do
     Enum.reduce_while(resources, {:ok, []}, fn resource, {:ok, resolved} ->
       case resolve_resource(resource, opts) do
@@ -50,11 +70,9 @@ defmodule HostKit.Plan do
     end)
   end
 
-  defp resolve_resource(%HostKit.Resources.Package{} = package, opts),
-    do: PackageResolver.resolve(package, opts)
+  defp resolve_resource(%Package{} = package, opts), do: Resolver.resolve(package, opts)
 
-  defp resolve_resource(%Capability{} = capability, opts),
-    do: PackageResolver.resolve(capability, opts)
+  defp resolve_resource(%Capability{} = capability, opts), do: Resolver.resolve(capability, opts)
 
   defp resolve_resource(resource, _opts), do: {:ok, resource}
 

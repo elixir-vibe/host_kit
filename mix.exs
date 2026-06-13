@@ -33,7 +33,7 @@ defmodule HostKit.MixProject do
       {:systemdkit, path: "../systemdkit", override: true},
       {:unitctl, path: "../unitctl"},
       {:jason, "~> 1.4"},
-      {:json_codec, "~> 0.1.3"},
+      {:json_codec, "~> 0.1.4"},
       {:req, "~> 0.5"},
       {:dotenvy, "~> 1.1"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

@@ -3,6 +3,7 @@ defmodule HostKit.Package.CLI do
 
   @behaviour HostKit.Package
 
+  alias HostKit.Package.Manager
   alias HostKit.Resources.Package, as: PackageResource
   alias HostKit.Runner.Ops
 
@@ -92,22 +93,7 @@ defmodule HostKit.Package.CLI do
     sh_ok(opts, "apk add#{update} #{package_spec(:apk, package)}")
   end
 
-  defp manager(opts) do
-    case Keyword.get(opts, :package_manager) do
-      manager when manager in [:apt, :dnf, :pacman, :apk] -> {:ok, manager}
-      nil -> detect_manager(opts)
-      manager -> {:error, {:unsupported_package_manager, manager}}
-    end
-  end
-
-  defp detect_manager(opts) do
-    Enum.find_value([apt: "apt-get", dnf: "dnf", pacman: "pacman", apk: "apk"], fn {manager,
-                                                                                    command} ->
-      if match?(:ok, Ops.cmd(opts, "sh", ["-c", "command -v #{command} >/dev/null 2>&1"])) do
-        {:ok, manager}
-      end
-    end) || {:error, :package_manager_not_found}
-  end
+  defp manager(opts), do: Manager.resolve(opts)
 
   defp package_status(package, output) do
     case String.split(output, "\t", parts: 2) do

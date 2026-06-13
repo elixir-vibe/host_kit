@@ -6,6 +6,11 @@ defmodule HostKit.PackageTest do
 
     def cmd("sh", ["-c", "dpkg-query" <> _rest], _opts), do: {"installed\t1.2.3", 0}
 
+    def cmd("sh", ["-c", "command -v apt-get >/dev/null 2>&1"] = args, opts) do
+      send(opts[:test_pid], {:cmd, "sh", args})
+      {"", 0}
+    end
+
     def cmd(command, args, opts) do
       send(opts[:test_pid], {:cmd, command, args})
       {"", 0}
@@ -71,6 +76,28 @@ defmodule HostKit.PackageTest do
 
     assert command =~
              "DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -- 'curl'"
+  end
+
+  test "apply detects package manager once for package changes" do
+    packages = [HostKit.Resources.Package.new(:curl), HostKit.Resources.Package.new(:git)]
+
+    plan = %HostKit.Plan{
+      project: %HostKit.Project{name: :demo},
+      changes:
+        Enum.map(packages, fn package ->
+          %HostKit.Change{
+            action: :create,
+            resource_id: HostKit.Resources.Package.id(package),
+            after: package
+          }
+        end)
+    }
+
+    assert {:ok, _results} =
+             HostKit.apply(plan, confirm: true, runner: {Runner, test_pid: self()})
+
+    assert_received {:cmd, "sh", ["-c", "command -v apt-get >/dev/null 2>&1"]}
+    refute_received {:cmd, "sh", ["-c", "command -v dnf >/dev/null 2>&1"]}
   end
 
   test "package resources read installed state from package manager" do

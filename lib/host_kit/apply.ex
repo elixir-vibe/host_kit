@@ -2,6 +2,7 @@ defmodule HostKit.Apply do
   @moduledoc "Applies supported HostKit plan changes."
 
   alias HostKit.{Change, Firewall, Plan, Provider, Proxy, Resources, Runner, Systemd}
+  alias HostKit.Package.Manager
   alias Resources.{Directory, EnvFile, File, Mise, Package, User}
   alias Runner.Ops
 
@@ -9,11 +10,26 @@ defmodule HostKit.Apply do
 
   @spec run(Plan.t(), keyword()) :: {:ok, [result()]} | {:error, term()}
   def run(%Plan{} = plan, opts \\ []) do
-    opts = Keyword.put_new(opts, :project, plan.project)
+    opts = opts |> Keyword.put_new(:project, plan.project) |> maybe_put_package_manager(plan)
 
     with :ok <- confirm(opts) do
       apply_changes(plan.changes, opts)
     end
+  end
+
+  defp maybe_put_package_manager(opts, plan) do
+    if package_changes?(plan.changes) and not Keyword.has_key?(opts, :package_manager) do
+      case Manager.detect(opts) do
+        {:ok, manager} -> Keyword.put(opts, :package_manager, manager)
+        {:error, _reason} -> opts
+      end
+    else
+      opts
+    end
+  end
+
+  defp package_changes?(changes) do
+    Enum.any?(changes, &match?(%Change{after: %Package{}}, &1))
   end
 
   defp confirm(opts) do

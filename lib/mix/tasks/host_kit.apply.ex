@@ -21,6 +21,7 @@ defmodule Mix.Tasks.HostKit.Apply do
           sudo: :boolean,
           require: :keep,
           ignore: :keep,
+          package_lock: :string,
           dry_run: :boolean,
           confirm: :boolean
         ],
@@ -49,7 +50,9 @@ defmodule Mix.Tasks.HostKit.Apply do
   end
 
   defp plan_opts(opts, target_opts) do
-    Keyword.put(target_opts, :ignore, Options.ignored_resources(opts))
+    target_opts
+    |> Keyword.put(:ignore, Options.ignored_resources(opts))
+    |> put_present(:package_lock, Keyword.get(opts, :package_lock))
   end
 
   defp apply_opts(opts, target_opts) do
@@ -59,4 +62,7 @@ defmodule Mix.Tasks.HostKit.Apply do
       sudo: Keyword.get(opts, :sudo, false)
     )
   end
+
+  defp put_present(opts, _key, nil), do: opts
+  defp put_present(opts, key, value), do: Keyword.put(opts, key, value)
 end
