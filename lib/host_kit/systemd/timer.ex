@@ -17,6 +17,18 @@ defmodule HostKit.Systemd.Timer do
             depends_on: [],
             meta: %{}
 
+  @spec new(String.t(), keyword()) :: t()
+  def new(name, opts \\ []) do
+    %__MODULE__{
+      name: name,
+      unit: opts |> Keyword.get(:unit, []) |> HostKit.Systemd.Directives.coerce(),
+      timer: opts |> Keyword.get(:timer, []) |> HostKit.Systemd.Directives.coerce(),
+      install: opts |> Keyword.get(:install, []) |> HostKit.Systemd.Directives.coerce(),
+      depends_on: Keyword.get(opts, :depends_on, []),
+      meta: Keyword.get(opts, :meta, %{})
+    }
+  end
+
   def id(%__MODULE__{name: name}), do: {:systemd_timer, name}
 
   @spec unit_file(t()) :: struct()

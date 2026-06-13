@@ -5,12 +5,7 @@ defmodule HostKit.DSL.Systemd.Scope do
   @timer_key {__MODULE__, :timer}
 
   def start_service(name, opts) do
-    Process.put(@service_key, %HostKit.Systemd.Service{
-      name: name,
-      unit: Keyword.get(opts, :unit, []),
-      service: Keyword.get(opts, :service, []),
-      install: Keyword.get(opts, :install, [])
-    })
+    Process.put(@service_key, HostKit.Systemd.Service.new(name, opts))
   end
 
   def finish_service do
@@ -18,12 +13,7 @@ defmodule HostKit.DSL.Systemd.Scope do
   end
 
   def start_timer(name, opts) do
-    Process.put(@timer_key, %HostKit.Systemd.Timer{
-      name: name,
-      unit: Keyword.get(opts, :unit, []),
-      timer: Keyword.get(opts, :timer, []),
-      install: Keyword.get(opts, :install, [])
-    })
+    Process.put(@timer_key, HostKit.Systemd.Timer.new(name, opts))
   end
 
   def finish_timer do
