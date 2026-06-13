@@ -15,6 +15,7 @@ defmodule Mix.Tasks.HostKit.Plan do
       OptionParser.parse!(args,
         strict: [
           local: :boolean,
+          host: :string,
           remote: :string,
           user: :string,
           port: :integer,
@@ -38,7 +39,7 @@ defmodule Mix.Tasks.HostKit.Plan do
     path = List.first(positional) || "infra/config.exs"
     project = HostKit.load!(path, require: Keyword.get_values(opts, :require))
 
-    Options.with_target_opts(opts, fn target_opts ->
+    Options.with_target_opts(opts, project, fn target_opts ->
       {:ok, plan} = HostKit.plan(project, plan_opts(opts, target_opts))
       maybe_write_artifact(plan, opts, target_opts)
       IO.puts(format_plan(plan, opts))
@@ -63,17 +64,17 @@ defmodule Mix.Tasks.HostKit.Plan do
     end
   end
 
-  defp target_metadata(plan, opts, target_opts) do
+  defp target_metadata(plan, _opts, target_opts) do
     %{}
-    |> put_metadata("kind", target_kind(opts))
+    |> put_metadata("kind", target_kind(target_opts))
     |> put_metadata("package_manager", package_manager(plan, target_opts))
     |> put_metadata("package_repo", package_repo(plan, target_opts))
   end
 
-  defp target_kind(opts) do
+  defp target_kind(target_opts) do
     cond do
-      Keyword.has_key?(opts, :remote) -> "remote"
-      Keyword.get(opts, :local, false) -> "local"
+      Keyword.has_key?(target_opts, :target) -> "remote"
+      Keyword.get(target_opts, :reader) == HostKit.Local -> "local"
       true -> nil
     end
   end

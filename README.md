@@ -104,23 +104,33 @@ mix host_kit.plan --write-package-lock host_kit.package.lock infra/config.exs
 mix host_kit.apply --package-lock host_kit.package.lock --confirm infra/config.exs
 ```
 
-Plan/apply artifacts make remote changes inspectable before apply:
+Plan/apply artifacts make remote changes inspectable before apply. Prefer declaring the remote host in normal `.exs` HostKit config and selecting it with `--host`:
+
+```elixir
+use HostKit.DSL
+
+project :infra do
+  host :prod do
+    hostname "host.example"
+    user "root"
+    sudo true
+
+    ssh identity_file: "~/.ssh/id_ed25519",
+        silently_accept_hosts: true
+  end
+end
+```
 
 ```sh
-mix host_kit.plan --remote host.example --user root --sudo \
+mix host_kit.plan --host prod \
   --package-lock host_kit.package.lock \
   --out host_kit.plan.json infra/config.exs
 
-mix host_kit.apply --remote host.example --user root --sudo \
-  --plan host_kit.plan.json --confirm
+mix host_kit.apply --host prod \
+  --plan host_kit.plan.json --confirm infra/config.exs
 ```
 
-Remote SSH auth supports `--identity-file`, `--password`, and `--password-env`:
-
-```sh
-HOSTKIT_SSH_PASSWORD=secret mix host_kit.plan \
-  --remote host.example --user root --password-env HOSTKIT_SSH_PASSWORD infra/config.exs
-```
+Raw SSH flags remain available as an escape hatch: `--remote`, `--user`, `--port`, `--identity-file`, `--password`, and `--password-env`.
 
 For Linux integration testing, use Incus as the lightweight native container/VM backend:
 
@@ -132,7 +142,7 @@ HOSTKIT_INCUS_SUDO=true HOSTKIT_SSH_PUBLIC_KEY=$HOME/.ssh/id_ed25519.pub \
 HOSTKIT_INCUS_SUDO=true scripts/incus_integration_vm.sh ip
 ```
 
-Set `HOSTKIT_INCUS_TYPE=vm` to launch an Incus VM instead of the default container. Run the remote CLI integration against Incus with `HOSTKIT_INCUS_INTEGRATION=1`.
+Set `HOSTKIT_INCUS_TYPE=vm` to launch an Incus VM instead of the default container. Run the remote CLI integration against Incus with `HOSTKIT_INTEGRATION_TOOL=incus`, or against a pre-existing host declared in `.exs` config with `HOSTKIT_INTEGRATION_TOOL=remote HOSTKIT_INTEGRATION_CONFIG=examples/integration_hosts.example.exs`.
 
 ## Project-local DSLs
 

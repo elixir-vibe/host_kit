@@ -69,6 +69,21 @@ defmodule HostKit.Project do
   @spec add_host(t(), HostKit.Host.t()) :: t()
   def add_host(%__MODULE__{} = project, host), do: %{project | hosts: project.hosts ++ [host]}
 
+  @spec fetch_host(t(), atom()) :: {:ok, HostKit.Host.t()} | :error
+  def fetch_host(%__MODULE__{} = project, name) when is_atom(name) do
+    case Enum.find(project.hosts, &(&1.name == name)) do
+      nil -> :error
+      host -> {:ok, host}
+    end
+  end
+
+  @spec fetch_host(t(), String.t()) :: {:ok, HostKit.Host.t()} | :error
+  def fetch_host(%__MODULE__{} = project, name) when is_binary(name) do
+    fetch_host(project, String.to_existing_atom(name))
+  rescue
+    ArgumentError -> :error
+  end
+
   @spec add_tenant(t(), Tenant.t()) :: t()
   def add_tenant(%__MODULE__{} = project, tenant),
     do: %{project | tenants: project.tenants ++ [tenant]}

@@ -253,6 +253,14 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro ssh(opts) do
+    quote do
+      HostKit.DSL.Scope.update_current(:host, fn host ->
+        update_in(host.meta[:ssh], &Keyword.merge(&1 || [], unquote(opts)))
+      end)
+    end
+  end
+
   defmacro observability(do: block) do
     quote do
       HostKit.DSL.Scope.start_observability()

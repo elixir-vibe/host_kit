@@ -16,6 +16,7 @@ defmodule Mix.Tasks.HostKit.Apply do
       OptionParser.parse!(args,
         strict: [
           local: :boolean,
+          host: :string,
           remote: :string,
           user: :string,
           port: :integer,
@@ -37,8 +38,10 @@ defmodule Mix.Tasks.HostKit.Apply do
         aliases: [dry_run: :dry_run]
       )
 
-    Options.with_target_opts(opts, fn target_opts ->
-      plan = load_plan(opts, positional, target_opts)
+    project = load_project(opts, positional)
+
+    Options.with_target_opts(opts, project, fn target_opts ->
+      plan = load_plan(opts, project, positional, target_opts)
 
       case HostKit.apply(plan, apply_opts(opts, target_opts)) do
         {:ok, results} -> print_results(results)
@@ -47,11 +50,19 @@ defmodule Mix.Tasks.HostKit.Apply do
     end)
   end
 
-  defp load_plan(opts, positional, target_opts) do
+  defp load_project(opts, positional) do
+    if Keyword.has_key?(opts, :plan) && !Keyword.has_key?(opts, :host) do
+      nil
+    else
+      path = List.first(positional) || "infra/config.exs"
+      HostKit.load!(path, require: Keyword.get_values(opts, :require))
+    end
+  end
+
+  defp load_plan(opts, project, positional, target_opts) do
     case Keyword.get(opts, :plan) do
       nil ->
-        path = List.first(positional) || "infra/config.exs"
-        project = HostKit.load!(path, require: Keyword.get_values(opts, :require))
+        project = project || HostKit.load!(List.first(positional) || "infra/config.exs")
         {:ok, plan} = HostKit.plan(project, plan_opts(opts, target_opts))
         plan
 
@@ -145,7 +156,7 @@ defmodule Mix.Tasks.HostKit.Apply do
     Keyword.merge(target_opts,
       dry_run: Keyword.get(opts, :dry_run, false),
       confirm: Keyword.get(opts, :confirm, false),
-      sudo: Keyword.get(opts, :sudo, false)
+      sudo: Keyword.get(opts, :sudo, Keyword.get(target_opts, :sudo, false))
     )
   end
 
