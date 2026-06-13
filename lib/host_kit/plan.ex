@@ -116,6 +116,10 @@ defmodule HostKit.Plan do
     Map.get(actual.meta, :content) == HostKit.Firewall.render(desired)
   end
 
+  defp equivalent?(%HostKit.Proxy{} = desired, actual) do
+    Map.get(actual.meta, :content) == HostKit.Proxy.render(desired)
+  end
+
   defp equivalent?(%HostKit.Caddy.Site{} = desired, actual) do
     normalize_caddy(Map.get(actual.meta, :content)) ==
       desired |> HostKit.Plugins.Caddy.render_site() |> IO.iodata_to_binary() |> normalize_caddy()

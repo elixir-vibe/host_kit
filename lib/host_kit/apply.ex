@@ -1,7 +1,7 @@
 defmodule HostKit.Apply do
   @moduledoc "Applies supported HostKit plan changes."
 
-  alias HostKit.{Change, Firewall, Plan, Runner}
+  alias HostKit.{Change, Firewall, Plan, Proxy, Runner}
   alias HostKit.Resources.{Directory, EnvFile, File, User}
   alias HostKit.Systemd
 
@@ -81,6 +81,11 @@ defmodule HostKit.Apply do
     apply_or_dry_run(change, opts, fn -> apply_firewall(firewall, opts) end)
   end
 
+  defp apply_change(%Change{action: action, after: %Proxy{} = proxy} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> apply_proxy(proxy, opts) end)
+  end
+
   defp apply_change(
          %Change{action: action, after: %HostKit.Workspace.Egress{} = egress} = change,
          opts
@@ -147,6 +152,14 @@ defmodule HostKit.Apply do
          :ok <- chown(path, "root", "root", opts),
          :ok <- chmod(path, 0o644, opts) do
       validate_firewall(path, opts)
+    end
+  end
+
+  defp apply_proxy(%Proxy{path: path} = proxy, opts) do
+    with :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, Proxy.render(proxy), opts),
+         :ok <- chown(path, "root", "root", opts) do
+      chmod(path, 0o644, opts)
     end
   end
 

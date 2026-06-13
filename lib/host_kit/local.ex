@@ -1,7 +1,7 @@
 defmodule HostKit.Local do
   @moduledoc "Read-only inspection of resources on the local host."
 
-  alias HostKit.{Caddy, Firewall}
+  alias HostKit.{Caddy, Firewall, Proxy}
   alias HostKit.Reader.Helpers
   alias HostKit.Resources.{Directory, EnvFile, File, User}
   alias HostKit.Systemd
@@ -55,6 +55,10 @@ defmodule HostKit.Local do
 
   def read(%Firewall{} = desired) do
     Helpers.read_firewall(desired, &read/1)
+  end
+
+  def read(%Proxy{} = desired) do
+    read_proxy(desired, %{})
   end
 
   def read(%Systemd.Service{name: name} = desired) do
@@ -129,6 +133,10 @@ defmodule HostKit.Local do
     Helpers.read_firewall(desired, &read(&1, context))
   end
 
+  def read(%Proxy{} = desired, context) do
+    read_proxy(desired, context)
+  end
+
   def read(resource, _context), do: read(resource)
 
   defp read_file(path, context) do
@@ -150,6 +158,10 @@ defmodule HostKit.Local do
   end
 
   defp sudo_read_file(_path, _context), do: {:error, :eacces}
+
+  defp read_proxy(%Proxy{path: path} = desired, context) do
+    Helpers.read_content_resource(desired, path, &read_file(&1, context))
+  end
 
   defp read_caddy_site(path, desired) do
     case Elixir.File.read(path) do

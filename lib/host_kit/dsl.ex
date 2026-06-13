@@ -105,7 +105,27 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro host(name, opts \\ [], do: block) do
+  defmacro host(name, opts \\ []) do
+    case Keyword.pop(opts, :do) do
+      {nil, _opts} ->
+        quote do
+          if HostKit.DSL.Scope.proxy_active?() do
+            HostKit.DSL.Scope.add_proxy_host(unquote(name))
+          else
+            raise ArgumentError, "host/2 without a block is only supported inside proxy/3"
+          end
+        end
+
+      {block, opts} ->
+        quote do
+          HostKit.DSL.Scope.start_host(unquote(name), unquote(opts))
+          unquote(block)
+          HostKit.DSL.Scope.finish_host()
+        end
+    end
+  end
+
+  defmacro host(name, opts, do: block) do
     quote do
       HostKit.DSL.Scope.start_host(unquote(name), unquote(opts))
       unquote(block)
@@ -113,11 +133,25 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro proxy(name, opts, do: block) do
+    quote do
+      HostKit.DSL.Scope.start_proxy(unquote(name), unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.finish_proxy()
+    end
+  end
+
   defmacro service(name, opts \\ [], do: block) do
     quote do
-      HostKit.DSL.Scope.start_service(unquote(name), unquote(opts))
-      unquote(block)
-      HostKit.DSL.Scope.finish_service()
+      if HostKit.DSL.Scope.proxy_active?() do
+        HostKit.DSL.Scope.start_proxy_service(unquote(name), unquote(opts))
+        unquote(block)
+        HostKit.DSL.Scope.finish_proxy_service()
+      else
+        HostKit.DSL.Scope.start_service(unquote(name), unquote(opts))
+        unquote(block)
+        HostKit.DSL.Scope.finish_service()
+      end
     end
   end
 
@@ -192,6 +226,12 @@ defmodule HostKit.DSL do
   defmacro backup_storage do
     quote do
       HostKit.DSL.Scope.backup_storage()
+    end
+  end
+
+  defmacro target(name, opts) do
+    quote do
+      HostKit.DSL.Scope.add_proxy_target(unquote(name), unquote(opts))
     end
   end
 

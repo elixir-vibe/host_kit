@@ -57,6 +57,14 @@ defmodule HostKit.Reader.Helpers do
     end
   end
 
+  def read_content_resource(desired, path, read_fun) do
+    case read_fun.(path) do
+      {:ok, content} -> {:ok, %{desired | meta: Map.put(desired.meta, :content, content)}}
+      {:error, :enoent} -> {:ok, nil}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def read_file(%File{path: path} = desired, stat_fun, read_fun) do
     with {:metadata, {:ok, %{type: :regular} = metadata}} <- {:metadata, stat_fun.(path)},
          {:content, {:ok, content}} <- {:content, read_fun.(path)} do

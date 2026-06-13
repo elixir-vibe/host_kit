@@ -11,6 +11,8 @@ defmodule HostKit.DSL.Scope do
   @provider_config_key {__MODULE__, :provider_config}
   @observability_key {__MODULE__, :observability}
   @firewall_key {__MODULE__, :firewall}
+  @proxy_key {__MODULE__, :proxy}
+  @proxy_service_key {__MODULE__, :proxy_service}
 
   def start_project(name, opts) do
     Process.put(@project_key, Project.new(name, opts))
@@ -84,6 +86,57 @@ defmodule HostKit.DSL.Scope do
 
   def put_tenant(name, opts) do
     update_project(&Project.add_tenant(&1, HostKit.Tenant.new(name, opts)))
+  end
+
+  def start_proxy(name, opts) do
+    Process.put(@proxy_key, %HostKit.Proxy{
+      name: name,
+      provider: Keyword.fetch!(opts, :provider),
+      path: Keyword.get(opts, :path, "/etc/xamal-proxy/config.exs"),
+      meta: Keyword.get(opts, :meta, %{})
+    })
+  end
+
+  def finish_proxy do
+    proxy = Process.delete(@proxy_key) || raise "no HostKit proxy in scope"
+    update_project(&Project.add_proxy(&1, proxy))
+  end
+
+  def proxy_active?, do: Process.get(@proxy_key) != nil
+
+  def start_proxy_service(name, opts) do
+    Process.put(@proxy_service_key, HostKit.Proxy.service(name, opts))
+  end
+
+  def finish_proxy_service do
+    service = Process.delete(@proxy_service_key) || raise "no HostKit proxy service in scope"
+    proxy = Process.get(@proxy_key) || raise "no HostKit proxy in scope"
+    Process.put(@proxy_key, %{proxy | services: proxy.services ++ [service]})
+  end
+
+  def add_proxy_host(host) do
+    update_proxy_service(&%{&1 | hosts: &1.hosts ++ [host]})
+  end
+
+  def add_proxy_target(name, opts) do
+    target =
+      if Keyword.has_key?(opts, :safe_rpc) do
+        %{
+          name: name,
+          safe_rpc: Keyword.fetch!(opts, :safe_rpc),
+          active: Keyword.get(opts, :active, false),
+          metadata: Keyword.get(opts, :metadata, %{})
+        }
+      else
+        %{
+          name: name,
+          url: Keyword.fetch!(opts, :url),
+          active: Keyword.get(opts, :active, false),
+          metadata: Keyword.get(opts, :metadata, %{})
+        }
+      end
+
+    update_proxy_service(&%{&1 | targets: &1.targets ++ [target]})
   end
 
   def start_host(name, opts) do
@@ -252,6 +305,15 @@ defmodule HostKit.DSL.Scope do
   end
 
   def listener_upstream(name), do: name |> listener() |> HostKit.Listener.upstream()
+
+  defp update_proxy_service(fun) do
+    service =
+      Process.get(@proxy_service_key) ||
+        raise "proxy service directive used outside proxy service block"
+
+    Process.put(@proxy_service_key, fun.(service))
+    :ok
+  end
 
   def update_current(:host, fun) do
     host = Process.get(@host_key) || raise "no HostKit host in scope"

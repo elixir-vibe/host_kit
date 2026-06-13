@@ -2,7 +2,7 @@ defmodule HostKit.Remote do
   @moduledoc "Read-only inspection of resources through a HostKit runner."
 
   alias HostKit.Caddy
-  alias HostKit.{Firewall, Reader.Helpers, Runner, Systemd}
+  alias HostKit.{Firewall, Proxy, Reader.Helpers, Runner, Systemd}
   alias HostKit.Resources.{Directory, EnvFile, File, User}
 
   @spec read(struct(), map()) :: {:ok, struct() | nil} | {:error, term()}
@@ -28,6 +28,10 @@ defmodule HostKit.Remote do
 
   def read(%Firewall{} = desired, context) do
     Helpers.read_firewall(desired, &read(&1, context))
+  end
+
+  def read(%Proxy{} = desired, context) do
+    read_proxy(desired, context)
   end
 
   def read(%Systemd.Service{name: name} = desired, context) do
@@ -71,6 +75,10 @@ defmodule HostKit.Remote do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp read_proxy(%Proxy{path: path} = desired, context) do
+    Helpers.read_content_resource(desired, path, &read_file(&1, context))
   end
 
   defp read_caddy_site(path, desired, context) do

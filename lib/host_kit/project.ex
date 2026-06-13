@@ -1,7 +1,7 @@
 defmodule HostKit.Project do
   @moduledoc "Project-level declaration loaded from HostKit DSL files."
 
-  alias HostKit.{Conventions, Firewall, Provider, ProviderConfig, Service, Tenant}
+  alias HostKit.{Conventions, Firewall, Provider, ProviderConfig, Proxy, Service, Tenant}
 
   @type t :: %__MODULE__{
           name: atom(),
@@ -10,6 +10,7 @@ defmodule HostKit.Project do
           services: [Service.t()],
           providers: [module()],
           provider_configs: %{optional(atom()) => ProviderConfig.t()},
+          proxies: [Proxy.t()],
           conventions: map(),
           meta: map()
         }
@@ -20,6 +21,7 @@ defmodule HostKit.Project do
             services: [],
             providers: [],
             provider_configs: %{},
+            proxies: [],
             conventions: %{},
             meta: %{}
 
@@ -74,10 +76,15 @@ defmodule HostKit.Project do
   def add_service(%__MODULE__{} = project, service),
     do: %{project | services: project.services ++ [service]}
 
+  @spec add_proxy(t(), Proxy.t()) :: t()
+  def add_proxy(%__MODULE__{} = project, %Proxy{} = proxy),
+    do: %{project | proxies: project.proxies ++ [proxy]}
+
   @spec resources(t()) :: [struct()]
   def resources(%__MODULE__{} = project) do
     project.services
     |> Enum.flat_map(& &1.resources)
+    |> Kernel.++(project.proxies)
     |> Kernel.++(Firewall.policies(project))
     |> Kernel.++(workspace_egress(project))
   end
