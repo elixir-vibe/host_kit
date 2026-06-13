@@ -30,12 +30,19 @@ defmodule HostKit.Resources.Package do
       source: Keyword.get(opts, :source, default_source(opts)),
       update: Keyword.get(opts, :update, false),
       depends_on: Keyword.get(opts, :depends_on, []),
-      meta: Keyword.get(opts, :meta, %{})
+      meta: opts |> Keyword.get(:meta, %{}) |> maybe_put_provides(opts)
     }
   end
 
   @spec id(t()) :: {:package, atom() | String.t()}
   def id(%__MODULE__{name: name}), do: {:package, name}
+
+  defp maybe_put_provides(meta, opts) do
+    case Keyword.fetch(opts, :provides) do
+      {:ok, provides} -> Map.put(meta, :provides, provides)
+      :error -> meta
+    end
+  end
 
   defp default_source(opts) do
     if Keyword.has_key?(opts, :as), do: :explicit, else: :semantic

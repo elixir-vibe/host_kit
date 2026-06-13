@@ -33,7 +33,8 @@ defmodule HostKit do
   This first implementation is intentionally structural: it preserves resources
   and dependency ordering without touching a host.
   """
-  @spec plan(Project.t(), keyword()) :: {:ok, Plan.t()}
+  @spec plan(Project.t(), keyword()) ::
+          {:ok, Plan.t()} | {:error, HostKit.Diagnostics.t() | term()}
   def plan(%Project{} = project, opts \\ []), do: Plan.build(project, expand_target_opts(opts))
 
   @doc "Applies supported changes from a HostKit plan."

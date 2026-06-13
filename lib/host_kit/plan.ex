@@ -26,6 +26,7 @@ defmodule HostKit.Plan do
     opts = maybe_put_package_manager(resources, opts)
 
     with {:ok, resources} <- resolve_resources(resources, opts),
+         :ok <- HostKit.CommandAnalysis.validate(resources),
          :ok <- maybe_write_package_lock(resources, opts) do
       changes = Enum.map(resources, &change_for(&1, project, opts))
 

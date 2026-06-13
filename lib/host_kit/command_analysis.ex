@@ -1,0 +1,73 @@
+defmodule HostKit.CommandAnalysis do
+  @moduledoc "Static command dependency analysis for HostKit resources."
+
+  alias HostKit.{Diagnostic, Diagnostics, Resource}
+  alias HostKit.Resources.{Command, Mise, Package}
+
+  @baseline_commands MapSet.new(
+                       ~w[base64 cd echo false install mkdir printf pwd rm sh sudo systemctl test true]
+                     )
+
+  @spec validate([struct()]) :: :ok | {:error, Diagnostics.t()}
+  def validate(resources) do
+    provided = provided_commands(resources)
+
+    diagnostics =
+      resources
+      |> Enum.flat_map(&required_command_diagnostics(&1, provided))
+      |> Diagnostics.new()
+
+    if Diagnostics.ok?(diagnostics), do: :ok, else: {:error, diagnostics}
+  end
+
+  @spec provided_commands([struct()]) :: MapSet.t(String.t())
+  def provided_commands(resources) do
+    resources
+    |> Enum.flat_map(&provided_by/1)
+    |> Kernel.++(MapSet.to_list(@baseline_commands))
+    |> MapSet.new()
+  end
+
+  @spec required_commands(struct()) :: [String.t()]
+  def required_commands(%Command{exec: {command, _args}, runtime: {:mise, _name}}), do: [command]
+  def required_commands(%Command{exec: {command, _args}}), do: [command]
+  def required_commands(_resource), do: []
+
+  defp required_command_diagnostics(resource, provided) do
+    resource
+    |> required_commands()
+    |> Enum.reject(&MapSet.member?(provided, &1))
+    |> Enum.map(&missing_command(resource, &1))
+  end
+
+  defp missing_command(resource, command) do
+    %Diagnostic{
+      severity: :error,
+      code: :missing_command_provider,
+      message: ~s(command "#{command}" is required but not provided),
+      resource_id: Resource.id(resource),
+      details: %{command: command, required_by: Resource.id(resource)},
+      hint:
+        "Add `package :#{String.replace(command, "-", "_")}` or a resource with `provides: [\"#{command}\"]`."
+    }
+  end
+
+  defp provided_by(%Package{} = package) do
+    case Map.get(package.meta, :provides) do
+      nil -> [package.system_name]
+      values -> Enum.map(values, &to_string/1)
+    end
+  end
+
+  defp provided_by(%Mise{} = mise) do
+    Enum.flat_map(mise.tools, &provided_by_tool/1)
+  end
+
+  defp provided_by(_resource), do: []
+
+  defp provided_by_tool(%{name: name}) when name in [:elixir, "elixir"],
+    do: ["elixir", "iex", "mix"]
+
+  defp provided_by_tool(%{name: name}) when name in [:erlang, "erlang"], do: ["erl", "erlc"]
+  defp provided_by_tool(%{name: name}), do: [to_string(name)]
+end
