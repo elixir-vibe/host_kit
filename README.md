@@ -279,6 +279,18 @@ Extract them with:
 HostKit.Workspace.inside_monitors(project)
 ```
 
+## Workspace agent helper
+
+Workspaces can declare the default sandbox agent service as ordinary HostKit resources:
+
+```elixir
+workspace :blog, owner: :alice do
+  workspace_agent port: 4173
+end
+```
+
+This expands to a service with a system user, workspace directory, systemd daemon, loopback listener, logs, telemetry, systemd monitor, and loopback-only network policy.
+
 ## Workspace scope
 
 `workspace` scopes ordinary HostKit DSL for user sandboxes while keeping resources inspectable:

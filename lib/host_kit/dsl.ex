@@ -239,6 +239,39 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro workspace_agent(opts \\ []) do
+    quote do
+      service Keyword.get(unquote(opts), :service, :agent) do
+        system_user(service_user())
+
+        directory(root_path(:data),
+          owner: service_user(),
+          group: service_user(),
+          mode: :private_dir
+        )
+
+        daemon unit_name() do
+          service_user(service_user())
+          service_group(service_user())
+          working_directory(root_path(:data))
+
+          run(
+            exec_start:
+              Keyword.get(unquote(opts), :exec_start, ["/usr/local/bin/hostkit-workspace-agent"])
+          )
+
+          restart(:on_failure)
+          wanted_by(:multi_user)
+          listen(:agent, port: Keyword.get(unquote(opts), :port, 4173), on: :loopback)
+          logs(identifier: service_user(), stdout: :journal, stderr: :journal)
+          telemetry(logs: true, metrics: true, service_name: service_user())
+          monitor(:systemd, expect: [state: :active], severity: :critical)
+          network_policy(deny: :all, allow: [:loopback])
+        end
+      end
+    end
+  end
+
   defmacro telemetry(opts) do
     quote do
       if HostKit.DSL.Scope.observability_active?() do
