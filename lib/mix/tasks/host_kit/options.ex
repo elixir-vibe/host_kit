@@ -80,8 +80,24 @@ defmodule Mix.Tasks.HostKit.Options do
     |> put_present(:user, Keyword.get(opts, :user))
     |> put_present(:port, Keyword.get(opts, :port))
     |> put_present(:identity_file, Keyword.get(opts, :identity_file))
-    |> put_present(:password, Keyword.get(opts, :password))
+    |> put_present(:password, password(opts))
     |> put_silently_accept_hosts(opts)
+  end
+
+  defp password(opts) do
+    case {Keyword.get(opts, :password), Keyword.get(opts, :password_env)} do
+      {password, nil} ->
+        password
+
+      {nil, env_var} ->
+        case System.fetch_env(env_var) do
+          {:ok, password} -> password
+          :error -> Mix.raise("environment variable #{env_var} is not set")
+        end
+
+      {_password, env_var} ->
+        Mix.raise("pass either --password or --password-env #{env_var}, not both")
+    end
   end
 
   defp put_silently_accept_hosts(remote_opts, opts) do

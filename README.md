@@ -97,6 +97,43 @@ end
 
 This applies through the `mise` CLI contract: it installs the binary with `mise.run` when missing, then runs `mise install --system` with `MISE_SYSTEM_DATA_DIR` set.
 
+Package planning resolves semantic package names through Repology and caches responses in `.host_kit/cache/repology` for 24 hours by default. Use locks for deterministic apply:
+
+```sh
+mix host_kit.plan --write-package-lock host_kit.package.lock infra/config.exs
+mix host_kit.apply --package-lock host_kit.package.lock --confirm infra/config.exs
+```
+
+Plan/apply artifacts make remote changes inspectable before apply:
+
+```sh
+mix host_kit.plan --remote host.example --user root --sudo \
+  --package-lock host_kit.package.lock \
+  --out host_kit.plan.json infra/config.exs
+
+mix host_kit.apply --remote host.example --user root --sudo \
+  --plan host_kit.plan.json --confirm
+```
+
+Remote SSH auth supports `--identity-file`, `--password`, and `--password-env`:
+
+```sh
+HOSTKIT_SSH_PASSWORD=secret mix host_kit.plan \
+  --remote host.example --user root --password-env HOSTKIT_SSH_PASSWORD infra/config.exs
+```
+
+For Linux integration testing, use Incus as the lightweight native container/VM backend:
+
+```sh
+scripts/incus_integration_vm.sh install
+HOSTKIT_INCUS_SUDO=true scripts/incus_integration_vm.sh init
+HOSTKIT_INCUS_SUDO=true HOSTKIT_SSH_PUBLIC_KEY=$HOME/.ssh/id_ed25519.pub \
+  scripts/incus_integration_vm.sh create
+HOSTKIT_INCUS_SUDO=true scripts/incus_integration_vm.sh ip
+```
+
+Set `HOSTKIT_INCUS_TYPE=vm` to launch an Incus VM instead of the default container. Run the remote CLI integration against Incus with `HOSTKIT_INCUS_INTEGRATION=1`.
+
 ## Project-local DSLs
 
 Use `HostKit.ProjectDSL` in consuming projects to build local conventions without baking them into HostKit.

@@ -20,6 +20,7 @@ defmodule Mix.Tasks.HostKit.Plan do
           port: :integer,
           identity_file: :string,
           password: :string,
+          password_env: :string,
           silently_accept_hosts: :boolean,
           sudo: :boolean,
           require: :keep,
