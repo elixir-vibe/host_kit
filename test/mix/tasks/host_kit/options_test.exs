@@ -59,7 +59,8 @@ defmodule Mix.Tasks.HostKit.OptionsTest do
     assert target.opts[:silently_accept_hosts] == true
   end
 
-  test "loads ssh settings from host DSL" do
+  test "loads ssh settings from host DSL", %{env_var: env_var} do
+    System.put_env(env_var, "secret")
     path = Path.join(System.tmp_dir!(), "hostkit-host-#{System.unique_integer([:positive])}.exs")
 
     File.write!(path, """
@@ -70,7 +71,10 @@ defmodule Mix.Tasks.HostKit.OptionsTest do
         hostname "example.test"
         user "root"
         sudo true
-        ssh port: 2222, identity_file: "/tmp/id", silently_accept_hosts: true
+        ssh port: 2222,
+            identity_file: "/tmp/id",
+            password: secret_env(#{inspect(env_var)}),
+            silently_accept_hosts: true
       end
     end
     """)
@@ -83,6 +87,19 @@ defmodule Mix.Tasks.HostKit.OptionsTest do
 
     assert target.opts[:port] == 2222
     assert target.opts[:identity_file] == "/tmp/id"
+    assert target.opts[:password] == "secret"
     assert target.opts[:silently_accept_hosts] == true
+  end
+
+  test "does not add a nil password for host SSH settings" do
+    project = %HostKit.Project{
+      name: :demo,
+      hosts: [%HostKit.Host{name: :integration, hostname: "example.test", user: "root"}]
+    }
+
+    opts = Options.target_opts([host: "integration"], project)
+    target = Keyword.fetch!(opts, :target)
+
+    refute Keyword.has_key?(target.opts, :password)
   end
 end

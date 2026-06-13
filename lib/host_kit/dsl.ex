@@ -261,6 +261,12 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro secret_env(name) do
+    quote do
+      HostKit.Secret.env(unquote(name))
+    end
+  end
+
   defmacro observability(do: block) do
     quote do
       HostKit.DSL.Scope.start_observability()

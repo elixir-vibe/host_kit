@@ -116,6 +116,7 @@ project :infra do
     sudo true
 
     ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
+        password: secret_env("HOSTKIT_SSH_PASSWORD"),
         silently_accept_hosts: true
   end
 end
@@ -130,7 +131,7 @@ mix host_kit.apply --host prod \
   --plan host_kit.plan.json --confirm infra/config.exs
 ```
 
-Raw SSH flags remain available as an escape hatch: `--remote`, `--user`, `--port`, `--identity-file`, `--password`, and `--password-env`.
+`secret_env/1` records an environment-backed secret reference and resolves it only when opening the SSH connection. Raw SSH flags remain available as an escape hatch: `--remote`, `--user`, `--port`, `--identity-file`, `--password`, and `--password-env`.
 
 For Linux integration testing, use Incus as the lightweight native container/VM backend:
 

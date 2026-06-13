@@ -25,7 +25,7 @@ defmodule HostKit.Host do
     host
     |> remote_options()
     |> Keyword.merge(overrides)
-    |> resolve_password_env()
+    |> resolve_secrets()
   end
 
   @spec remote_options(t()) :: keyword()
@@ -37,13 +37,10 @@ defmodule HostKit.Host do
     |> Keyword.put_new(:sudo, host.sudo)
   end
 
-  defp resolve_password_env(opts) do
-    case Keyword.pop(opts, :password_env) do
-      {nil, opts} ->
-        opts
-
-      {env_var, opts} ->
-        Keyword.put(opts, :password, System.fetch_env!(env_var))
+  defp resolve_secrets(opts) do
+    case Keyword.fetch(opts, :password) do
+      {:ok, password} -> Keyword.put(opts, :password, HostKit.Secret.resolve!(password))
+      :error -> opts
     end
   end
 end

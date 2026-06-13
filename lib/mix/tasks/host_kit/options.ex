@@ -107,13 +107,13 @@ defmodule Mix.Tasks.HostKit.Options do
   defp remote_options(host, opts) do
     [host: host, sudo: Keyword.get(opts, :sudo, false)]
     |> Keyword.merge(cli_ssh_overrides(opts))
-    |> put_present(:password, password(opts))
   end
 
   defp cli_ssh_overrides(opts) do
     opts
     |> Keyword.take([:user, :port, :identity_file, :silently_accept_hosts])
     |> put_present(:sudo, Keyword.get(opts, :sudo))
+    |> put_present(:password, password(opts))
   end
 
   defp password(opts) do
