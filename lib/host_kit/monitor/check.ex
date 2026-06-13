@@ -6,17 +6,23 @@ defmodule HostKit.Monitor.Check do
           type: atom(),
           target: String.t() | nil,
           expect: keyword(),
+          task: String.t() | nil,
+          port: non_neg_integer() | nil,
+          clean: boolean() | nil,
           severity: atom(),
           resource_id: term(),
           meta: map()
         }
 
-  @fields [:name, :type, :target, :expect, :severity, :resource_id, :meta]
+  @fields [:name, :type, :target, :expect, :task, :port, :clean, :severity, :resource_id, :meta]
 
   defstruct name: nil,
             type: nil,
             target: nil,
             expect: [],
+            task: nil,
+            port: nil,
+            clean: nil,
             severity: :warning,
             resource_id: nil,
             meta: %{}
