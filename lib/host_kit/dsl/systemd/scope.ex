@@ -79,16 +79,31 @@ defmodule HostKit.DSL.Systemd.Scope do
     do:
       update(
         :service,
-        &%{&1 | service: put_directive(&1.service, key, normalize_value(key, value))}
+        &%{
+          &1
+          | service:
+              put_directive(&1.service, key, HostKit.Systemd.Directives.coerce_value(key, value))
+        }
       )
 
   def put_timer(values), do: update(:timer, &%{&1 | timer: merge_directives(&1.timer, values)})
 
   def put_timer(key, value),
-    do: update(:timer, &%{&1 | timer: put_directive(&1.timer, key, normalize_value(key, value))})
+    do:
+      update(
+        :timer,
+        &%{
+          &1
+          | timer:
+              put_directive(&1.timer, key, HostKit.Systemd.Directives.coerce_value(key, value))
+        }
+      )
 
   def put_install(values),
-    do: update_current(&%{&1 | install: Keyword.merge(&1.install, normalize_values(values))})
+    do:
+      update_current(
+        &%{&1 | install: Keyword.merge(&1.install, HostKit.Systemd.Directives.coerce(values))}
+      )
 
   def put_install(key, value),
     do: update_current(&%{&1 | install: Keyword.put(&1.install, key, value)})
@@ -177,11 +192,7 @@ defmodule HostKit.DSL.Systemd.Scope do
     do: Keyword.put(service, :syslog_identifier, identifier)
 
   defp merge_directives(keywords, values) do
-    Keyword.merge(keywords, normalize_values(values))
-  end
-
-  defp normalize_values(values) do
-    Enum.map(values, fn {key, value} -> {key, normalize_value(key, value)} end)
+    Keyword.merge(keywords, HostKit.Systemd.Directives.coerce(values))
   end
 
   defp put_directive(keywords, key, values)
@@ -190,9 +201,4 @@ defmodule HostKit.DSL.Systemd.Scope do
   end
 
   defp put_directive(keywords, key, value), do: Keyword.put(keywords, key, value)
-
-  defp normalize_value(:exec_start, argv) when is_list(argv), do: Enum.join(argv, " ")
-  defp normalize_value(:restart, :on_failure), do: "on-failure"
-  defp normalize_value(:on_calendar, value), do: HostKit.Systemd.Calendar.name(value)
-  defp normalize_value(_key, value), do: value
 end
