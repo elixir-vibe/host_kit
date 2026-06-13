@@ -5,7 +5,7 @@ defmodule HostKit.WorkspacePreviewTest do
     source = """
     use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
-    project :demo, providers: [HostKit.Providers.Caddy] do
+    project :demo do
       roots data: "/var/lib/hostkit/workspaces"
       prefixes user: "hk-", unit: "hk-ws-"
 

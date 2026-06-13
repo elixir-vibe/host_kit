@@ -14,9 +14,22 @@ defmodule HostKit.DSL.Scope do
   @firewall_key {__MODULE__, :firewall}
   @proxy_key {__MODULE__, :proxy}
   @proxy_service_key {__MODULE__, :proxy_service}
+  @default_providers_key {__MODULE__, :default_providers}
+
+  def put_default_providers(providers) do
+    Process.put(@default_providers_key, providers)
+  end
 
   def start_project(name, opts) do
-    Process.put(@project_key, Project.new(name, opts))
+    Process.put(@project_key, Project.new(name, project_opts(opts)))
+  end
+
+  defp project_opts(opts) do
+    if Keyword.has_key?(opts, :providers) or Keyword.has_key?(opts, :plugins) do
+      opts
+    else
+      Keyword.put(opts, :providers, Process.get(@default_providers_key, []))
+    end
   end
 
   def finish_project do

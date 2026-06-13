@@ -1,6 +1,6 @@
 use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
 
-project :caddy_static_demo, providers: [HostKit.Plugins.Caddy] do
+project :caddy_static_demo do
   service :landing do
     caddy_site :landing, "elixir.toys", path: "landing.caddy" do
       root "/srv/toys/www/elixir.toys"

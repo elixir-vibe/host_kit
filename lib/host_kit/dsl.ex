@@ -23,6 +23,7 @@ defmodule HostKit.DSL do
       end)
 
     quote do
+      HostKit.DSL.Scope.put_default_providers(unquote(plugins))
       import HostKit.DSL
       import HostKit.DSL.Systemd
       unquote_splicing(provider_imports)

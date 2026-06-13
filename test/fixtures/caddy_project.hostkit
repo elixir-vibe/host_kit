@@ -1,6 +1,6 @@
 use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
 
-project :caddy_demo, providers: [HostKit.Plugins.Caddy] do
+project :caddy_demo do
   service :exograph do
     caddy_site :search, "search.elixir.toys" do
       encode [:zstd, :gzip]

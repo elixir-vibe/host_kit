@@ -59,7 +59,7 @@ Providers can contribute DSL modules, resource types, renderers, validators, and
 ```elixir
 use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
-project :demo, providers: [HostKit.Providers.Caddy] do
+project :demo do
   provider :caddy, HostKit.Providers.Caddy do
     set :sites_dir, "/etc/caddy/sites"
   end

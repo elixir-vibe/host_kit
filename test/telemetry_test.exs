@@ -5,7 +5,7 @@ defmodule HostKit.TelemetryTest do
     source = """
     use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
-    project :demo, providers: [HostKit.Providers.Caddy] do
+    project :demo do
       observability do
         telemetry logs: true, metrics: true, traces: false, attributes: [environment: :test]
       end
@@ -91,7 +91,7 @@ defmodule HostKit.TelemetryTest do
     source = """
     use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
-    project :demo, providers: [HostKit.Providers.Caddy] do
+    project :demo do
       service :web do
         daemon "web.service" do
           run exec_start: ["/usr/bin/env", "true"]

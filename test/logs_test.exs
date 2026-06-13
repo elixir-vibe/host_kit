@@ -5,7 +5,7 @@ defmodule HostKit.LogsTest do
     source = """
     use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
-    project :demo, providers: [HostKit.Providers.Caddy] do
+    project :demo do
       observability do
         logs driver: :journald, retention: "14d", ship: true, attributes: [environment: :test]
       end

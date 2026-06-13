@@ -1,8 +1,8 @@
 # HostKit
 
-Elixir-native host management: declare packages, runtimes, files, services, firewall policy, and provider integrations as plain inspectable structs; plan the change; review an artifact; then apply it locally or over SSH.
+Elixir-native host management: declare a Linux host, bootstrap packages and runtimes, isolate services with systemd, wire provider integrations, review a plan artifact, then apply it locally or over SSH.
 
-HostKit is for bootstrapping and operating real Linux hosts without assuming the machine already has Elixir, Mix, or your application runtime installed.
+HostKit is for operating real machines without assuming the target already has Elixir, Mix, Docker, or your application runtime installed.
 
 ## Why HostKit
 
@@ -11,17 +11,18 @@ Infrastructure code should be boring Elixir, not an opaque pile of shell scripts
 HostKit gives you:
 
 - **Declarative host bootstrap** — OS packages, users, directories, files, env files, systemd units, firewall rules, and `mise` runtimes.
-- **Plan before apply** — read current state, produce a diff, write an inspectable JSON plan artifact, then apply exactly what was reviewed.
+- **Docker-less service isolation** — systemd sandboxing, resource limits, network policy, read/write path allowlists, loopback listeners, and managed env files.
+- **Plan before apply** — read current state, produce a diff, write an inspectable JSON artifact, then apply exactly what was reviewed.
 - **Distribution-aware packages** — semantic package names resolve through Repology and can be locked for deterministic applies.
 - **No hidden Mix requirement on target hosts** — bootstrap can install prerequisites and BEAM tools through `mise`.
-- **Host config in `.exs`** — normal Elixir syntax highlighting, macros, composition, and project-local DSLs.
+- **Host config in `.exs`** — syntax highlighting, macros, composition, and project-local DSLs.
 - **Provider boundary** — integrations such as Caddy live as providers while core owns systemd/unitctl primitives.
 - **Linux-native integration testing** — Incus containers/VMs replace macOS-only Lima flows on Linux.
 
-## A small host
+## One file: host, runtime, isolated service, reverse proxy
 
 ```elixir
-use HostKit.DSL
+use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
 project :prod do
   host :app do
@@ -29,8 +30,14 @@ project :prod do
     user "root"
     sudo true
 
+    # For password-only hosts use:
+    # ssh password: secret_env("HOSTKIT_SSH_PASSWORD"), silently_accept_hosts: true
     ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
         silently_accept_hosts: true
+  end
+
+  provider :caddy, HostKit.Providers.Caddy do
+    set :sites_dir, "/etc/caddy/sites"
   end
 
   service :bootstrap do
@@ -42,48 +49,70 @@ project :prod do
       tool :elixir, "1.20.1"
     end
   end
-end
-```
 
-Plan and apply:
+  service :api do
+    system_user "api", home: "/var/lib/api"
 
-```sh
-mix host_kit.plan --host app --write-package-lock host_kit.package.lock --out host_kit.plan.json infra/config.exs
-mix host_kit.apply --host app --plan host_kit.plan.json --confirm infra/config.exs
-```
+    directory "/var/lib/api", owner: "api", group: "api", mode: 0o750
 
-For password-only hosts, keep the secret out of config and shell history:
+    env_file "/etc/api/api.env", owner: "root", group: "api" do
+      set :mix_env, :prod
+      secret :database_url, env: "DATABASE_URL"
+    end
 
-```elixir
-ssh password: secret_env("HOSTKIT_SSH_PASSWORD"),
-    silently_accept_hosts: true
-```
+    daemon "api.service" do
+      description "API service"
+      service_user "api"
+      working_directory "/opt/api"
+      environment_file "/etc/api/api.env"
+      exec_start ["/opt/api/bin/server"]
+      restart :on_failure
 
-`secret_env/1` stores a reference to the environment variable. Plan artifacts include the reference name, not the resolved value.
+      # Container-like isolation without a Docker daemon.
+      sandbox :strict_app,
+        resources: [memory_max: "512M"],
+        sandbox: [read_write_paths: ["/var/lib/api"]]
 
-## Caddy provider example
+      listen :http, port: 4000, on: :loopback
+      wanted_by :multi_user
+    end
 
-```elixir
-use HostKit.DSL, providers: [HostKit.Providers.Caddy]
-
-project :demo, providers: [HostKit.Providers.Caddy] do
-  provider :caddy, HostKit.Providers.Caddy do
-    set :sites_dir, "/etc/caddy/sites"
-  end
-
-  service :web do
-    caddy_site :web, "example.com", path: "web.caddy" do
+    caddy_site :api, "api.example.com" do
       encode [:zstd, :gzip]
-      reverse_proxy "127.0.0.1:4000"
+      reverse_proxy listener(:http)
     end
   end
 end
 ```
 
+This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, env files, system users, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits.
+
+Plan, review, apply:
+
+```sh
+mix host_kit.plan --host app \
+  --write-package-lock host_kit.package.lock \
+  --out host_kit.plan.json \
+  infra/config.exs
+
+mix host_kit.apply --host app \
+  --plan host_kit.plan.json \
+  --confirm \
+  infra/config.exs
+```
+
+`secret_env/1` stores an environment-variable reference. Plan artifacts include the variable name, not the resolved secret value.
+
 ## Documentation
 
 - [Getting started](guides/introduction/getting-started.md)
+- [Conventions and paths](guides/introduction/conventions-and-paths.md)
 - [Remote bootstrap and plan artifacts](guides/deployment/remote-bootstrap.md)
+- [Systemd isolation](guides/deployment/systemd-isolation.md)
+- [Firewall and networking](guides/deployment/firewall-and-networking.md)
+- [Workspaces and tenants](guides/workspaces/workspaces-and-tenants.md)
+- [Observability and monitors](guides/operations/observability-and-monitors.md)
+- [Timers and jobs](guides/operations/timers-and-jobs.md)
 - [CLI reference](guides/reference/cli.md)
 - [Full DSL/reference notes](guides/reference/full-reference.md)
 - [Changelog](CHANGELOG.md)

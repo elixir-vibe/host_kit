@@ -26,7 +26,7 @@ defmodule HostKit.ListenerTest do
     source = """
     use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
-    project :demo, providers: [HostKit.Providers.Caddy] do
+    project :demo do
       service :web do
         daemon "web.service" do
           run exec_start: ["/usr/bin/env", "true"]

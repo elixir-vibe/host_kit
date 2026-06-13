@@ -1,6 +1,6 @@
 use HostKit.DSL, providers: [HostKit.TestPlugin]
 
-project :plugin_demo, providers: [HostKit.TestPlugin] do
+project :plugin_demo do
   service :web do
     test_site "example.test" do
       reverse_proxy "127.0.0.1:4000"
