@@ -115,7 +115,7 @@ project :infra do
     user "root"
     sudo true
 
-    ssh identity_file: "~/.ssh/id_ed25519",
+    ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
         silently_accept_hosts: true
   end
 end
@@ -135,14 +135,12 @@ Raw SSH flags remain available as an escape hatch: `--remote`, `--user`, `--port
 For Linux integration testing, use Incus as the lightweight native container/VM backend:
 
 ```sh
-scripts/incus_integration_vm.sh install
-HOSTKIT_INCUS_SUDO=true scripts/incus_integration_vm.sh init
 HOSTKIT_INCUS_SUDO=true HOSTKIT_SSH_PUBLIC_KEY=$HOME/.ssh/id_ed25519.pub \
-  scripts/incus_integration_vm.sh create
+  scripts/incus_integration_vm.sh ensure
 HOSTKIT_INCUS_SUDO=true scripts/incus_integration_vm.sh ip
 ```
 
-Set `HOSTKIT_INCUS_TYPE=vm` to launch an Incus VM instead of the default container. Run the remote CLI integration against Incus with `HOSTKIT_INTEGRATION_TOOL=incus`, or against a pre-existing host declared in `.exs` config with `HOSTKIT_INTEGRATION_TOOL=remote HOSTKIT_INTEGRATION_CONFIG=examples/integration_hosts.example.exs`.
+Set `HOSTKIT_INCUS_TYPE=vm` to launch an Incus VM instead of the default container, and `HOSTKIT_INCUS_INSTANCE=name` to change the instance name. Run the remote CLI integration against Incus with `HOSTKIT_INTEGRATION_TOOL=incus`, or against a pre-existing host declared in `.exs` config with `HOSTKIT_INTEGRATION_TOOL=remote HOSTKIT_INTEGRATION_CONFIG=examples/integration_hosts.example.exs`.
 
 ## Project-local DSLs
 

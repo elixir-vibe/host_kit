@@ -1,5 +1,11 @@
 defmodule Mix.Tasks.HostKit.Apply do
-  @moduledoc "Applies supported HostKit plan changes. Requires `--dry-run` or `--confirm`."
+  @moduledoc """
+  Applies supported HostKit plan changes. Requires `--dry-run` or `--confirm`.
+
+  Prefer `--host NAME config.exs` for remote targets declared with HostKit's
+  `host` DSL. Raw SSH flags (`--remote`, `--user`, `--port`, `--identity-file`,
+  `--password-env`) are available as an escape hatch.
+  """
 
   use Mix.Task
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-VM_NAME="${HOSTKIT_INCUS_VM:-hostkit-test}"
+INSTANCE_NAME="${HOSTKIT_INCUS_INSTANCE:-${HOSTKIT_INCUS_VM:-hostkit-test}}"
 IMAGE="${HOSTKIT_INCUS_IMAGE:-images:ubuntu/24.04}"
 TYPE="${HOSTKIT_INCUS_TYPE:-container}"
 INCUS_BIN="${INCUS:-incus}"
@@ -15,6 +15,7 @@ Usage: $0 COMMAND
 Commands:
   install       Install Incus with apt if missing
   init          Initialize Incus with --minimal if needed
+  ensure        Install, initialize, create/start the test instance, and install SSH
   create        Create/start the test instance and install SSH
   ip            Print the instance IP address
   ssh-config    Print an OpenSSH config entry for the instance
@@ -22,7 +23,8 @@ Commands:
   status        Show instance status
 
 Environment:
-  HOSTKIT_INCUS_VM          instance name (default: hostkit-test)
+  HOSTKIT_INCUS_INSTANCE    instance name (default: hostkit-test)
+  HOSTKIT_INCUS_VM          legacy fallback for HOSTKIT_INCUS_INSTANCE
   HOSTKIT_INCUS_IMAGE       image alias (default: images:ubuntu/24.04)
   HOSTKIT_INCUS_TYPE        container or vm (default: container)
   HOSTKIT_INCUS_SUDO        run incus through sudo: true/false (default: false)
@@ -67,7 +69,7 @@ init_incus() {
 }
 
 instance_exists() {
-  incus_cmd info "$VM_NAME" >/dev/null 2>&1
+  incus_cmd info "$INSTANCE_NAME" >/dev/null 2>&1
 }
 
 create_instance() {
@@ -81,10 +83,10 @@ create_instance() {
   if ! instance_exists; then
     case "$TYPE" in
       container)
-        incus_cmd launch "$IMAGE" "$VM_NAME"
+        incus_cmd launch "$IMAGE" "$INSTANCE_NAME"
         ;;
       vm)
-        incus_cmd launch "$IMAGE" "$VM_NAME" --vm
+        incus_cmd launch "$IMAGE" "$INSTANCE_NAME" --vm
         ;;
       *)
         echo "unsupported HOSTKIT_INCUS_TYPE=$TYPE, expected container or vm" >&2
@@ -92,7 +94,7 @@ create_instance() {
         ;;
     esac
   else
-    incus_cmd start "$VM_NAME" >/dev/null 2>&1 || true
+    incus_cmd start "$INSTANCE_NAME" >/dev/null 2>&1 || true
   fi
 
   wait_ready
@@ -102,7 +104,7 @@ create_instance() {
 wait_ready() {
   i=0
   while [ "$i" -lt 120 ]; do
-    if incus_cmd exec "$VM_NAME" -- true >/dev/null 2>&1; then
+    if incus_cmd exec "$INSTANCE_NAME" -- true >/dev/null 2>&1; then
       break
     fi
     i=$((i + 1))
@@ -110,30 +112,30 @@ wait_ready() {
   done
 
   if [ "$i" -ge 120 ]; then
-    echo "instance $VM_NAME did not become ready" >&2
+    echo "instance $INSTANCE_NAME did not become ready" >&2
     exit 1
   fi
 
-  incus_cmd exec "$VM_NAME" -- cloud-init status --wait >/dev/null 2>&1 || true
+  incus_cmd exec "$INSTANCE_NAME" -- cloud-init status --wait >/dev/null 2>&1 || true
 }
 
 install_ssh() {
-  incus_cmd exec "$VM_NAME" -- env DEBIAN_FRONTEND=noninteractive apt-get update
-  incus_cmd exec "$VM_NAME" -- env DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo ca-certificates curl
-  incus_cmd exec "$VM_NAME" -- mkdir -p /root/.ssh
-  incus_cmd exec "$VM_NAME" -- chmod 700 /root/.ssh
-  incus_cmd file push "$PUBKEY" "$VM_NAME/root/.ssh/authorized_keys" --uid 0 --gid 0 --mode 0600
-  incus_cmd exec "$VM_NAME" -- systemctl enable --now ssh >/dev/null 2>&1 || \
-    incus_cmd exec "$VM_NAME" -- service ssh start
+  incus_cmd exec "$INSTANCE_NAME" -- env DEBIAN_FRONTEND=noninteractive apt-get update
+  incus_cmd exec "$INSTANCE_NAME" -- env DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo ca-certificates curl
+  incus_cmd exec "$INSTANCE_NAME" -- mkdir -p /root/.ssh
+  incus_cmd exec "$INSTANCE_NAME" -- chmod 700 /root/.ssh
+  incus_cmd file push "$PUBKEY" "$INSTANCE_NAME/root/.ssh/authorized_keys" --uid 0 --gid 0 --mode 0600
+  incus_cmd exec "$INSTANCE_NAME" -- systemctl enable --now ssh >/dev/null 2>&1 || \
+    incus_cmd exec "$INSTANCE_NAME" -- service ssh start
 }
 
 instance_ip() {
   need_incus
 
-  ip=$(incus_cmd list "$VM_NAME" -c 4 --format csv | tr ' ' '\n' | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }')
+  ip=$(incus_cmd list "$INSTANCE_NAME" -c 4 --format csv | tr ' ' '\n' | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }')
 
   if [ -z "${ip:-}" ]; then
-    echo "could not determine IPv4 address for $VM_NAME" >&2
+    echo "could not determine IPv4 address for $INSTANCE_NAME" >&2
     exit 1
   fi
 
@@ -143,7 +145,7 @@ instance_ip() {
 ssh_config() {
   ip=$(instance_ip)
   cat <<EOF
-Host $VM_NAME
+Host $INSTANCE_NAME
   HostName $ip
   User root
   StrictHostKeyChecking accept-new
@@ -152,17 +154,24 @@ EOF
 
 destroy_instance() {
   need_incus
-  incus_cmd delete "$VM_NAME" --force
+  incus_cmd delete "$INSTANCE_NAME" --force
 }
 
 status() {
   need_incus
-  incus_cmd list "$VM_NAME"
+  incus_cmd list "$INSTANCE_NAME"
+}
+
+ensure() {
+  install_incus
+  init_incus
+  create_instance
 }
 
 case "${1:-}" in
   install) install_incus ;;
   init) init_incus ;;
+  ensure) ensure ;;
   create) create_instance ;;
   ip) instance_ip ;;
   ssh-config) ssh_config ;;

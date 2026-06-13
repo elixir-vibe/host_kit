@@ -1,5 +1,13 @@
 defmodule Mix.Tasks.HostKit.Plan do
-  @moduledoc "Builds and prints a HostKit plan. Pass `--local` for read-only local inspection."
+  @moduledoc """
+  Builds and prints a HostKit plan.
+
+  Prefer `--host NAME config.exs` for remote targets declared with HostKit's
+  `host` DSL. Raw SSH flags (`--remote`, `--user`, `--port`, `--identity-file`,
+  `--password-env`) are available as an escape hatch.
+
+  Pass `--local` for read-only local inspection.
+  """
 
   use Mix.Task
 

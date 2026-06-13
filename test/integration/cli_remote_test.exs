@@ -211,6 +211,7 @@ defmodule HostKit.CLIRemoteIntegrationTest do
   defp incus_env do
     env = []
     env = put_env(env, "INCUS", System.get_env("INCUS"))
+    env = put_env(env, "HOSTKIT_INCUS_INSTANCE", System.get_env("HOSTKIT_INCUS_INSTANCE"))
     env = put_env(env, "HOSTKIT_INCUS_VM", System.get_env("HOSTKIT_INCUS_VM"))
     env = put_env(env, "HOSTKIT_INCUS_SUDO", System.get_env("HOSTKIT_INCUS_SUDO"))
     env = put_env(env, "HOSTKIT_INCUS_IMAGE", System.get_env("HOSTKIT_INCUS_IMAGE"))
