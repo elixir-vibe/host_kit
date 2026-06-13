@@ -12,6 +12,8 @@ defmodule HostKit.Telemetry.Signal do
           meta: map()
         }
 
+  @fields [:service_name, :signals, :logs, :metrics, :traces, :attributes, :resource_id, :meta]
+
   defstruct service_name: nil,
             signals: [],
             logs: nil,
@@ -20,4 +22,12 @@ defmodule HostKit.Telemetry.Signal do
             attributes: %{},
             resource_id: nil,
             meta: %{}
+
+  @spec new(map() | keyword()) :: t()
+  def new(attrs) do
+    attrs
+    |> Map.new()
+    |> Map.take(@fields)
+    |> then(&struct!(__MODULE__, &1))
+  end
 end

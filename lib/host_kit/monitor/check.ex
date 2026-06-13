@@ -11,6 +11,8 @@ defmodule HostKit.Monitor.Check do
           meta: map()
         }
 
+  @fields [:name, :type, :target, :expect, :severity, :resource_id, :meta]
+
   defstruct name: nil,
             type: nil,
             target: nil,
@@ -18,4 +20,12 @@ defmodule HostKit.Monitor.Check do
             severity: :warning,
             resource_id: nil,
             meta: %{}
+
+  @spec new(map() | keyword()) :: t()
+  def new(attrs) do
+    attrs
+    |> Map.new()
+    |> Map.take(@fields)
+    |> then(&struct!(__MODULE__, &1))
+  end
 end

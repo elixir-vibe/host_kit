@@ -6,15 +6,10 @@ defmodule HostKit.Monitor do
 
   @spec check(atom(), keyword()) :: Check.t()
   def check(type, opts) when is_atom(type) do
-    %Check{
-      type: type,
-      name: Keyword.get(opts, :name),
-      target: Keyword.get(opts, :target, Keyword.get(opts, :url, Keyword.get(opts, :unit))),
-      expect: Keyword.get(opts, :expect, []),
-      severity: Keyword.get(opts, :severity, :warning),
-      resource_id: Keyword.get(opts, :resource_id),
-      meta: Keyword.get(opts, :meta, %{})
-    }
+    opts
+    |> Keyword.put(:type, type)
+    |> Keyword.put_new(:target, Keyword.get(opts, :url, Keyword.get(opts, :unit)))
+    |> Check.new()
   end
 
   @spec checks(Project.t()) :: [Check.t()]

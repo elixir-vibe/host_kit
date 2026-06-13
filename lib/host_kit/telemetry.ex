@@ -53,16 +53,10 @@ defmodule HostKit.Telemetry do
   defp signal(config, resource) do
     config = normalize_config(config)
 
-    %Signal{
-      service_name: Map.get(config, :service_name),
-      signals: enabled_signals(config),
-      logs: Map.get(config, :logs),
-      metrics: Map.get(config, :metrics),
-      traces: Map.get(config, :traces),
-      attributes: Map.get(config, :attributes, %{}),
-      resource_id: HostKit.Resource.id(resource),
-      meta: Map.get(config, :meta, %{})
-    }
+    config
+    |> Map.put(:signals, enabled_signals(config))
+    |> Map.put(:resource_id, HostKit.Resource.id(resource))
+    |> Signal.new()
   end
 
   defp normalize_config(false), do: %{enabled: false}
