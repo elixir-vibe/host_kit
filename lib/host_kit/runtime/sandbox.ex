@@ -104,9 +104,10 @@ defmodule HostKit.Runtime.Sandbox do
         system_call_architectures: :native
     }
   end
+end
 
-  @spec to_systemd_service_options(t()) :: keyword()
-  def to_systemd_service_options(%__MODULE__{} = sandbox) do
+defimpl HostKit.Systemd.ServiceOptions, for: HostKit.Runtime.Sandbox do
+  def service_options(sandbox) do
     sandbox
     |> Map.from_struct()
     |> Enum.reject(fn

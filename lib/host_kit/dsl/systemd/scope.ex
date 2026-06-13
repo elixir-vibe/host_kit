@@ -110,8 +110,8 @@ defmodule HostKit.DSL.Systemd.Scope do
       |> Map.merge(Map.new(Keyword.get(opts, :resources, [])))
 
     values =
-      HostKit.Runtime.Sandbox.to_systemd_service_options(sandbox) ++
-        HostKit.Runtime.Resources.to_systemd_service_options(resources)
+      HostKit.Systemd.ServiceOptions.service_options(sandbox) ++
+        HostKit.Systemd.ServiceOptions.service_options(resources)
 
     put_service(values)
 

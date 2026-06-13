@@ -28,9 +28,10 @@ defmodule HostKit.Runtime.Resources do
   def profile(:vibe_dev), do: new(memory_max: "2G", cpu_quota: "150%", tasks_max: 512)
   def profile(:strict_app), do: profile(:small)
   def profile(:untrusted), do: new(memory_max: "1G", cpu_quota: "100%", tasks_max: 256)
+end
 
-  @spec to_systemd_service_options(t()) :: keyword()
-  def to_systemd_service_options(%__MODULE__{} = resources) do
+defimpl HostKit.Systemd.ServiceOptions, for: HostKit.Runtime.Resources do
+  def service_options(resources) do
     resources
     |> Map.from_struct()
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)

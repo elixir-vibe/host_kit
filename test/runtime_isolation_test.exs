@@ -14,7 +14,7 @@ defmodule HostKit.RuntimeIsolationTest do
   test "converts sandbox to systemd service options" do
     opts =
       Sandbox.new(:web_service)
-      |> Sandbox.to_systemd_service_options()
+      |> HostKit.Systemd.ServiceOptions.service_options()
 
     assert opts[:no_new_privileges] == true
     assert opts[:private_tmp] == true
@@ -25,7 +25,7 @@ defmodule HostKit.RuntimeIsolationTest do
   test "converts resource controls to systemd service options" do
     opts =
       Resources.new(:small)
-      |> Resources.to_systemd_service_options()
+      |> HostKit.Systemd.ServiceOptions.service_options()
 
     assert opts[:memory_max] == "512M"
     assert opts[:cpu_quota] == "50%"
