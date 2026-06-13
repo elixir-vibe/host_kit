@@ -20,6 +20,7 @@ defmodule HostKit.MixProject do
 
   def application do
     [
+      mod: {HostKit.Application, []},
       extra_applications: [:logger, :ssh]
     ]
   end

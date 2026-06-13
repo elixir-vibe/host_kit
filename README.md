@@ -194,6 +194,25 @@ project :toys do
 end
 ```
 
+## HostKit agent
+
+HostKit can run as a supervised OTP application. The supervision tree currently starts a small agent state process:
+
+```elixir
+HostKit.Agent.status()
+HostKit.Agent.configure(project: project, target: HostKit.Target.local(:prod))
+```
+
+HostKit can also declare its own outer systemd supervisor unit:
+
+```elixir
+HostKit.Agent.Systemd.service(
+  exec_start: ["/opt/host_kit/bin/host_kit", "agent", "--config", "/etc/host_kit/config.exs"]
+)
+```
+
+This gives a clean two-layer supervision model: OTP inside the BEAM and systemd outside it.
+
 ## Firewall policy
 
 HostKit can declare project- or host-scoped firewall policy:
