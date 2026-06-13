@@ -19,6 +19,8 @@ defmodule Mix.Tasks.HostKit.Apply do
           remote: :string,
           user: :string,
           port: :integer,
+          identity_file: :string,
+          silently_accept_hosts: :boolean,
           sudo: :boolean,
           require: :keep,
           ignore: :keep,
@@ -52,6 +54,8 @@ defmodule Mix.Tasks.HostKit.Apply do
         plan
 
       artifact_path ->
+        target_opts = expand_target_opts(target_opts)
+
         with {:ok, artifact} <- HostKit.Plan.Artifact.load_artifact(artifact_path),
              :ok <- validate_artifact_target(artifact, target_opts),
              {:ok, plan} <- HostKit.Plan.Artifact.to_plan(artifact) do
@@ -112,6 +116,13 @@ defmodule Mix.Tasks.HostKit.Apply do
   end
 
   defp validate_package_manager(_target, _target_opts), do: :ok
+
+  defp expand_target_opts(opts) do
+    case Keyword.pop(opts, :target) do
+      {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
+      {nil, opts} -> opts
+    end
+  end
 
   defp print_results(results) do
     results

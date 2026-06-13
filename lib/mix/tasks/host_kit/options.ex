@@ -79,6 +79,16 @@ defmodule Mix.Tasks.HostKit.Options do
     [host: host, sudo: Keyword.get(opts, :sudo, false)]
     |> put_present(:user, Keyword.get(opts, :user))
     |> put_present(:port, Keyword.get(opts, :port))
+    |> put_present(:identity_file, Keyword.get(opts, :identity_file))
+    |> put_silently_accept_hosts(opts)
+  end
+
+  defp put_silently_accept_hosts(remote_opts, opts) do
+    if Keyword.get(opts, :silently_accept_hosts, false) do
+      Keyword.put(remote_opts, :silently_accept_hosts, true)
+    else
+      remote_opts
+    end
   end
 
   defp put_present(opts, _key, nil), do: opts

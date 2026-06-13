@@ -136,15 +136,27 @@ defmodule HostKit.Runner.SSH.Connection do
       :silently_accept_hosts,
       :key_cb,
       :password,
-      :preferred_algorithms
+      :preferred_algorithms,
+      :silently_accept_hosts
     ])
     |> Enum.map(fn
       {:user, user} -> {:user, to_charlist(user)}
       {:user_dir, dir} -> {:user_dir, to_charlist(dir)}
       pair -> pair
     end)
+    |> put_identity_file(opts)
     |> Keyword.put_new(:user_interaction, false)
     |> Keyword.put_new(:preferred_algorithms, @default_preferred_algorithms)
+  end
+
+  defp put_identity_file(ssh_opts, opts) do
+    case Keyword.get(opts, :identity_file) do
+      nil ->
+        ssh_opts
+
+      path ->
+        Keyword.put(ssh_opts, :key_cb, {HostKit.Runner.SSH.IdentityKey, identity_file: path})
+    end
   end
 
   defp shell_join(parts), do: Enum.map_join(parts, " ", &shell_escape/1)

@@ -18,6 +18,8 @@ defmodule Mix.Tasks.HostKit.Plan do
           remote: :string,
           user: :string,
           port: :integer,
+          identity_file: :string,
+          silently_accept_hosts: :boolean,
           sudo: :boolean,
           require: :keep,
           format: :string,
