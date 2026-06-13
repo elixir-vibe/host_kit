@@ -8,6 +8,7 @@ defmodule HostKit.DSL.Scope do
   @service_key {__MODULE__, :service}
   @provider_config_key {__MODULE__, :provider_config}
   @observability_key {__MODULE__, :observability}
+  @firewall_key {__MODULE__, :firewall}
 
   def start_project(name, opts) do
     Process.put(@project_key, Project.new(name, opts))
@@ -34,6 +35,26 @@ defmodule HostKit.DSL.Scope do
       :service -> update_current(:service, &put_observability_value(&1, kind, value))
       nil -> raise "no HostKit observability in scope"
     end
+  end
+
+  def start_firewall do
+    scope = if Process.get(@host_key), do: :host, else: :project
+    Process.put(@firewall_key, %HostKit.Firewall{scope: scope})
+  end
+
+  def finish_firewall do
+    firewall = Process.delete(@firewall_key) || raise "no HostKit firewall in scope"
+
+    case firewall.scope do
+      :project -> update_project(&put_firewall_value(&1, firewall))
+      :host -> update_current(:host, &put_firewall_value(&1, firewall))
+    end
+  end
+
+  def add_firewall_rule(rule) do
+    firewall = Process.get(@firewall_key) || raise "no HostKit firewall in scope"
+    Process.put(@firewall_key, %{firewall | rules: firewall.rules ++ [rule]})
+    :ok
   end
 
   def put_providers(providers) do
@@ -193,6 +214,10 @@ defmodule HostKit.DSL.Scope do
   defp put_observability_value(%{meta: meta} = parent, kind, value) do
     observability = meta |> Map.get(:observability, %{}) |> Map.put(kind, value)
     %{parent | meta: Map.put(meta, :observability, observability)}
+  end
+
+  defp put_firewall_value(%{meta: meta} = parent, firewall) do
+    %{parent | meta: Map.put(meta, :firewall, firewall)}
   end
 
   defp storage_opts(opts) do

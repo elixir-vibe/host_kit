@@ -197,6 +197,26 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro firewall(do: block) do
+    quote do
+      HostKit.DSL.Scope.start_firewall()
+      unquote(block)
+      HostKit.DSL.Scope.finish_firewall()
+    end
+  end
+
+  defmacro allow(opts) do
+    quote do
+      HostKit.DSL.Scope.add_firewall_rule(HostKit.Firewall.allow(unquote(opts)))
+    end
+  end
+
+  defmacro deny(target, opts \\ []) do
+    quote do
+      HostKit.DSL.Scope.add_firewall_rule(HostKit.Firewall.deny(unquote(target), unquote(opts)))
+    end
+  end
+
   defmacro telemetry(opts) do
     quote do
       if HostKit.DSL.Scope.observability_active?() do

@@ -194,6 +194,37 @@ project :toys do
 end
 ```
 
+## Firewall policy
+
+HostKit can declare project- or host-scoped firewall policy:
+
+```elixir
+firewall do
+  allow tcp: 22, from: :any
+  allow tcp: [80, 443], from: :any
+  allow tcp: 9100, from: {10, 44, 0, 0, 24}
+  deny :all
+end
+```
+
+Host-scoped policy lives inside `host`:
+
+```elixir
+host :prod, hostname: "elixir.toys" do
+  firewall do
+    allow tcp: 22, from: :any
+    deny :all
+  end
+end
+```
+
+Extract or render policies with:
+
+```elixir
+HostKit.Firewall.policies(project)
+HostKit.Firewall.Nftables.render(policy)
+```
+
 ## Network addresses and policy
 
 Network addresses can use Elixir tuple forms and semantic aliases:
