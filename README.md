@@ -99,6 +99,7 @@ mix host_kit.apply --host app \
 - [Workspaces and tenants](guides/workspaces/workspaces-and-tenants.md)
 - [Observability and monitors](guides/operations/observability-and-monitors.md)
 - [Timers and jobs](guides/operations/timers-and-jobs.md)
+- [Deploy a Caddy site Livebook](notebooks/learn/deploy_caddy_site.livemd)
 - [CLI reference](guides/reference/cli.md)
 - [Full DSL/reference notes](guides/reference/full-reference.md)
 - [Changelog](CHANGELOG.md)

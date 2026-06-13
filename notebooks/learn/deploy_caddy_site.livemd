@@ -1,0 +1,193 @@
+# Deploy a Caddy static site with HostKit
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14"},
+  {:host_kit, path: Path.expand("../..", __DIR__)}
+])
+```
+
+## What this notebook does
+
+This notebook deploys a small static site through HostKit's real DSL:
+
+- chooses an SSH target,
+- declares files/directories and Caddy config,
+- builds and displays a HostKit plan,
+- writes an inspectable plan artifact,
+- optionally applies the plan,
+- optionally verifies the remote files.
+
+The HostKit deployment declaration lives directly in this notebook. The integration test extracts and evaluates the marked DSL cell below, so this notebook is the source of truth.
+
+## Configure deployment
+
+```elixir
+form = Kino.Control.form(
+  [
+    target_host: Kino.Input.text("SSH host", default: System.get_env("HOSTKIT_TARGET_HOST", "127.0.0.1")),
+    target_user: Kino.Input.text("SSH user", default: System.get_env("HOSTKIT_TARGET_USER", "root")),
+    target_port: Kino.Input.number("SSH port", default: 22),
+    target_sudo: Kino.Input.checkbox("Use sudo", default: true),
+    identity_file: Kino.Input.text("Identity file", default: Path.expand("~/.ssh/id_ed25519")),
+    password_env: Kino.Input.text("Password env var (optional)", default: ""),
+    silently_accept_hosts: Kino.Input.checkbox("Silently accept host keys", default: false),
+    domain: Kino.Input.text("Site domain", default: "hello.example.test"),
+    site_root: Kino.Input.text("Site root", default: "/srv/hostkit-hello"),
+    caddy_sites_dir: Kino.Input.text("Caddy sites dir", default: "/etc/caddy/sites"),
+    message: Kino.Input.text("Message", default: "Deployed by HostKit"),
+    artifact_path: Kino.Input.text("Plan artifact path", default: "/tmp/hostkit-caddy-site.plan.json"),
+    apply: Kino.Input.checkbox("Apply changes", default: false),
+    verify: Kino.Input.checkbox("Verify remote files", default: false)
+  ],
+  submit: "Build plan"
+)
+
+Kino.render(form)
+```
+
+```elixir
+inputs = Kino.Control.await(form)
+```
+
+## Build SSH options
+
+```elixir
+ssh_opts =
+  []
+  |> Keyword.put(:port, inputs.target_port)
+  |> Keyword.put(:silently_accept_hosts, inputs.silently_accept_hosts)
+  |> then(fn opts ->
+    if inputs.identity_file == "" do
+      opts
+    else
+      Keyword.put(opts, :identity_file, inputs.identity_file)
+    end
+  end)
+  |> then(fn opts ->
+    if inputs.password_env == "" do
+      opts
+    else
+      Keyword.put(opts, :password, HostKit.Secret.env(inputs.password_env))
+    end
+  end)
+```
+
+## Build the HostKit project
+
+```elixir
+target_host = inputs.target_host
+target_user = inputs.target_user
+target_sudo = inputs.target_sudo
+domain = inputs.domain
+site_root = inputs.site_root
+caddy_sites_dir = inputs.caddy_sites_dir
+message = inputs.message
+```
+
+This is the actual deployment declaration. It is normal HostKit DSL and is the cell used by the integration test.
+
+```elixir
+# hostkit:deploy-caddy-site-dsl
+html = """
+<!doctype html>
+<html>
+  <head><meta charset=\"utf-8\"><title>Hello from HostKit</title></head>
+  <body>
+    <h1>Hello from HostKit</h1>
+    <p>#{message}</p>
+  </body>
+</html>
+"""
+
+use HostKit.DSL, providers: [HostKit.Providers.Caddy]
+
+project =
+  project :deploy_caddy_site do
+    host :target do
+      hostname target_host
+      user target_user
+      sudo target_sudo
+      ssh ssh_opts
+    end
+
+    provider :caddy, HostKit.Providers.Caddy do
+      set :sites_dir, caddy_sites_dir
+    end
+
+    service :hello_site do
+      directory site_root, owner: "root", group: "root", mode: 0o755
+
+      file Path.join(site_root, "index.html"),
+        content: html,
+        owner: "root",
+        group: "root",
+        mode: 0o644
+
+      caddy_site :hello, domain do
+        root site_root
+        file_server()
+      end
+    end
+  end
+
+project
+```
+
+## Inspect resources
+
+```elixir
+HostKit.Project.resources(project)
+```
+
+## Plan
+
+```elixir
+host = hd(project.hosts)
+target_opts = HostKit.Host.target_opts(host)
+
+{:ok, plan} = HostKit.plan(project, target_opts)
+
+plan |> HostKit.Plan.Format.format() |> Kino.Markdown.new()
+```
+
+## Write the plan artifact
+
+```elixir
+:ok = HostKit.Plan.Artifact.save(inputs.artifact_path, plan)
+
+inputs.artifact_path
+|> File.read!()
+|> Jason.decode!()
+```
+
+If you used `password_env`, the artifact contains the environment variable name, not the secret value.
+
+## Apply (explicit opt-in)
+
+```elixir
+if inputs.apply do
+  HostKit.apply(plan, Keyword.merge(target_opts, confirm: true))
+else
+  {:skipped, "Check Apply changes above to modify the target"}
+end
+```
+
+## Verify (optional)
+
+```elixir
+if inputs.verify do
+  runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
+
+  index_path = Path.join(inputs.site_root, "index.html")
+  site_path = Path.join(inputs.caddy_sites_dir, "hello.caddy")
+
+  %{
+    index: HostKit.Runner.cmd(runner, "test", ["-f", index_path], stderr_to_stdout: true),
+    caddy_site: HostKit.Runner.cmd(runner, "test", ["-f", site_path], stderr_to_stdout: true),
+    index_preview: HostKit.Runner.cmd(runner, "sh", ["-c", "head -20 #{index_path}"], stderr_to_stdout: true)
+  }
+else
+  {:skipped, "Check Verify remote files above to inspect the target"}
+end
+```
