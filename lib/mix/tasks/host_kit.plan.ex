@@ -33,18 +33,20 @@ defmodule Mix.Tasks.HostKit.Plan do
 
     Options.with_target_opts(opts, fn target_opts ->
       {:ok, plan} = HostKit.plan(project, plan_opts(opts, target_opts))
-      maybe_write_artifact(plan, opts)
+      maybe_write_artifact(plan, opts, target_opts)
       IO.puts(format_plan(plan, opts))
     end)
   end
 
-  defp maybe_write_artifact(plan, opts) do
+  defp maybe_write_artifact(plan, opts, target_opts) do
     case Keyword.get(opts, :out) do
       nil ->
         :ok
 
       path ->
-        case HostKit.Plan.Artifact.save(path, plan) do
+        case HostKit.Plan.Artifact.save(path, plan,
+               target_metadata: target_metadata(plan, opts, target_opts)
+             ) do
           :ok ->
             :ok
 
@@ -53,6 +55,58 @@ defmodule Mix.Tasks.HostKit.Plan do
         end
     end
   end
+
+  defp target_metadata(plan, opts, target_opts) do
+    %{}
+    |> put_metadata("kind", target_kind(opts))
+    |> put_metadata("package_manager", package_manager(plan, target_opts))
+    |> put_metadata("package_repo", package_repo(plan, target_opts))
+  end
+
+  defp target_kind(opts) do
+    cond do
+      Keyword.has_key?(opts, :remote) -> "remote"
+      Keyword.get(opts, :local, false) -> "local"
+      true -> nil
+    end
+  end
+
+  defp package_manager(plan, target_opts) do
+    plan.opts
+    |> Keyword.get(:package_manager, Keyword.get(target_opts, :package_manager))
+    |> case do
+      nil -> nil
+      manager -> to_string(manager)
+    end
+  end
+
+  defp package_repo(plan, target_opts) do
+    case Keyword.get(target_opts, :package_repo) do
+      repo when is_binary(repo) -> resolved_package_repo(repo)
+      _other -> resolved_package_repo(plan)
+    end
+  end
+
+  defp resolved_package_repo(repo) when is_binary(repo), do: repo
+
+  defp resolved_package_repo(plan) do
+    plan.resources
+    |> Enum.flat_map(fn
+      %HostKit.Resources.Package{meta: %{resolution: %{repo: repo}}} when is_binary(repo) ->
+        [repo]
+
+      _resource ->
+        []
+    end)
+    |> Enum.uniq()
+    |> case do
+      [repo] -> repo
+      _other -> nil
+    end
+  end
+
+  defp put_metadata(metadata, _key, nil), do: metadata
+  defp put_metadata(metadata, key, value), do: Map.put(metadata, key, value)
 
   defp format_plan(plan, opts) do
     case Keyword.get(opts, :format, "text") do

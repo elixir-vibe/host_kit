@@ -3,6 +3,7 @@ defmodule Mix.Tasks.HostKit.Apply do
 
   use Mix.Task
 
+  alias HostKit.Package.{Manager, TargetRepo}
   alias Mix.Tasks.HostKit.Options
 
   @shortdoc "Apply HostKit resources"
@@ -48,15 +49,66 @@ defmodule Mix.Tasks.HostKit.Apply do
         plan
 
       artifact_path ->
-        case HostKit.Plan.Artifact.load(artifact_path) do
-          {:ok, plan} ->
-            plan
-
+        with {:ok, artifact} <- HostKit.Plan.Artifact.load_artifact(artifact_path),
+             :ok <- validate_artifact_target(artifact, target_opts),
+             {:ok, plan} <- HostKit.Plan.Artifact.to_plan(artifact) do
+          plan
+        else
           {:error, reason} ->
             Mix.raise("could not load HostKit plan artifact: #{inspect(reason)}")
         end
     end
   end
+
+  defp validate_artifact_target(%HostKit.Plan.Artifact{target: target}, target_opts)
+       when is_map(target) do
+    with :ok <- validate_package_repo(target, target_opts) do
+      validate_package_manager(target, target_opts)
+    end
+  end
+
+  defp validate_artifact_target(_artifact, _target_opts), do: :ok
+
+  defp validate_package_repo(%{"package_repo" => expected}, target_opts)
+       when is_binary(expected) do
+    actual =
+      case Keyword.get(target_opts, :package_repo) do
+        repo when is_binary(repo) -> {:ok, repo}
+        _other -> TargetRepo.detect(target_opts)
+      end
+
+    case actual do
+      {:ok, ^expected} ->
+        :ok
+
+      {:ok, actual} ->
+        {:error, {:plan_artifact_target_mismatch, :package_repo, expected, actual}}
+
+      {:error, reason} ->
+        {:error, {:plan_artifact_target_detection_failed, :package_repo, reason}}
+    end
+  end
+
+  defp validate_package_repo(_target, _target_opts), do: :ok
+
+  defp validate_package_manager(%{"package_manager" => expected}, target_opts)
+       when is_binary(expected) do
+    case Manager.resolve(target_opts) do
+      {:ok, manager} ->
+        actual = to_string(manager)
+
+        if actual == expected do
+          :ok
+        else
+          {:error, {:plan_artifact_target_mismatch, :package_manager, expected, actual}}
+        end
+
+      {:error, reason} ->
+        {:error, {:plan_artifact_target_detection_failed, :package_manager, reason}}
+    end
+  end
+
+  defp validate_package_manager(_target, _target_opts), do: :ok
 
   defp print_results(results) do
     results

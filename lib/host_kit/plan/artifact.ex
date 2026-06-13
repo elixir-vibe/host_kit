@@ -16,7 +16,7 @@ defmodule HostKit.Plan.Artifact do
 
   @type t :: %__MODULE__{
           version: pos_integer(),
-          target: String.t() | nil,
+          target: map() | nil,
           project: term(),
           resources: [term()],
           changes: [term()],
@@ -28,7 +28,7 @@ defmodule HostKit.Plan.Artifact do
   @spec from_plan(Plan.t(), keyword()) :: t()
   def from_plan(%Plan{} = plan, opts \\ []) do
     %__MODULE__{
-      target: Keyword.get(opts, :target),
+      target: Keyword.get(opts, :target_metadata, %{}),
       project: Resource.dump(plan.project),
       resources: Resource.dump(plan.resources),
       changes: Enum.map(plan.changes, &dump_change/1),
@@ -52,9 +52,15 @@ defmodule HostKit.Plan.Artifact do
 
   @spec load(Path.t()) :: {:ok, Plan.t()} | {:error, term()}
   def load(path) do
-    with {:ok, content} <- File.read(path),
-         {:ok, artifact} <- decode(content) do
+    with {:ok, artifact} <- load_artifact(path) do
       to_plan(artifact)
+    end
+  end
+
+  @spec load_artifact(Path.t()) :: {:ok, t()} | {:error, term()}
+  def load_artifact(path) do
+    with {:ok, content} <- File.read(path) do
+      decode(content)
     end
   end
 
