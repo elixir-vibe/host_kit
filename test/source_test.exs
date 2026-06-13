@@ -67,6 +67,58 @@ defmodule HostKit.SourceTest do
     assert diagnostic.details.command == "git"
   end
 
+  test "git source branch refs produce plan warnings" do
+    repo = create_repo!()
+
+    project = %HostKit.Project{
+      name: :source_warning,
+      services: [
+        %HostKit.Service{
+          name: :app,
+          resources: [
+            HostKit.Resources.Package.new(:git, as: "git"),
+            Source.new(:app,
+              git: repo.uri,
+              ref: "main",
+              checkout: Path.join(repo.root, "checkout")
+            )
+          ]
+        }
+      ]
+    }
+
+    assert {:ok, plan} = HostKit.plan(project)
+
+    assert [%HostKit.Diagnostic{code: :source_mutable_ref, severity: :warning}] =
+             plan.diagnostics.warnings
+  end
+
+  test "dirty git source checkout is a plan error by default" do
+    repo = create_repo!()
+    checkout = Path.join(repo.root, "checkout")
+    source = Source.new(:app, git: repo.uri, ref: "main", checkout: checkout)
+
+    assert {:ok, resolved} = HostKit.Source.Git.resolve(source)
+    assert :ok = HostKit.Source.Git.apply(resolved, [])
+    File.write!(Path.join(checkout, "README.md"), "dirty\n")
+
+    project = %HostKit.Project{
+      name: :source_dirty,
+      services: [
+        %HostKit.Service{
+          name: :app,
+          resources: [HostKit.Resources.Package.new(:git, as: "git"), source]
+        }
+      ]
+    }
+
+    assert {:error, %HostKit.Diagnostics{errors: [diagnostic]}} =
+             HostKit.plan(project, reader: HostKit.Local)
+
+    assert diagnostic.code == :source_checkout_dirty
+    assert diagnostic.details.checkout == checkout
+  end
+
   test "git source resolves branch refs from ls-remote semantics" do
     repo = create_repo!()
 

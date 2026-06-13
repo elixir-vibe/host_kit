@@ -36,6 +36,31 @@ defmodule HostKit.PlanFormatTest do
              """)
   end
 
+  test "formats plan diagnostics before changes" do
+    plan = %HostKit.Plan{
+      diagnostics: %HostKit.Diagnostics{
+        warnings: [
+          %HostKit.Diagnostic{
+            severity: :warning,
+            message: "source :app uses mutable git ref \"main\"",
+            details: %{revision: "abc123"},
+            hint: "pin it"
+          }
+        ]
+      },
+      changes: []
+    }
+
+    assert Format.format(plan) ==
+             String.trim_trailing("""
+             warning: source :app uses mutable git ref \"main\"
+               revision: "abc123"
+               hint: pin it
+
+             Plan: 0 to create, 0 to update, 0 to delete, 0 read errors, 0 unchanged
+             """)
+  end
+
   test "formats source details" do
     plan = %HostKit.Plan{
       changes: [
@@ -65,7 +90,6 @@ defmodule HostKit.PlanFormatTest do
                uri: https://github.com/elixir-vibe/host_kit.git
                ref: main (branch)
                resolved: abc123
-               warning: mutable ref; resolved revision is pinned in this plan
                checkout: /opt/app/source
                path: examples/hello
              """)

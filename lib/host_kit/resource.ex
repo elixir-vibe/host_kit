@@ -14,6 +14,8 @@ defmodule HostKit.Resource do
                       HostKit.Change,
                       HostKit.CommandLine,
                       HostKit.Conventions,
+                      HostKit.Diagnostic,
+                      HostKit.Diagnostics,
                       HostKit.Firewall,
                       HostKit.Firewall.Rule,
                       HostKit.Host,

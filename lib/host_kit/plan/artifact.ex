@@ -13,7 +13,8 @@ defmodule HostKit.Plan.Artifact do
             resources: [],
             sources: %{},
             changes: [],
-            summary: %{}
+            summary: %{},
+            diagnostics: Resource.dump(%HostKit.Diagnostics{})
 
   @type t :: %__MODULE__{
           version: pos_integer(),
@@ -22,7 +23,8 @@ defmodule HostKit.Plan.Artifact do
           resources: [term()],
           sources: map(),
           changes: [term()],
-          summary: term()
+          summary: term(),
+          diagnostics: term()
         }
 
   codec(:version, transform: :validate_version!)
@@ -35,7 +37,8 @@ defmodule HostKit.Plan.Artifact do
       resources: Resource.dump(plan.resources),
       sources: source_identities(plan.resources),
       changes: Enum.map(plan.changes, &dump_change/1),
-      summary: Resource.dump(plan.summary)
+      summary: Resource.dump(plan.summary),
+      diagnostics: Resource.dump(plan.diagnostics)
     }
   end
 
@@ -47,7 +50,8 @@ defmodule HostKit.Plan.Artifact do
        resources: Resource.load(artifact.resources),
        changes: Enum.map(artifact.changes, &load_change/1),
        summary: Resource.load(artifact.summary),
-       opts: []
+       opts: [],
+       diagnostics: Resource.load(artifact.diagnostics)
      }}
   rescue
     error in [ArgumentError] -> {:error, error}

@@ -11,14 +11,16 @@ defmodule HostKit.Plan do
           resources: [struct()],
           changes: [Change.t()],
           summary: map(),
-          opts: keyword()
+          opts: keyword(),
+          diagnostics: HostKit.Diagnostics.t()
         }
 
   defstruct project: nil,
             resources: [],
             changes: [],
             summary: %{},
-            opts: []
+            opts: [],
+            diagnostics: %HostKit.Diagnostics{}
 
   @spec build(Project.t(), keyword()) :: {:ok, t()} | {:error, HostKit.Diagnostics.t() | term()}
   def build(%Project{} = project, opts \\ []) do
@@ -30,15 +32,21 @@ defmodule HostKit.Plan do
          :ok <- maybe_write_package_lock(resources, opts) do
       opts = Keyword.put(opts, :resources, resources)
       changes = Enum.map(resources, &change_for(&1, project, opts))
+      diagnostics = HostKit.Source.Diagnostics.for_plan(resources, changes)
 
-      {:ok,
-       %__MODULE__{
-         project: project,
-         resources: resources,
-         changes: changes,
-         summary: summarize(changes),
-         opts: opts
-       }}
+      if HostKit.Diagnostics.ok?(diagnostics) do
+        {:ok,
+         %__MODULE__{
+           project: project,
+           resources: resources,
+           changes: changes,
+           summary: summarize(changes),
+           opts: opts,
+           diagnostics: diagnostics
+         }}
+      else
+        {:error, diagnostics}
+      end
     end
   end
 
@@ -76,7 +84,12 @@ defmodule HostKit.Plan do
 
   defp resolve_resource(%Capability{} = capability, opts), do: Resolver.resolve(capability, opts)
 
-  defp resolve_resource(%Source{} = source, _opts), do: HostKit.Source.Git.resolve(source)
+  defp resolve_resource(%Source{} = source, _opts) do
+    case HostKit.Source.Git.resolve(source) do
+      {:ok, source} -> {:ok, source}
+      {:error, reason} -> {:error, HostKit.Source.Diagnostics.resolution_error(source, reason)}
+    end
+  end
 
   defp resolve_resource(resource, _opts), do: {:ok, resource}
 

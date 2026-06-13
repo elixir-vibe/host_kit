@@ -9,7 +9,7 @@ defmodule HostKit.Plan.Format do
 
   @spec format(Plan.t()) :: String.t()
   def format(%Plan{} = plan) do
-    [summary(plan), "\n", changes(plan.changes)]
+    [diagnostics(plan.diagnostics), summary(plan), "\n", changes(plan.changes)]
     |> IO.iodata_to_binary()
     |> String.trim_trailing()
   end
@@ -29,6 +29,15 @@ defmodule HostKit.Plan.Format do
       format_details(change)
     ]
     |> IO.iodata_to_binary()
+  end
+
+  defp diagnostics(%HostKit.Diagnostics{warnings: []}), do: []
+
+  defp diagnostics(%HostKit.Diagnostics{} = diagnostics) do
+    diagnostics.warnings
+    |> Enum.map(&HostKit.Diagnostics.Format.format(%HostKit.Diagnostics{warnings: [&1]}))
+    |> Enum.intersperse("\n")
+    |> Kernel.++(["\n\n"])
   end
 
   defp summary(%Plan{changes: changes}) do
@@ -89,7 +98,6 @@ defmodule HostKit.Plan.Format do
       Atom.to_string(source.ref_kind),
       ")",
       format_source_revision(source.revision),
-      format_mutable_source(source),
       "\n  checkout: ",
       source.checkout,
       format_source_path(source.path)
@@ -112,11 +120,6 @@ defmodule HostKit.Plan.Format do
 
   defp format_source_revision(nil), do: []
   defp format_source_revision(revision), do: ["\n  resolved: ", revision]
-
-  defp format_mutable_source(%{ref_kind: :branch}),
-    do: ["\n  warning: mutable ref; resolved revision is pinned in this plan"]
-
-  defp format_mutable_source(_source), do: []
 
   defp format_source_path("."), do: []
   defp format_source_path(path), do: ["\n  path: ", path]
