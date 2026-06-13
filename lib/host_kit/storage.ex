@@ -14,13 +14,12 @@ defmodule HostKit.Storage do
 
   @spec directory(Volume.t()) :: Directory.t()
   def directory(%Volume{} = volume) do
-    %Directory{
-      path: volume.path,
+    Directory.new(volume.path,
       owner: volume.owner,
       group: volume.group,
       mode: volume.mode,
       meta: %{storage: volume.name, backup: volume.backup, secret: volume.secret}
-    }
+    )
   end
 
   @spec read_write_path(Volume.t()) :: String.t() | nil

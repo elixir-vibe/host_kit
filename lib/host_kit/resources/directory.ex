@@ -17,5 +17,17 @@ defmodule HostKit.Resources.Directory do
             depends_on: [],
             meta: %{}
 
+  @spec new(String.t(), keyword()) :: t()
+  def new(path, opts \\ []) do
+    %__MODULE__{
+      path: path,
+      owner: Keyword.get(opts, :owner),
+      group: Keyword.get(opts, :group),
+      mode: opts |> Keyword.get(:mode) |> HostKit.Mode.normalize!(),
+      depends_on: Keyword.get(opts, :depends_on, []),
+      meta: Keyword.get(opts, :meta, %{})
+    }
+  end
+
   def id(%__MODULE__{path: path}), do: {:directory, path}
 end

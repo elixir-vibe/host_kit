@@ -338,24 +338,15 @@ defmodule HostKit.DSL do
 
   defmacro directory(path, opts \\ []) do
     quote do
-      HostKit.DSL.Scope.add_resource(%HostKit.Resources.Directory{
-        path: unquote(path),
-        owner: Keyword.get(unquote(opts), :owner),
-        group: Keyword.get(unquote(opts), :group),
-        mode: HostKit.Mode.normalize!(Keyword.get(unquote(opts), :mode))
-      })
+      HostKit.DSL.Scope.add_resource(
+        HostKit.Resources.Directory.new(unquote(path), unquote(opts))
+      )
     end
   end
 
   defmacro file(path, opts \\ []) do
     quote do
-      HostKit.DSL.Scope.add_resource(%HostKit.Resources.File{
-        path: unquote(path),
-        content: Keyword.get(unquote(opts), :content),
-        owner: Keyword.get(unquote(opts), :owner),
-        group: Keyword.get(unquote(opts), :group),
-        mode: HostKit.Mode.normalize!(Keyword.get(unquote(opts), :mode))
-      })
+      HostKit.DSL.Scope.add_resource(HostKit.Resources.File.new(unquote(path), unquote(opts)))
     end
   end
 end

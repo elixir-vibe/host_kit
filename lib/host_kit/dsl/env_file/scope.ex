@@ -4,12 +4,10 @@ defmodule HostKit.DSL.EnvFile.Scope do
   @key {__MODULE__, :env_file}
 
   def start(path, opts) do
-    Process.put(@key, %HostKit.Resources.EnvFile{
-      path: path,
-      owner: Keyword.get(opts, :owner),
-      group: Keyword.get(opts, :group),
-      mode: opts |> Keyword.get(:mode, :secret_group_file) |> HostKit.Mode.normalize!()
-    })
+    Process.put(
+      @key,
+      HostKit.Resources.EnvFile.new(path, Keyword.put_new(opts, :mode, :secret_group_file))
+    )
   end
 
   def finish do
