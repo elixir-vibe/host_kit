@@ -3,6 +3,7 @@ defmodule HostKit.Plan.Format do
 
   alias HostKit.Addr.Resource
   alias HostKit.{Change, Plan}
+  alias HostKit.Package.Resolution
 
   @action_marks %{create: "+", update: "~", delete: "-", no_op: "=", read: "?"}
 
@@ -24,7 +25,8 @@ defmodule HostKit.Plan.Format do
       "\n  ",
       Atom.to_string(change.action),
       " ",
-      format_reason(change.reason)
+      format_reason(change.reason),
+      format_details(change)
     ]
     |> IO.iodata_to_binary()
   end
@@ -52,6 +54,27 @@ defmodule HostKit.Plan.Format do
     changes
     |> Enum.map(&format_change/1)
     |> Enum.intersperse("\n")
+  end
+
+  defp format_details(%Change{after: %{meta: %{resolution: %Resolution{} = resolution}}}) do
+    [
+      "\n  resolves to ",
+      resolution.package,
+      " via ",
+      Atom.to_string(resolution.source),
+      resolution_context(resolution)
+    ]
+  end
+
+  defp format_details(_change), do: []
+
+  defp resolution_context(%Resolution{project: project, repo: repo}) do
+    case {project, repo} do
+      {nil, nil} -> ""
+      {project, nil} -> " (#{project})"
+      {nil, repo} -> " (#{repo})"
+      {project, repo} -> " (#{project}/#{repo})"
+    end
   end
 
   defp format_resource_id(%Resource{} = resource), do: to_string(resource)

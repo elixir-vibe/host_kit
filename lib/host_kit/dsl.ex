@@ -531,9 +531,9 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro mise_tool(name, version, opts \\ []) do
+  defmacro tool(name, version, opts \\ []) do
     quote do
-      HostKit.DSL.Scope.add_mise_tool(unquote(name), unquote(version), unquote(opts))
+      HostKit.DSL.Scope.add_tool(unquote(name), unquote(version), unquote(opts))
     end
   end
 end

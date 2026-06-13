@@ -4,6 +4,7 @@ defmodule HostKit.Plan do
   alias HostKit.Addr
   alias HostKit.{Change, Project, Resource}
   alias HostKit.Package.Resolver, as: PackageResolver
+  alias HostKit.Resources.Capability
 
   @type t :: %__MODULE__{
           project: Project.t(),
@@ -21,7 +22,8 @@ defmodule HostKit.Plan do
 
   @spec build(Project.t(), keyword()) :: {:ok, t()}
   def build(%Project{} = project, opts \\ []) do
-    with {:ok, resources} <- resolve_resources(Project.resources(project), opts) do
+    with {:ok, resources} <- resolve_resources(Project.resources(project), opts),
+         :ok <- maybe_write_package_lock(resources, opts) do
       changes = Enum.map(resources, &change_for(&1, project, opts))
 
       {:ok,
@@ -51,7 +53,30 @@ defmodule HostKit.Plan do
   defp resolve_resource(%HostKit.Resources.Package{} = package, opts),
     do: PackageResolver.resolve(package, opts)
 
+  defp resolve_resource(%Capability{} = capability, opts),
+    do: PackageResolver.resolve(capability, opts)
+
   defp resolve_resource(resource, _opts), do: {:ok, resource}
+
+  defp maybe_write_package_lock(resources, opts) do
+    case Keyword.get(opts, :package_lock_write) do
+      path when is_binary(path) -> write_package_lock(path, resources)
+      _other -> :ok
+    end
+  end
+
+  defp write_package_lock(path, resources) do
+    lock =
+      Enum.reduce(resources, %HostKit.Package.Lock{}, fn
+        %HostKit.Resources.Package{meta: %{resolution: resolution}, name: name}, lock ->
+          HostKit.Package.Lock.put(lock, name, resolution.package, resolution.repo)
+
+        _resource, lock ->
+          lock
+      end)
+
+    HostKit.Package.Lock.save(path, lock)
+  end
 
   defp change_for(resource, project, opts) do
     if ignored?(resource, opts) do

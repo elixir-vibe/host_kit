@@ -2,6 +2,7 @@ defmodule HostKit.Project do
   @moduledoc "Project-level declaration loaded from HostKit DSL files."
 
   alias HostKit.{Conventions, Firewall, Provider, ProviderConfig, Proxy, Service, Tenant}
+  alias HostKit.Resources.Mise
 
   @type t :: %__MODULE__{
           name: atom(),
@@ -83,10 +84,17 @@ defmodule HostKit.Project do
   @spec resources(t()) :: [struct()]
   def resources(%__MODULE__{} = project) do
     project.services
-    |> Enum.flat_map(& &1.resources)
+    |> Enum.flat_map(&expand_resources(&1.resources))
     |> Kernel.++(project.proxies)
     |> Kernel.++(Firewall.policies(project))
     |> Kernel.++(workspace_egress(project))
+  end
+
+  defp expand_resources(resources) do
+    Enum.flat_map(resources, fn
+      %Mise{} = mise -> Mise.package_resources(mise) ++ [mise]
+      resource -> [resource]
+    end)
   end
 
   defp workspace_egress(project) do

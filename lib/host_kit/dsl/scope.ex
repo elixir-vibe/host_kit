@@ -78,7 +78,7 @@ defmodule HostKit.DSL.Scope do
     Process.put(@mise_key, HostKit.Resources.Mise.new(opts))
   end
 
-  def add_mise_tool(name, version, opts) do
+  def add_tool(name, version, opts) do
     mise = Process.get(@mise_key) || raise "no HostKit mise in scope"
     Process.put(@mise_key, HostKit.Resources.Mise.add_tool(mise, name, version, opts))
     :ok

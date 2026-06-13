@@ -10,21 +10,21 @@ defmodule HostKit.Package.CLI do
   def read(%PackageResource{} = package, context) do
     opts = Map.get(context, :opts, [])
 
-    with {:ok, manager} <- manager(package, opts) do
+    with {:ok, manager} <- manager(opts) do
       read_package(manager, package, opts)
     end
   end
 
   @impl true
   def install(%PackageResource{} = package, opts) do
-    with {:ok, manager} <- manager(package, opts) do
+    with {:ok, manager} <- manager(opts) do
       install_package(manager, package, opts)
     end
   end
 
   defp read_package(:apt, package, opts) do
     command =
-      "dpkg-query -W -f='${db:Status-Status}\\t${Version}' #{shell_escape(package.package)}"
+      "dpkg-query -W -f='${db:Status-Status}\\t${Version}' #{shell_escape(package.system_name)}"
 
     case sh(opts, command) do
       {:ok, output} -> package_status(package, output)
@@ -33,7 +33,7 @@ defmodule HostKit.Package.CLI do
   end
 
   defp read_package(:dnf, package, opts) do
-    command = "rpm -q --qf '%{VERSION}-%{RELEASE}' #{shell_escape(package.package)}"
+    command = "rpm -q --qf '%{VERSION}-%{RELEASE}' #{shell_escape(package.system_name)}"
 
     case sh(opts, command) do
       {:ok, output} -> {:ok, installed(package, String.trim(output))}
@@ -42,7 +42,7 @@ defmodule HostKit.Package.CLI do
   end
 
   defp read_package(:pacman, package, opts) do
-    command = "pacman -Q #{shell_escape(package.package)}"
+    command = "pacman -Q #{shell_escape(package.system_name)}"
 
     case sh(opts, command) do
       {:ok, output} -> {:ok, installed(package, output |> String.trim() |> package_version())}
@@ -52,7 +52,7 @@ defmodule HostKit.Package.CLI do
 
   defp read_package(:apk, package, opts) do
     command =
-      "apk info -e #{shell_escape(package.package)} >/dev/null && apk info -v #{shell_escape(package.package)} | head -n 1"
+      "apk info -e #{shell_escape(package.system_name)} >/dev/null && apk info -v #{shell_escape(package.system_name)} | head -n 1"
 
     case sh(opts, command) do
       {:ok, output} -> {:ok, installed(package, output |> String.trim() |> apk_version(package))}
@@ -76,10 +76,14 @@ defmodule HostKit.Package.CLI do
 
   defp install_package(:pacman, package, opts) do
     if package.version do
-      {:error, {:version_pin_not_supported, :pacman, package.package}}
+      {:error, {:version_pin_not_supported, :pacman, package.system_name}}
     else
       refresh = if package.update, do: "pacman -Sy && ", else: ""
-      sh_ok(opts, "#{refresh}pacman -S --noconfirm --needed -- #{shell_escape(package.package)}")
+
+      sh_ok(
+        opts,
+        "#{refresh}pacman -S --noconfirm --needed -- #{shell_escape(package.system_name)}"
+      )
     end
   end
 
@@ -88,11 +92,7 @@ defmodule HostKit.Package.CLI do
     sh_ok(opts, "apk add#{update} #{package_spec(:apk, package)}")
   end
 
-  defp manager(%PackageResource{manager: manager}, _opts)
-       when manager in [:apt, :dnf, :pacman, :apk],
-       do: {:ok, manager}
-
-  defp manager(_package, opts) do
+  defp manager(opts) do
     case Keyword.get(opts, :package_manager) do
       manager when manager in [:apt, :dnf, :pacman, :apk] -> {:ok, manager}
       nil -> detect_manager(opts)
@@ -129,23 +129,26 @@ defmodule HostKit.Package.CLI do
   defp apk_version("", _package), do: ""
 
   defp apk_version(line, package) do
-    String.replace_prefix(line, package.package <> "-", "")
+    String.replace_prefix(line, package.system_name <> "-", "")
   end
 
-  defp package_spec(:apt, %{package: package, version: nil}), do: shell_escape(package)
+  defp package_spec(:apt, %{system_name: system_name, version: nil}),
+    do: shell_escape(system_name)
 
-  defp package_spec(:apt, %{package: package, version: version}),
-    do: shell_escape("#{package}=#{version}")
+  defp package_spec(:apt, %{system_name: system_name, version: version}),
+    do: shell_escape("#{system_name}=#{version}")
 
-  defp package_spec(:dnf, %{package: package, version: nil}), do: shell_escape(package)
+  defp package_spec(:dnf, %{system_name: system_name, version: nil}),
+    do: shell_escape(system_name)
 
-  defp package_spec(:dnf, %{package: package, version: version}),
-    do: shell_escape("#{package}-#{version}")
+  defp package_spec(:dnf, %{system_name: system_name, version: version}),
+    do: shell_escape("#{system_name}-#{version}")
 
-  defp package_spec(:apk, %{package: package, version: nil}), do: shell_escape(package)
+  defp package_spec(:apk, %{system_name: system_name, version: nil}),
+    do: shell_escape(system_name)
 
-  defp package_spec(:apk, %{package: package, version: version}),
-    do: shell_escape("#{package}=#{version}")
+  defp package_spec(:apk, %{system_name: system_name, version: version}),
+    do: shell_escape("#{system_name}=#{version}")
 
   defp sh_ok(opts, command) do
     case sh(opts, command) do

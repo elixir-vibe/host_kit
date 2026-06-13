@@ -34,21 +34,20 @@ defmodule HostKit.PackageTest do
     project :demo do
       service :bootstrap do
         package :ca_certificates
-        package :build_essential, package: "build-essential", manager: :apt, update: true
+        package :build_essential, as: "build-essential", update: true
       end
     end
     """
 
     {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
     assert [ca, build] = HostKit.Project.resources(project)
-    assert %HostKit.Resources.Package{name: :ca_certificates, package: "ca-certificates"} = ca
+    assert %HostKit.Resources.Package{name: :ca_certificates, system_name: "ca-certificates"} = ca
 
-    assert %HostKit.Resources.Package{package: "build-essential", manager: :apt, update: true} =
-             build
+    assert %HostKit.Resources.Package{system_name: "build-essential", update: true} = build
   end
 
   test "package resources install through selected manager" do
-    package = HostKit.Resources.Package.new(:curl, manager: :apt, update: true)
+    package = HostKit.Resources.Package.new(:curl, update: true)
 
     plan = %HostKit.Plan{
       project: %HostKit.Project{name: :demo},
@@ -62,7 +61,11 @@ defmodule HostKit.PackageTest do
     }
 
     assert {:ok, _results} =
-             HostKit.apply(plan, confirm: true, runner: {Runner, test_pid: self()})
+             HostKit.apply(plan,
+               confirm: true,
+               package_manager: :apt,
+               runner: {Runner, test_pid: self()}
+             )
 
     assert_received {:cmd, "sh", ["-c", command]}
 
@@ -71,9 +74,11 @@ defmodule HostKit.PackageTest do
   end
 
   test "package resources read installed state from package manager" do
-    package = HostKit.Resources.Package.new(:curl, manager: :apt)
+    package = HostKit.Resources.Package.new(:curl)
 
-    assert {:ok, actual} = HostKit.Package.read(package, %{opts: [runner: Runner]})
+    assert {:ok, actual} =
+             HostKit.Package.read(package, %{opts: [package_manager: :apt, runner: Runner]})
+
     assert actual.meta.installed == true
     assert actual.meta.version == "1.2.3"
   end

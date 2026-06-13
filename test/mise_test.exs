@@ -52,21 +52,70 @@ defmodule HostKit.MiseTest do
     project :demo do
       service :bootstrap do
         mise path: "/usr/local/bin/mise", system_data_dir: "/usr/local/share/mise" do
-          mise_tool :erlang, "29.0.2"
-          mise_tool :elixir, "1.20.1"
+          tool :erlang, "29.0.2"
+          tool :elixir, "1.20.1"
         end
       end
     end
     """
 
     {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
-    assert [resource] = HostKit.Project.resources(project)
-    assert %HostKit.Resources.Mise{} = resource
+    assert resources = HostKit.Project.resources(project)
+    assert %HostKit.Resources.Mise{} = resource = List.last(resources)
 
     assert Enum.map(resource.tools, &{&1.name, &1.version}) == [
              erlang: "29.0.2",
              elixir: "1.20.1"
            ]
+  end
+
+  test "mise resources expand prerequisite packages" do
+    mise =
+      HostKit.Resources.Mise.new()
+      |> HostKit.Resources.Mise.add_tool(:erlang, "29.0.2")
+
+    package_names = mise |> HostKit.Resources.Mise.package_resources() |> Enum.map(& &1.name)
+
+    assert :curl in package_names
+    assert :ca_certificates in package_names
+    assert :openssl_dev in package_names
+    assert :ncurses_dev in package_names
+    assert :cxx_compiler in package_names
+  end
+
+  test "mise package expansion supports explicit modes" do
+    disabled = HostKit.Resources.Mise.new(packages: false)
+    assert HostKit.Resources.Mise.package_resources(disabled) == []
+
+    common = HostKit.Resources.Mise.new(packages: :common)
+
+    assert Enum.map(HostKit.Resources.Mise.package_resources(common), & &1.name) == [
+             :curl,
+             :ca_certificates
+           ]
+
+    custom = HostKit.Resources.Mise.new(packages: [:curl, :custom_dep])
+
+    assert Enum.map(HostKit.Resources.Mise.package_resources(custom), & &1.name) == [
+             :curl,
+             :custom_dep
+           ]
+  end
+
+  test "project resources place mise prerequisites before mise" do
+    mise =
+      HostKit.Resources.Mise.new()
+      |> HostKit.Resources.Mise.add_tool(:erlang, "29.0.2")
+
+    project = %HostKit.Project{
+      name: :demo,
+      services: [%HostKit.Service{name: :bootstrap, resources: [mise]}]
+    }
+
+    resources = HostKit.Project.resources(project)
+
+    assert %HostKit.Resources.Package{name: :curl} = hd(resources)
+    assert %HostKit.Resources.Mise{} = List.last(resources)
   end
 
   test "mise CLI read reports installed tools" do
@@ -131,6 +180,7 @@ defmodule HostKit.MiseTest do
     %HostKit.Resources.Mise{
       path: "/usr/local/bin/mise",
       system_data_dir: "/usr/local/share/mise",
+      packages: false,
       tools: [
         %{name: :erlang, version: "29.0.2", opts: []},
         %{name: :elixir, version: "1.20.1", opts: []}

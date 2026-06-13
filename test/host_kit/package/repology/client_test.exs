@@ -39,6 +39,36 @@ defmodule HostKit.Package.Repology.ClientTest do
     assert headers["user-agent"] == ["host-kit-test"]
   end
 
+  test "resolves project API records by repository package name redirect" do
+    adapter = fn request ->
+      send(self(), {:request, request.method, request.url.path, request.url.query})
+
+      response =
+        Req.Response.json([
+          %{
+            "repo" => "debian_13",
+            "srcname" => "libxslt",
+            "binnames" => ["libxslt1.1", "xsltproc"],
+            "version" => "1.1.35"
+          }
+        ])
+
+      {request, response}
+    end
+
+    assert {:ok, [%Record{srcname: "libxslt"}]} =
+             Client.project_by_package("debian_13", "xsltproc",
+               site_url: "https://repology.test",
+               req_options: [adapter: adapter]
+             )
+
+    assert_received {:request, :get, "/tools/project-by", query}
+    assert query =~ "repo=debian_13"
+    assert query =~ "name=xsltproc"
+    assert query =~ "name_type=binname"
+    assert query =~ "target_page=api_v1_project"
+  end
+
   test "returns package names for matching repositories" do
     adapter = fn request ->
       response =

@@ -3,7 +3,9 @@ defmodule HostKit.PlanFormatTest do
 
   alias HostKit.Addr.Resource
   alias HostKit.Change
+  alias HostKit.Package.Resolution
   alias HostKit.Plan.Format
+  alias HostKit.Resources.Package
 
   test "formats a concise human-readable plan" do
     plan = %HostKit.Plan{
@@ -31,6 +33,40 @@ defmodule HostKit.PlanFormatTest do
                update drift
              ? file./etc/app/env
                read {:read_error, :eacces}
+             """)
+  end
+
+  test "formats package resolution details" do
+    package = %Package{
+      name: :openssl_dev,
+      system_name: "libssl-dev",
+      meta: %{
+        resolution: %Resolution{
+          package: "libssl-dev",
+          source: :repology,
+          project: "openssl",
+          repo: "debian_13"
+        }
+      }
+    }
+
+    plan = %HostKit.Plan{
+      changes: [
+        %Change{
+          action: :create,
+          resource_id: {:package, :openssl_dev},
+          after: package,
+          reason: :missing
+        }
+      ]
+    }
+
+    assert Format.format(plan) ==
+             String.trim_trailing("""
+             Plan: 1 to create, 0 to update, 0 to delete, 0 read errors, 0 unchanged
+             + package.openssl_dev
+               create missing
+               resolves to libssl-dev via repology (openssl/debian_13)
              """)
   end
 end

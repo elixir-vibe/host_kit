@@ -4,11 +4,13 @@ defmodule HostKit.Package.Repology.Client do
   alias HostKit.Package.Repology.Record
 
   @default_base_url "https://repology.org/api/v1"
+  @default_site_url "https://repology.org"
   @default_user_agent "host-kit package catalog resolver"
   @default_timeout 15_000
 
   @type option ::
           {:base_url, String.t()}
+          | {:site_url, String.t()}
           | {:user_agent, String.t()}
           | {:timeout, pos_integer()}
           | {:req_options, keyword()}
@@ -27,6 +29,26 @@ defmodule HostKit.Package.Repology.Client do
     opts
     |> request()
     |> Req.get(Keyword.merge(req_options(opts), url: "/project/#{project}"))
+    |> decode_response({:list, Record})
+  rescue
+    error in [Req.TransportError, Req.HTTPError, Jason.DecodeError, JSONCodec.Error] ->
+      {:error, normalize_exception(error)}
+  end
+
+  @spec project_by_package(String.t(), String.t(), [option()]) ::
+          {:ok, [Record.t()]} | {:error, error()}
+  def project_by_package(repo, package, opts \\ []) when is_binary(repo) and is_binary(package) do
+    query =
+      URI.encode_query(%{
+        repo: repo,
+        name_type: "binname",
+        target_page: "api_v1_project",
+        name: package
+      })
+
+    opts
+    |> request(:site)
+    |> Req.get(Keyword.merge(req_options(opts), url: "/tools/project-by?#{query}"))
     |> decode_response({:list, Record})
   rescue
     error in [Req.TransportError, Req.HTTPError, Jason.DecodeError, JSONCodec.Error] ->
@@ -62,9 +84,9 @@ defmodule HostKit.Package.Repology.Client do
     end
   end
 
-  defp request(opts) do
+  defp request(opts, base \\ :api) do
     Req.new(
-      base_url: Keyword.get(opts, :base_url, @default_base_url),
+      base_url: base_url(opts, base),
       receive_timeout: Keyword.get(opts, :timeout, @default_timeout),
       retry: false,
       headers: [
@@ -73,6 +95,9 @@ defmodule HostKit.Package.Repology.Client do
       ]
     )
   end
+
+  defp base_url(opts, :api), do: Keyword.get(opts, :base_url, @default_base_url)
+  defp base_url(opts, :site), do: Keyword.get(opts, :site_url, @default_site_url)
 
   defp req_options(opts), do: Keyword.get(opts, :req_options, [])
 

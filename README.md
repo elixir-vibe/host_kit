@@ -80,7 +80,7 @@ HostKit can install OS packages through the target package manager. The DSL is d
 ```elixir
 service :bootstrap do
   package :ca_certificates
-  package :build_essential, package: "build-essential", manager: :apt, update: true
+  package :build_essential, as: "build-essential", update: true
 end
 ```
 
@@ -89,8 +89,8 @@ HostKit can also bootstrap `mise` and install system-wide tool versions. This is
 ```elixir
 service :bootstrap do
   mise path: "/usr/local/bin/mise", system_data_dir: "/usr/local/share/mise" do
-    mise_tool :erlang, "29.0.2"
-    mise_tool :elixir, "1.20.1"
+    tool :erlang, "29.0.2"
+    tool :elixir, "1.20.1"
   end
 end
 ```
