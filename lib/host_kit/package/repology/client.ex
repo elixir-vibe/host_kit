@@ -5,7 +5,7 @@ defmodule HostKit.Package.Repology.Client do
 
   @default_base_url "https://repology.org/api/v1"
   @default_site_url "https://repology.org"
-  @default_user_agent "host-kit package catalog resolver"
+  @default_user_agent "host_kit/0.1 (+https://github.com/elixir-vibe/host_kit/issues)"
   @default_timeout 15_000
 
   @type option ::
@@ -13,6 +13,7 @@ defmodule HostKit.Package.Repology.Client do
           | {:site_url, String.t()}
           | {:user_agent, String.t()}
           | {:timeout, pos_integer()}
+          | {:rate_limit, boolean()}
           | {:req_options, keyword()}
 
   @type error ::
@@ -25,6 +26,8 @@ defmodule HostKit.Package.Repology.Client do
   @spec project(String.t() | atom(), [option()]) :: {:ok, [Record.t()]} | {:error, error()}
   def project(project, opts \\ []) when is_binary(project) or is_atom(project) do
     project = project |> to_string() |> URI.encode()
+
+    :ok = HostKit.Package.Repology.RateLimit.wait(opts)
 
     opts
     |> request()
@@ -59,6 +62,8 @@ defmodule HostKit.Package.Repology.Client do
           {:ok, %{String.t() => [Record.t()]}} | {:error, error()}
   def projects(start \\ nil, opts \\ []) do
     url = if start, do: "/projects/#{URI.encode(start)}/", else: "/projects/"
+
+    :ok = HostKit.Package.Repology.RateLimit.wait(opts)
 
     opts
     |> request()

@@ -182,6 +182,7 @@ defmodule HostKit.Package.Resolver do
       :repology_site_url,
       :repology_user_agent,
       :repology_timeout,
+      :repology_rate_limit,
       :req_options
     ])
     |> Enum.map(fn
@@ -189,6 +190,7 @@ defmodule HostKit.Package.Resolver do
       {:repology_site_url, value} -> {:site_url, value}
       {:repology_user_agent, value} -> {:user_agent, value}
       {:repology_timeout, value} -> {:timeout, value}
+      {:repology_rate_limit, value} -> {:rate_limit, value}
       other -> other
     end)
   end

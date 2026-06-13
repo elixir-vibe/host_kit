@@ -27,6 +27,7 @@ defmodule HostKit.Package.Repology.ClientTest do
              Client.project(:openssl,
                base_url: "https://repology.test/api/v1",
                user_agent: "host-kit-test",
+               rate_limit: false,
                req_options: [adapter: adapter]
              )
 
@@ -59,6 +60,7 @@ defmodule HostKit.Package.Repology.ClientTest do
     assert {:ok, [%Record{srcname: "libxslt"}]} =
              Client.project_by_package("debian_13", "xsltproc",
                site_url: "https://repology.test",
+               rate_limit: false,
                req_options: [adapter: adapter]
              )
 
@@ -91,6 +93,7 @@ defmodule HostKit.Package.Repology.ClientTest do
     assert {:ok, ["libssl-dev", "openssl"]} =
              Client.package_names(:openssl, ~r/^debian_/,
                base_url: "https://repology.test/api/v1",
+               rate_limit: false,
                req_options: [adapter: adapter]
              )
   end
@@ -101,6 +104,7 @@ defmodule HostKit.Package.Repology.ClientTest do
     assert {:error, {:http_error, 429, "slow down"}} =
              Client.project(:openssl,
                base_url: "https://repology.test/api/v1",
+               rate_limit: false,
                req_options: [adapter: adapter]
              )
   end

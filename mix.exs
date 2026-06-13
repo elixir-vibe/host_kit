@@ -35,6 +35,7 @@ defmodule HostKit.MixProject do
       {:jason, "~> 1.4"},
       {:json_codec, "~> 0.1.4"},
       {:req, "~> 0.5"},
+      {:hammer, "~> 7.0"},
       {:dotenvy, "~> 1.1"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},

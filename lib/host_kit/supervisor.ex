@@ -11,6 +11,7 @@ defmodule HostKit.Supervisor do
   def init(opts) do
     children = [
       HostKit.Agent.State,
+      {HostKit.Package.Repology.RateLimit, Keyword.get(opts, :repology_rate_limit, [])},
       {HostKit.Agent.DriftWorker, Keyword.get(opts, :drift, [])},
       {HostKit.Agent.MonitorWorker, Keyword.get(opts, :monitor, [])}
     ]
