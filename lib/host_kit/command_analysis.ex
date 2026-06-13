@@ -2,7 +2,7 @@ defmodule HostKit.CommandAnalysis do
   @moduledoc "Static command dependency analysis for HostKit resources."
 
   alias HostKit.{Diagnostic, Diagnostics, Resource}
-  alias HostKit.Resources.{Command, Mise, Package, Shell, Source}
+  alias HostKit.Resources.{Command, Mise, Package, Readiness, Shell, Source}
 
   @baseline_commands MapSet.new(
                        ~w[base64 bash cd echo export false install mkdir printf pwd rm set sh sudo systemctl test true]
@@ -40,6 +40,10 @@ defmodule HostKit.CommandAnalysis do
     do: commands
 
   def required_command_refs(%Source{type: :git}), do: [%{name: "git"}]
+
+  def required_command_refs(%Readiness{checks: checks}) do
+    if Enum.any?(checks, &match?(%HostKit.Readiness.HTTP{}, &1)), do: [%{name: "curl"}], else: []
+  end
 
   def required_command_refs(_resource), do: []
 

@@ -82,7 +82,10 @@ target_host = inputs.target_host
 target_user = inputs.target_user
 target_sudo = inputs.target_sudo
 public_hostname = inputs.public_hostname
+source_repo = System.get_env("HOSTKIT_PHOENIX_SOURCE_GIT", "https://github.com/elixir-vibe/host_kit.git")
 source_ref = inputs.source_ref
+erlang_version = System.get_env("HOSTKIT_PHOENIX_ERLANG", "29.0.2")
+elixir_version = System.get_env("HOSTKIT_PHOENIX_ELIXIR", "1.20.1")
 app_port = inputs.app_port
 http_port = inputs.http_port
 site_address = ":#{http_port}"
@@ -144,9 +147,13 @@ project =
 
     elixir_app app_name,
       source: [
-        github: "elixir-vibe/host_kit",
+        git: source_repo,
         path: "examples/hello_phoenix",
         ref: source_ref
+      ],
+      runtime: [
+        erlang: erlang_version,
+        elixir: elixir_version
       ],
       phoenix: [
         host: public_hostname,

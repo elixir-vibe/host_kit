@@ -32,7 +32,7 @@ defmodule HostKit.Recipes.ElixirApp do
       package(:caddy, as: "caddy")
       package(:build_essential, as: "build-essential")
 
-      mise name: :beam do
+      mise name: :beam, packages: app.runtime.mise_packages do
         tool(:erlang, app.runtime.erlang)
         tool(:elixir, app.runtime.elixir)
       end
@@ -44,6 +44,7 @@ defmodule HostKit.Recipes.ElixirApp do
         set("MIX_ENV", "prod")
         set("PHX_HOST", app.phoenix.host)
         set("PORT", to_string(app.phoenix.port))
+        set("RELEASE_DISTRIBUTION", "none")
         set("SECRET_KEY_BASE", app.phoenix.secret_key_base)
       end
 
@@ -51,7 +52,8 @@ defmodule HostKit.Recipes.ElixirApp do
         git: app.source.repo,
         ref: app.source.ref,
         checkout: app.paths.source,
-        path: app.source.path
+        path: app.source.path,
+        dirty: :reset
       )
 
       mix(
@@ -88,9 +90,14 @@ defmodule HostKit.Recipes.ElixirApp do
         description("#{app.name} Elixir release")
         environment_file(app.paths.env)
         working_directory(app.paths.app_dir)
-        exec_start([app.paths.release_bin])
+        exec_start([app.paths.release_bin, "start"])
         restart(:on_failure)
         wanted_by(:multi_user)
+      end
+
+      ready app.commands.ready.name, timeout: app.health.timeout do
+        systemd(app.paths.service_unit, restart: true)
+        http(app.health.url, body: app.health.expect_body)
       end
 
       caddy_site app.service_name, app.caddy.host do
@@ -116,13 +123,15 @@ defmodule HostKit.Recipes.ElixirApp do
       source: normalize_source(source),
       runtime: %{
         erlang: Keyword.get(runtime, :erlang, @default_erlang),
-        elixir: Keyword.get(runtime, :elixir, @default_elixir)
+        elixir: Keyword.get(runtime, :elixir, @default_elixir),
+        mise_packages: Keyword.get(runtime, :mise_packages, mise_beam_packages())
       },
       phoenix: %{
         host: phoenix_host,
         port: Keyword.get(phoenix, :port, 4000),
         secret_key_base: secret_key_base(Keyword.get(phoenix, :secret_key_base, :generate))
       },
+      health: health(phoenix),
       caddy: %{
         host: Keyword.get(caddy, :host, phoenix_host)
       }
@@ -173,11 +182,41 @@ defmodule HostKit.Recipes.ElixirApp do
       source: %{name: command_name(app, :source)},
       deps: %{name: command_name(app, :deps)},
       assets: %{name: command_name(app, :assets)},
-      release: %{name: command_name(app, :release)}
+      release: %{name: command_name(app, :release)},
+      ready: %{name: command_name(app, :ready)}
+    }
+  end
+
+  defp health(phoenix) do
+    path = Keyword.get(phoenix, :health_path, "/health")
+    port = Keyword.get(phoenix, :port, 4000)
+
+    %{
+      path: path,
+      url: "http://127.0.0.1:#{port}#{path}",
+      expect_body: Keyword.get(phoenix, :health_body, "ok"),
+      timeout: Keyword.get(phoenix, :health_timeout, 60_000)
     }
   end
 
   defp command_name(app, step), do: "#{app.name}_#{step}"
+
+  defp mise_beam_packages do
+    [
+      :curl,
+      :ca_certificates,
+      :git,
+      :autoconf,
+      :make,
+      :gcc,
+      :perl,
+      :m4,
+      :openssl_dev,
+      :ncurses_dev,
+      :unzip,
+      :xsltproc
+    ]
+  end
 
   defp secret_key_base(:generate), do: Base.encode64(:crypto.strong_rand_bytes(64))
   defp secret_key_base(value), do: value

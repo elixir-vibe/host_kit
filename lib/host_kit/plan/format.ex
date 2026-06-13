@@ -86,6 +86,16 @@ defmodule HostKit.Plan.Format do
     ]
   end
 
+  defp format_details(%Change{after: %HostKit.Resources.Readiness{} = readiness}) do
+    [
+      "\n  checks: ",
+      Enum.map_join(readiness.checks, ", ", &format_readiness_check/1),
+      "\n  timeout: ",
+      to_string(readiness.timeout),
+      "ms"
+    ]
+  end
+
   defp format_details(%Change{after: %HostKit.Resources.Source{} = source}) do
     [
       "\n  type: ",
@@ -115,6 +125,23 @@ defmodule HostKit.Plan.Format do
   end
 
   defp format_details(_change), do: []
+
+  defp format_readiness_check(%HostKit.Readiness.Systemd{
+         unit: unit,
+         state: state,
+         restart: restart
+       }) do
+    restart = if restart, do: " restart", else: ""
+    "systemd #{unit} #{state}#{restart}"
+  end
+
+  defp format_readiness_check(%HostKit.Readiness.HTTP{url: url, expect_body: nil}) do
+    "http #{url}"
+  end
+
+  defp format_readiness_check(%HostKit.Readiness.HTTP{url: url, expect_body: body}) do
+    "http #{url} contains #{inspect(body)}"
+  end
 
   defp format_exec({command, args}), do: Enum.join([command | args], " ")
 

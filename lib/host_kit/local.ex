@@ -3,7 +3,20 @@ defmodule HostKit.Local do
 
   alias HostKit.{Caddy, Firewall, Proxy}
   alias HostKit.Reader.Helpers
-  alias HostKit.Resources.{Command, Directory, EnvFile, File, Mise, Package, Shell, Source, User}
+
+  alias HostKit.Resources.{
+    Command,
+    Directory,
+    EnvFile,
+    File,
+    Mise,
+    Package,
+    Readiness,
+    Shell,
+    Source,
+    User
+  }
+
   alias HostKit.Systemd
 
   @spec read(struct()) :: {:ok, struct() | nil} | {:error, term()}
@@ -74,6 +87,8 @@ defmodule HostKit.Local do
   def read(%Shell{} = desired), do: Helpers.read_run_resource(desired, [])
 
   def read(%Source{} = desired), do: HostKit.Source.Git.read(desired, [])
+
+  def read(%Readiness{} = desired), do: read_readiness(desired, [])
 
   def read(%Systemd.Service{name: name} = desired) do
     read_systemd_unit("/etc/systemd/system/#{name}", desired)
@@ -168,7 +183,14 @@ defmodule HostKit.Local do
   def read(%Source{} = desired, context),
     do: HostKit.Source.Git.read(desired, Map.get(context, :opts, []))
 
+  def read(%Readiness{} = desired, context),
+    do: read_readiness(desired, Map.get(context, :opts, []))
+
   def read(resource, _context), do: read(resource)
+
+  defp read_readiness(desired, opts) do
+    if HostKit.Readiness.current?(desired, opts), do: {:ok, desired}, else: {:ok, nil}
+  end
 
   defp read_file(path, context) do
     case Elixir.File.read(path) do

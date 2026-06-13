@@ -3,7 +3,20 @@ defmodule HostKit.Apply do
 
   alias HostKit.{Change, Firewall, Plan, Provider, Proxy, Resources, Runner, Systemd}
   alias HostKit.Package.Manager
-  alias Resources.{Command, Directory, EnvFile, File, Mise, Package, Shell, Source, User}
+
+  alias Resources.{
+    Command,
+    Directory,
+    EnvFile,
+    File,
+    Mise,
+    Package,
+    Readiness,
+    Shell,
+    Source,
+    User
+  }
+
   alias Runner.Ops
 
   @type result :: %{change: Change.t(), status: :dry_run | :applied | :skipped}
@@ -109,6 +122,11 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %Source{} = source} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn -> HostKit.Source.Git.apply(source, opts) end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Readiness{} = readiness} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> HostKit.Readiness.wait(readiness, opts) end)
   end
 
   defp apply_change(%Change{action: action, after: %EnvFile{} = env_file} = change, opts)
@@ -285,8 +303,8 @@ defmodule HostKit.Apply do
     end
   end
 
-  defp command_exec(%Command{exec: {command, args}, runtime: nil} = resource, _opts) do
-    {command, args, command_opts(resource)}
+  defp command_exec(%Command{exec: {command, args}, runtime: nil} = resource, opts) do
+    command_env(command, args, command_opts(resource), opts)
   end
 
   defp command_exec(%Command{exec: {command, args}, runtime: {:mise, name}} = resource, opts) do
@@ -298,7 +316,18 @@ defmodule HostKit.Apply do
       |> command_opts()
       |> Keyword.update(:env, mise_env(mise), &Map.merge(mise_env(mise), &1))
 
-    {mise.path, ["exec"] ++ tool_args ++ ["--", command | args], command_opts}
+    command_env(mise.path, ["exec"] ++ tool_args ++ ["--", command | args], command_opts, opts)
+  end
+
+  defp command_env(command, args, command_opts, opts) do
+    case {Keyword.get(opts, :sudo, false), Keyword.pop(command_opts, :env)} do
+      {true, {env, command_opts}} when is_map(env) and map_size(env) > 0 ->
+        env_args = Enum.map(env, fn {key, value} -> "#{key}=#{value}" end)
+        {"env", env_args ++ [command | args], command_opts}
+
+      _other ->
+        {command, args, command_opts}
+    end
   end
 
   defp command_opts(%Command{} = command) do

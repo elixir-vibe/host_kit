@@ -74,6 +74,20 @@ defmodule HostKit.ElixirAppRecipeTest do
                false
            end)
 
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Readiness{name: "hello_ready", checks: checks} ->
+               match?(
+                 [
+                   %HostKit.Readiness.Systemd{unit: "hello.service", restart: true},
+                   %HostKit.Readiness.HTTP{url: "http://127.0.0.1:4000/health", expect_body: "ok"}
+                 ],
+                 checks
+               )
+
+             _resource ->
+               false
+           end)
+
     assert Enum.any?(resources, &match?(%HostKit.Caddy.Site{host: "hello.example.com"}, &1))
   end
 end

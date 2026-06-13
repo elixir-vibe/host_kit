@@ -107,6 +107,30 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro ready(name, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Readiness.Scope.start(unquote(name), unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.add_resource(HostKit.DSL.Readiness.Scope.finish())
+    end
+  end
+
+  defmacro systemd(unit, opts \\ []) do
+    quote do
+      HostKit.DSL.Readiness.Scope.add_check(
+        HostKit.Readiness.Systemd.new(unquote(unit), unquote(opts))
+      )
+    end
+  end
+
+  defmacro http(url, opts \\ []) do
+    quote do
+      HostKit.DSL.Readiness.Scope.add_check(
+        HostKit.Readiness.HTTP.new(unquote(url), unquote(opts))
+      )
+    end
+  end
+
   defmacro secret(key, opts) do
     quote do
       HostKit.DSL.EnvFile.Scope.put_secret(unquote(key), unquote(opts))
