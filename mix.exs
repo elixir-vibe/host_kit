@@ -33,6 +33,7 @@ defmodule HostKit.MixProject do
 
   defp deps do
     [
+      {:pi_bridge, "== 0.6.17", only: :dev},
       {:systemdkit, path: "../systemdkit", override: true},
       {:unitctl, path: "../unitctl"},
       {:jason, "~> 1.4"},
@@ -40,6 +41,7 @@ defmodule HostKit.MixProject do
       {:req, "~> 0.5"},
       {:hammer, "~> 7.0"},
       {:dotenvy, "~> 1.1"},
+      {:bash, "~> 0.5.1"},
       {:ex_doc, "~> 0.38", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},

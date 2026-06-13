@@ -4,8 +4,7 @@ defmodule HostKit.ElixirAppRecipeTest do
   test "elixir_app recipe expands to ordinary HostKit resources" do
     defmodule ElixirAppRecipeProject do
       use HostKit.DSL,
-        providers: [HostKit.Providers.Caddy],
-        recipes: [HostKit.Recipes.ElixirApp]
+        providers: [HostKit.Providers.Caddy, HostKit.Providers.Elixir]
 
       def project do
         project :demo do

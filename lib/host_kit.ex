@@ -11,6 +11,12 @@ defmodule HostKit do
 
   alias HostKit.{Apply, Loader, Plan, Project, Target}
 
+  defmacro __using__(opts \\ []) do
+    quote do
+      use HostKit.DSL, unquote(opts)
+    end
+  end
+
   @doc "Loads a HostKit project from an `.exs` file."
   @spec load(Path.t(), keyword()) :: {:ok, Project.t()} | {:error, term()}
   def load(path, opts \\ []), do: Loader.load(path, opts)

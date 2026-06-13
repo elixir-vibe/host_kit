@@ -4,6 +4,7 @@ defmodule HostKit.Recipe do
   defmacro __using__(_opts) do
     quote do
       import HostKit.Recipe
+      import HostKit.Sigils
     end
   end
 

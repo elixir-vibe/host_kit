@@ -3,7 +3,7 @@ defmodule HostKit.Apply do
 
   alias HostKit.{Change, Firewall, Plan, Provider, Proxy, Resources, Runner, Systemd}
   alias HostKit.Package.Manager
-  alias Resources.{Command, Directory, EnvFile, File, Mise, Package, User}
+  alias Resources.{Command, Directory, EnvFile, File, Mise, Package, Shell, User}
   alias Runner.Ops
 
   @type result :: %{change: Change.t(), status: :dry_run | :applied | :skipped}
@@ -78,6 +78,11 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %Command{} = command} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn -> apply_command(command, opts) end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Shell{} = shell} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> apply_shell(shell, opts) end)
   end
 
   defp apply_change(%Change{action: action, after: %EnvFile{} = env_file} = change, opts)
@@ -185,18 +190,32 @@ defmodule HostKit.Apply do
     end
   end
 
-  defp command_creates(%Command{creates: nil}, _opts), do: :ok
+  defp apply_shell(%Shell{} = shell, opts) do
+    command = %Command{
+      name: shell.name,
+      exec: {"bash", ["-euo", "pipefail", "-c", shell.script.source]},
+      cwd: shell.cwd,
+      env: shell.env,
+      creates: shell.creates,
+      unless: shell.unless,
+      timeout: shell.timeout
+    }
 
-  defp command_creates(%Command{creates: path}, opts) do
+    apply_command(command, opts)
+  end
+
+  defp command_creates(%{creates: nil}, _opts), do: :ok
+
+  defp command_creates(%{creates: path}, opts) do
     case Ops.cmd(opts, "test", ["-e", path]) do
       :ok -> :skip
       {:error, _reason} -> :ok
     end
   end
 
-  defp command_unless(%Command{unless: nil}, _opts), do: :ok
+  defp command_unless(%{unless: nil}, _opts), do: :ok
 
-  defp command_unless(%Command{unless: shell}, opts) do
+  defp command_unless(%{unless: shell}, opts) do
     case Ops.cmd(opts, "sh", ["-c", shell]) do
       :ok -> :skip
       {:error, _reason} -> :ok

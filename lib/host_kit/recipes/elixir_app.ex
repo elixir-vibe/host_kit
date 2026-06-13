@@ -6,16 +6,23 @@ defmodule HostKit.Recipes.ElixirApp do
   @default_erlang "27.2"
   @default_elixir "1.18.2-otp-27"
 
-  defmacro mix(name, args, opts \\ []) do
+  defmacro mix(name, command_line, opts \\ []) do
     quote do
       command(
         unquote(name),
         unquote(opts)
         |> Keyword.put_new(:runtime, {:mise, :beam})
-        |> Keyword.put(:exec, ["mix" | unquote(args)])
+        |> Keyword.put(:exec, HostKit.Recipes.ElixirApp.mix_exec(unquote(command_line)))
       )
     end
   end
+
+  def mix_exec(%HostKit.CommandLine{} = command), do: {"mix", [command.command | command.args]}
+
+  def mix_exec(command) when is_binary(command),
+    do: command |> HostKit.CommandLine.parse!() |> mix_exec()
+
+  def mix_exec(args) when is_list(args), do: ["mix" | args]
 
   defrecipe elixir_app(name, opts) do
     app = __MODULE__.assigns(name, opts)
@@ -42,14 +49,14 @@ defmodule HostKit.Recipes.ElixirApp do
 
       git(
         app.commands.checkout.name,
-        ["clone", "--branch", app.source.ref, app.source.repo, app.paths.source],
+        "clone --branch #{app.source.ref} #{app.source.repo} #{app.paths.source}",
         creates: app.paths.source,
         timeout: 120_000
       )
 
       mix(
         app.commands.deps.name,
-        ["deps.get", "--only", "prod"],
+        ~SH"deps.get --only prod",
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
         timeout: 300_000
@@ -57,7 +64,7 @@ defmodule HostKit.Recipes.ElixirApp do
 
       mix(
         app.commands.assets.name,
-        ["assets.deploy"],
+        ~SH"assets.deploy",
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
         unless: "test ! -f mix.exs || ! grep -q assets.deploy mix.exs",
@@ -66,7 +73,7 @@ defmodule HostKit.Recipes.ElixirApp do
 
       mix(
         app.commands.release.name,
-        ["release"],
+        ~SH"release",
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
         creates: app.paths.release_bin,

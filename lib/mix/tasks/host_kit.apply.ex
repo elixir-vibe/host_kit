@@ -69,8 +69,17 @@ defmodule Mix.Tasks.HostKit.Apply do
     case Keyword.get(opts, :plan) do
       nil ->
         project = project || HostKit.load!(List.first(positional) || "infra/config.exs")
-        {:ok, plan} = HostKit.plan(project, plan_opts(opts, target_opts))
-        plan
+
+        case HostKit.plan(project, plan_opts(opts, target_opts)) do
+          {:ok, plan} ->
+            plan
+
+          {:error, %HostKit.Diagnostics{} = diagnostics} ->
+            Mix.raise(HostKit.Diagnostics.Format.format(diagnostics))
+
+          {:error, reason} ->
+            Mix.raise("HostKit plan failed: #{inspect(reason)}")
+        end
 
       artifact_path ->
         target_opts = expand_target_opts(target_opts)

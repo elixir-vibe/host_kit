@@ -18,6 +18,8 @@ defmodule HostKit.DSL do
       |> Keyword.get(:recipes, [])
       |> Enum.map(&Macro.expand(&1, __CALLER__))
 
+    import_sigils? = Keyword.get(opts, :sigils, true)
+
     provider_imports =
       plugins
       |> HostKit.Provider.dsl_modules()
@@ -34,10 +36,18 @@ defmodule HostKit.DSL do
         end
       end)
 
+    sigil_import =
+      if import_sigils? do
+        quote do
+          import HostKit.Sigils
+        end
+      end
+
     quote do
       HostKit.DSL.Scope.put_default_providers(unquote(plugins))
       import HostKit.DSL
       import HostKit.DSL.Systemd
+      unquote(sigil_import)
       unquote_splicing(provider_imports)
       unquote_splicing(recipe_imports)
     end
@@ -534,8 +544,18 @@ defmodule HostKit.DSL do
   end
 
   defmacro package(name, opts \\ []) do
+    source = HostKit.Source.from_caller(__CALLER__)
+
     quote do
-      HostKit.DSL.Scope.add_resource(HostKit.Resources.Package.new(unquote(name), unquote(opts)))
+      opts =
+        Keyword.update(
+          unquote(opts),
+          :meta,
+          %{source: unquote(Macro.escape(source))},
+          &Map.put(&1, :source, unquote(Macro.escape(source)))
+        )
+
+      HostKit.DSL.Scope.add_resource(HostKit.Resources.Package.new(unquote(name), opts))
     end
   end
 
@@ -552,16 +572,60 @@ defmodule HostKit.DSL do
   end
 
   defmacro command(name, opts) do
+    source = HostKit.Source.from_caller(__CALLER__)
+
     quote do
-      HostKit.DSL.Scope.add_resource(HostKit.Resources.Command.new(unquote(name), unquote(opts)))
+      opts =
+        Keyword.update(
+          unquote(opts),
+          :meta,
+          %{source: unquote(Macro.escape(source))},
+          &Map.put(&1, :source, unquote(Macro.escape(source)))
+        )
+
+      HostKit.DSL.Scope.add_resource(HostKit.Resources.Command.new(unquote(name), opts))
     end
   end
 
-  defmacro git(name, args, opts \\ []) do
+  defmacro run(name, command, opts \\ []) do
     quote do
-      command(unquote(name), Keyword.put(unquote(opts), :exec, ["git" | unquote(args)]))
+      command(unquote(name), Keyword.put(unquote(opts), :exec, unquote(command)))
     end
   end
+
+  defmacro git(name, command, opts \\ []) do
+    quote do
+      command(
+        unquote(name),
+        Keyword.put(unquote(opts), :exec, HostKit.DSL.git_exec(unquote(command)))
+      )
+    end
+  end
+
+  defmacro bash(name, script, opts \\ []) do
+    source = HostKit.Source.from_caller(__CALLER__)
+
+    quote do
+      opts =
+        Keyword.update(
+          unquote(opts),
+          :meta,
+          %{source: unquote(Macro.escape(source))},
+          &Map.put(&1, :source, unquote(Macro.escape(source)))
+        )
+
+      HostKit.DSL.Scope.add_resource(
+        HostKit.Resources.Shell.new(unquote(name), unquote(script), opts)
+      )
+    end
+  end
+
+  def git_exec(%HostKit.CommandLine{} = command), do: {"git", [command.command | command.args]}
+
+  def git_exec(command) when is_binary(command),
+    do: command |> HostKit.CommandLine.parse!() |> git_exec()
+
+  def git_exec(args) when is_list(args), do: ["git" | args]
 
   defmacro mise(opts \\ [], do: block) do
     quote do

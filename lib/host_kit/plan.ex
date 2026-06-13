@@ -20,7 +20,7 @@ defmodule HostKit.Plan do
             summary: %{},
             opts: []
 
-  @spec build(Project.t(), keyword()) :: {:ok, t()}
+  @spec build(Project.t(), keyword()) :: {:ok, t()} | {:error, HostKit.Diagnostics.t() | term()}
   def build(%Project{} = project, opts \\ []) do
     resources = Project.resources(project)
     opts = maybe_put_package_manager(resources, opts)

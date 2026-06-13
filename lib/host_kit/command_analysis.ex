@@ -2,10 +2,10 @@ defmodule HostKit.CommandAnalysis do
   @moduledoc "Static command dependency analysis for HostKit resources."
 
   alias HostKit.{Diagnostic, Diagnostics, Resource}
-  alias HostKit.Resources.{Command, Mise, Package}
+  alias HostKit.Resources.{Command, Mise, Package, Shell}
 
   @baseline_commands MapSet.new(
-                       ~w[base64 cd echo false install mkdir printf pwd rm sh sudo systemctl test true]
+                       ~w[base64 bash cd echo export false install mkdir printf pwd rm set sh sudo systemctl test true]
                      )
 
   @spec validate([struct()]) :: :ok | {:error, Diagnostics.t()}
@@ -31,6 +31,10 @@ defmodule HostKit.CommandAnalysis do
   @spec required_commands(struct()) :: [String.t()]
   def required_commands(%Command{exec: {command, _args}, runtime: {:mise, _name}}), do: [command]
   def required_commands(%Command{exec: {command, _args}}), do: [command]
+
+  def required_commands(%Shell{script: %HostKit.ShellScript{commands: commands}}),
+    do: Enum.map(commands, & &1.name)
+
   def required_commands(_resource), do: []
 
   defp required_command_diagnostics(resource, provided) do
@@ -46,6 +50,9 @@ defmodule HostKit.CommandAnalysis do
       code: :missing_command_provider,
       message: ~s(command "#{command}" is required but not provided),
       resource_id: Resource.id(resource),
+      file: get_in(resource.meta, [:source, :file]),
+      line: get_in(resource.meta, [:source, :line]),
+      column: get_in(resource.meta, [:source, :column]),
       details: %{command: command, required_by: Resource.id(resource)},
       hint:
         "Add `package :#{String.replace(command, "-", "_")}` or a resource with `provides: [\"#{command}\"]`."

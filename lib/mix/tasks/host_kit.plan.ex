@@ -48,9 +48,17 @@ defmodule Mix.Tasks.HostKit.Plan do
     project = HostKit.load!(path, require: Keyword.get_values(opts, :require))
 
     Options.with_target_opts(opts, project, fn target_opts ->
-      {:ok, plan} = HostKit.plan(project, plan_opts(opts, target_opts))
-      maybe_write_artifact(plan, opts, target_opts)
-      IO.puts(format_plan(plan, opts))
+      case HostKit.plan(project, plan_opts(opts, target_opts)) do
+        {:ok, plan} ->
+          maybe_write_artifact(plan, opts, target_opts)
+          IO.puts(format_plan(plan, opts))
+
+        {:error, %HostKit.Diagnostics{} = diagnostics} ->
+          Mix.raise(HostKit.Diagnostics.Format.format(diagnostics))
+
+        {:error, reason} ->
+          Mix.raise("HostKit plan failed: #{inspect(reason)}")
+      end
     end)
   end
 

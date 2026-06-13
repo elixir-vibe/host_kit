@@ -35,7 +35,7 @@ defmodule HostKit.Resources.Command do
       exec: opts |> Keyword.fetch!(:exec) |> normalize_exec(),
       runtime: Keyword.get(opts, :runtime),
       cwd: Keyword.get(opts, :cwd),
-      env: opts |> Keyword.get(:env, %{}) |> normalize_env(),
+      env: opts |> Keyword.get(:env, %{}) |> HostKit.Env.Normalize.string_map(),
       creates: Keyword.get(opts, :creates),
       unless: Keyword.get(opts, :unless),
       timeout: Keyword.get(opts, :timeout),
@@ -46,14 +46,11 @@ defmodule HostKit.Resources.Command do
 
   def id(%__MODULE__{name: name}), do: {:command, name}
 
+  defp normalize_exec(%HostKit.CommandLine{command: command, args: args}), do: {command, args}
+
+  defp normalize_exec(command) when is_binary(command),
+    do: command |> HostKit.CommandLine.parse!() |> normalize_exec()
+
   defp normalize_exec({command, args}), do: {to_string(command), Enum.map(args, &to_string/1)}
   defp normalize_exec([command | args]), do: normalize_exec({command, args})
-
-  defp normalize_env(env) when is_map(env) do
-    Map.new(env, fn {key, value} -> {to_string(key), to_string(value)} end)
-  end
-
-  defp normalize_env(env) when is_list(env) do
-    env |> Map.new() |> normalize_env()
-  end
 end
