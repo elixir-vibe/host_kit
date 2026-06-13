@@ -23,7 +23,7 @@ defmodule HostKit.DSL.EnvFile.Scope do
   def put_secret(key, opts) do
     source =
       if env = Keyword.get(opts, :env) do
-        {:env, env}
+        HostKit.Secret.env(env)
       else
         raise ArgumentError, "secret requires :env source"
       end

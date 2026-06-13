@@ -26,11 +26,10 @@ defmodule HostKit.Env do
 
   defp render_entry({:set, key, value}, _opts), do: {:ok, "#{key}=#{quote_value(value)}"}
 
-  defp render_entry({:secret, key, {:env, env_name}}, _opts) do
-    case System.fetch_env(env_name) do
-      {:ok, value} -> {:ok, "#{key}=#{quote_value(value)}"}
-      :error -> {:error, {:missing_secret_env, env_name}}
-    end
+  defp render_entry({:secret, key, %HostKit.Secret{} = secret}, _opts) do
+    {:ok, "#{key}=#{quote_value(HostKit.Secret.resolve!(secret))}"}
+  rescue
+    error in [System.EnvError] -> {:error, {:missing_secret_env, error.env}}
   end
 
   defp validate_dotenv(content) do

@@ -131,7 +131,16 @@ mix host_kit.apply --host prod \
   --plan host_kit.plan.json --confirm infra/config.exs
 ```
 
-`secret_env/1` records an environment-backed secret reference and resolves it only when opening the SSH connection. Raw SSH flags remain available as an escape hatch: `--remote`, `--user`, `--port`, `--identity-file`, `--password`, and `--password-env`.
+`secret_env/1` records an environment-backed secret reference and resolves it only at the control-plane boundary that needs the value. Use it for HostKit's own credentials, such as SSH passwords or future provider API tokens. Target application environment files use the env-file DSL, which is backed by the same secret reference type:
+
+```elixir
+env_file "/etc/app/app.env" do
+  set :mix_env, :prod
+  secret :database_url, env: "DATABASE_URL"
+end
+```
+
+Raw SSH flags remain available as an escape hatch: `--remote`, `--user`, `--port`, `--identity-file`, `--password`, and `--password-env`.
 
 For Linux integration testing, use Incus as the lightweight native container/VM backend:
 

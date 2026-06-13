@@ -1,7 +1,7 @@
 defmodule HostKit.Resources.EnvFile do
   @moduledoc "Desired dotenv-compatible env file with redacted secret entries."
 
-  @type source :: {:env, String.t()}
+  @type source :: HostKit.Secret.t()
   @type entry :: {:set, String.t(), String.t()} | {:secret, String.t(), source()}
   @type t :: %__MODULE__{
           path: String.t(),

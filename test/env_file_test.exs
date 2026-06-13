@@ -27,7 +27,7 @@ defmodule HostKit.EnvFileTest do
     assert env_file.entries == [
              {:set, "MIX_ENV", "prod"},
              {:set, "PORT", "4000"},
-             {:secret, "SECRET_KEY_BASE", {:env, "HOST_KIT_TEST_SECRET"}}
+             {:secret, "SECRET_KEY_BASE", HostKit.Secret.env("HOST_KIT_TEST_SECRET")}
            ]
   end
 
@@ -37,7 +37,7 @@ defmodule HostKit.EnvFileTest do
       entries: [
         {:set, "MIX_ENV", "prod"},
         {:set, "URL", "https://example.com/a?b=c&d=e"},
-        {:secret, "SECRET", {:env, "HOST_KIT_TEST_SECRET"}}
+        {:secret, "SECRET", HostKit.Secret.env("HOST_KIT_TEST_SECRET")}
       ]
     }
 
@@ -54,7 +54,7 @@ defmodule HostKit.EnvFileTest do
   test "missing secret envs fail rendering" do
     env_file = %HostKit.Resources.EnvFile{
       path: "/etc/app/env",
-      entries: [{:secret, "SECRET", {:env, "HOST_KIT_MISSING_SECRET"}}]
+      entries: [{:secret, "SECRET", HostKit.Secret.env("HOST_KIT_MISSING_SECRET")}]
     }
 
     assert HostKit.Env.render(env_file) ==
