@@ -241,6 +241,14 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro egress(opts) do
+    quote do
+      user = service_user()
+      policy = HostKit.Workspace.Egress.new(Keyword.put_new(unquote(opts), :user, user))
+      HostKit.DSL.Scope.update_current(:service, &put_in(&1.meta[:egress], policy))
+    end
+  end
+
   defmacro inside(do: block) do
     quote do
       HostKit.DSL.Scope.start_inside()

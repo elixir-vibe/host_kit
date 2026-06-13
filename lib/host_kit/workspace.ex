@@ -43,6 +43,22 @@ defmodule HostKit.Workspace do
     |> Enum.reduce_while({:ok, []}, &run_workspace_inside_monitors(&1, &2, project, opts))
   end
 
+  def start(project, owner, workspace, opts \\ []),
+    do: lifecycle(:restart, project, owner, workspace, opts)
+
+  def stop(project, owner, workspace, opts \\ []),
+    do: lifecycle(:stop, project, owner, workspace, opts)
+
+  def restart(project, owner, workspace, opts \\ []),
+    do: lifecycle(:restart, project, owner, workspace, opts)
+
+  def status(project, owner, workspace, opts \\ []) do
+    with {:ok, service} <-
+           workspace_service(project, owner, workspace, Keyword.get(opts, :service, :agent)) do
+      HostKit.Runtime.status(unit_name(service), opts)
+    end
+  end
+
   @spec inside_monitors(Project.t()) :: [map()]
   def inside_monitors(%Project{} = project) do
     project.services
@@ -51,6 +67,13 @@ defmodule HostKit.Workspace do
       |> Map.get(:inside_monitor, [])
       |> Enum.map(&%{workspace: service.meta[:workspace], service: service.name, check: &1})
     end)
+  end
+
+  defp lifecycle(action, project, owner, workspace, opts) do
+    with {:ok, service} <-
+           workspace_service(project, owner, workspace, Keyword.get(opts, :service, :agent)) do
+      apply(HostKit.Runtime, action, [unit_name(service), opts])
+    end
   end
 
   defp exec_via_unitctl(project, owner, workspace, argv, opts) do
@@ -107,6 +130,7 @@ defmodule HostKit.Workspace do
     end
   end
 
+  defp unit_name(service), do: "hk-ws-#{service.meta.identity_name}.service"
   defp service_user(service), do: service.meta.identity_name && "hk-#{service.meta.identity_name}"
 
   defp workspace_dir(service),

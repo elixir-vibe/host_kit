@@ -38,7 +38,10 @@ defmodule HostKit.Caddy.JSON do
 
   defp logs_for_sites(sites) do
     if Enum.any?(sites, &(get_in(&1.meta, [:logs, :driver]) == :caddy_access)) do
-      %{default_logger_name: "hostkit_caddy_access"}
+      %{
+        default_logger_name: "hostkit_caddy_access",
+        logger_names: %{hostkit_caddy_access: %{include: ["http.log.access"]}}
+      }
     end
   end
 
