@@ -213,6 +213,13 @@ HostKit.Agent.Systemd.service(
 )
 ```
 
+State snapshots can be written for audit/drift history:
+
+```elixir
+HostKit.State.write(plan, "/var/lib/host_kit/state/latest-plan.json")
+HostKit.State.read("/var/lib/host_kit/state/latest-plan.json")
+```
+
 This gives a clean two-layer supervision model: OTP inside the BEAM and systemd outside it.
 
 ## Firewall policy
