@@ -79,5 +79,12 @@ defmodule HostKit.Project do
     project.services
     |> Enum.flat_map(& &1.resources)
     |> Kernel.++(Firewall.policies(project))
+    |> Kernel.++(workspace_egress(project))
+  end
+
+  defp workspace_egress(project) do
+    project.services
+    |> Enum.map(& &1.meta[:egress])
+    |> Enum.reject(&is_nil/1)
   end
 end

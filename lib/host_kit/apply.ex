@@ -81,6 +81,14 @@ defmodule HostKit.Apply do
     apply_or_dry_run(change, opts, fn -> apply_firewall(firewall, opts) end)
   end
 
+  defp apply_change(
+         %Change{action: action, after: %HostKit.Workspace.Egress{} = egress} = change,
+         opts
+       )
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> apply_egress(egress, opts) end)
+  end
+
   defp apply_change(%Change{} = change, _opts),
     do: {:error, {:unsupported_resource, change.resource_id}}
 
@@ -127,6 +135,18 @@ defmodule HostKit.Apply do
          :ok <- write_file(path, content, opts),
          :ok <- chown(path, env_file.owner, env_file.group, opts) do
       chmod(path, env_file.mode, opts)
+    end
+  end
+
+  defp apply_egress(%HostKit.Workspace.Egress{user: user} = egress, opts) do
+    path =
+      Keyword.get(opts, :egress_dir, "/etc/nftables.d") |> Path.join("hostkit-egress-#{user}.nft")
+
+    with :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, Firewall.Nftables.render_egress(egress), opts),
+         :ok <- chown(path, "root", "root", opts),
+         :ok <- chmod(path, 0o644, opts) do
+      validate_firewall(path, opts)
     end
   end
 

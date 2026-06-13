@@ -4,10 +4,14 @@ defmodule HostKit.Workspace.Agent.UnixClient do
   @behaviour HostKit.Workspace.Agent.Client
 
   @impl true
-  def status(socket, opts), do: request(socket, :status, opts)
+  def status(socket, opts) do
+    with {:ok, {:ok, status}} <- request(socket, :status, opts), do: {:ok, status}
+  end
 
   @impl true
-  def exec(socket, argv, opts), do: request(socket, {:exec, argv}, opts)
+  def exec(socket, argv, opts) do
+    with {:ok, {:ok, result}} <- request(socket, {:exec, argv}, opts), do: {:ok, result}
+  end
 
   @impl true
   def run_checks(socket, checks, opts) do

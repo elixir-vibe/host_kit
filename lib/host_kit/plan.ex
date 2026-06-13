@@ -108,6 +108,10 @@ defmodule HostKit.Plan do
     )
   end
 
+  defp equivalent?(%HostKit.Workspace.Egress{} = desired, actual) do
+    Map.get(actual.meta, :content) == HostKit.Firewall.Nftables.render_egress(desired)
+  end
+
   defp equivalent?(%HostKit.Firewall{} = desired, actual) do
     Map.get(actual.meta, :content) == HostKit.Firewall.render(desired)
   end
