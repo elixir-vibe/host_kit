@@ -307,6 +307,13 @@ Extract log intent with:
 HostKit.Logs.configs(project)
 ```
 
+Read recent journald logs through local or remote targets:
+
+```elixir
+HostKit.Logs.read("toys-forgejo.service", target: prod, since: "1h")
+HostKit.Logs.tail("toys-forgejo.service", target: prod, lines: 100)
+```
+
 ## OpenTelemetry collection intent
 
 Observability defaults can be enabled once at project or service scope and inherited by resources:
