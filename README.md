@@ -369,11 +369,14 @@ caddy_site :web, "web.example.com" do
 end
 ```
 
-Extract checks with:
+Extract or run checks with:
 
 ```elixir
 HostKit.Monitor.checks(project)
+HostKit.Monitor.run(project, target: prod)
 ```
+
+Initial execution supports systemd state, HTTP status, and filesystem existence checks.
 
 ## File modes
 

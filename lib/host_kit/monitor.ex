@@ -1,8 +1,8 @@
 defmodule HostKit.Monitor do
   @moduledoc "Helpers for extracting monitoring declarations from HostKit projects."
 
-  alias HostKit.Monitor.Check
-  alias HostKit.Project
+  alias HostKit.Monitor.{Check, Result}
+  alias HostKit.{Project, Runner, Target}
 
   @spec check(atom(), keyword()) :: Check.t()
   def check(type, opts) when is_atom(type) do
@@ -19,10 +19,87 @@ defmodule HostKit.Monitor do
     |> Enum.flat_map(&resource_checks/1)
   end
 
+  @spec run(Project.t(), keyword()) :: {:ok, [Result.t()]} | {:error, term()}
+  def run(%Project{} = project, opts \\ []) do
+    project
+    |> checks()
+    |> Enum.map(&run_check(&1, opts))
+    |> then(&{:ok, &1})
+  end
+
   defp resource_checks(resource) do
     resource
     |> Map.get(:meta, %{})
     |> Map.get(:monitor, [])
     |> List.wrap()
+  end
+
+  defp run_check(%Check{type: :systemd} = check, opts) do
+    unit = check.target || unit_from_resource_id(check.resource_id)
+    target = Keyword.get(opts, :target, Target.local(:local))
+    runner = Keyword.get(opts, :runner, target.runner)
+
+    runner_opts =
+      target |> Target.opts(Keyword.get(opts, :runner_opts, [])) |> Keyword.delete(:runner)
+
+    case Runner.cmd(
+           runner,
+           "systemctl",
+           ["is-active", unit],
+           Keyword.put(runner_opts, :stderr_to_stdout, true)
+         ) do
+      {output, 0} when output in ["active", "active\n"] ->
+        Result.ok(check, %{state: :active, unit: unit})
+
+      {output, status} ->
+        Result.error(check, {:unexpected_state, String.trim(output)}, %{
+          status: status,
+          unit: unit
+        })
+    end
+  end
+
+  defp run_check(%Check{type: :http} = check, _opts) do
+    expected_status = get_in(check.expect, [:status]) || 200
+
+    with {:ok, status} <- http_status(check.target),
+         true <- status == expected_status do
+      Result.ok(check, %{status: status})
+    else
+      false -> Result.error(check, {:unexpected_status, expected_status}, %{})
+      {:error, reason} -> Result.error(check, reason)
+    end
+  end
+
+  defp run_check(%Check{type: :filesystem} = check, _opts) do
+    path = check.target || path_from_resource_id(check.resource_id)
+
+    if File.exists?(path) do
+      Result.ok(check, %{exists: true, path: path})
+    else
+      Result.error(check, :missing, %{exists: false, path: path})
+    end
+  end
+
+  defp run_check(%Check{} = check, _opts),
+    do: Result.error(check, {:unsupported_check_type, check.type})
+
+  defp unit_from_resource_id({:systemd_service, unit}), do: unit
+  defp unit_from_resource_id({:systemd_timer, unit}), do: unit
+  defp unit_from_resource_id(_resource_id), do: nil
+
+  defp path_from_resource_id({_type, path}) when is_binary(path), do: path
+  defp path_from_resource_id(_resource_id), do: nil
+
+  defp http_status(nil), do: {:error, :missing_url}
+
+  defp http_status(url) do
+    :inets.start()
+    :ssl.start()
+
+    case :httpc.request(:get, {String.to_charlist(url), []}, [], body_format: :binary) do
+      {:ok, {{_version, status, _reason}, _headers, _body}} -> {:ok, status}
+      {:error, reason} -> {:error, reason}
+    end
   end
 end
