@@ -56,6 +56,19 @@ defmodule HostKit.DSL.Systemd.Scope do
     end)
   end
 
+  def put_network_policy(opts) do
+    update_current(fn resource ->
+      resource
+      |> put_in([Access.key(:meta), :network_policy], Map.new(opts))
+      |> apply_network_policy(opts)
+    end)
+  end
+
+  def put_listen(port, opts) do
+    listen = %{port: port, on: HostKit.Net.Addr.normalize!(Keyword.get(opts, :on, :loopback))}
+    update_current(&update_in(&1.meta[:listen], fn values -> List.wrap(values) ++ [listen] end))
+  end
+
   def put_unit(values), do: update_current(&%{&1 | unit: merge_directives(&1.unit, values)})
   def put_unit(key, value), do: update_current(&%{&1 | unit: put_directive(&1.unit, key, value)})
 
@@ -130,6 +143,33 @@ defmodule HostKit.DSL.Systemd.Scope do
   end
 
   defp apply_log_directives(resource, _config), do: resource
+
+  defp apply_network_policy(%HostKit.Systemd.Service{} = resource, opts) do
+    service =
+      resource.service
+      |> put_network_directive(
+        :ip_address_deny,
+        Keyword.get(opts, :deny),
+        &HostKit.Net.Addr.systemd_deny/1
+      )
+      |> put_network_directive(
+        :ip_address_allow,
+        Keyword.get(opts, :allow),
+        &HostKit.Net.Addr.systemd_allow/1
+      )
+      |> Keyword.put_new(:restrict_address_families, "AF_INET AF_INET6 AF_UNIX")
+
+    %{resource | service: service}
+  end
+
+  defp apply_network_policy(resource, _opts), do: resource
+
+  defp put_network_directive(service, _key, nil, _fun), do: service
+
+  defp put_network_directive(service, key, values, fun) when is_list(values),
+    do: Keyword.put(service, key, Enum.map(values, fun))
+
+  defp put_network_directive(service, key, value, fun), do: Keyword.put(service, key, fun.(value))
 
   defp maybe_put_syslog_identifier(service, nil), do: service
 

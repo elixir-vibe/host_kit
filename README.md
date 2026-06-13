@@ -194,6 +194,24 @@ project :toys do
 end
 ```
 
+## Network addresses and policy
+
+Network addresses can use Elixir tuple forms and semantic aliases:
+
+```elixir
+listen 3000, on: :loopback
+listen 4000, on: {127, 0, 0, 1}
+network_policy deny: :all, allow: [:loopback, {10, 44, 0, 0, 24}]
+```
+
+Systemd services compile network policy to:
+
+```ini
+IPAddressDeny=any
+IPAddressAllow=localhost 10.44.0.0/24
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+```
+
 ## Log management intent
 
 Log management can be declared globally, per service, or on individual resources:

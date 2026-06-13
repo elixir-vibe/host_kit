@@ -247,6 +247,18 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro network_policy(opts) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_network_policy(unquote(opts))
+    end
+  end
+
+  defmacro listen(port, opts \\ []) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_listen(unquote(port), unquote(opts))
+    end
+  end
+
   defmacro monitor(type, opts \\ []) do
     quote do
       cond do
