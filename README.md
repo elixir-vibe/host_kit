@@ -131,6 +131,24 @@ mix host_kit.apply --host prod \
   --plan host_kit.plan.json --confirm infra/config.exs
 ```
 
+Plan artifacts are JSON and intended to be inspectable. Secret references are stored as references, not values, for example:
+
+```json
+{
+  "$type": "struct",
+  "module": "Elixir.HostKit.Secret",
+  "fields": {
+    "source": {
+      "$type": "tuple",
+      "items": [
+        {"$type": "atom", "value": "env"},
+        "HOSTKIT_SSH_PASSWORD"
+      ]
+    }
+  }
+}
+```
+
 `secret_env/1` records an environment-backed secret reference and resolves it only at the control-plane boundary that needs the value. Use it for HostKit's own credentials, such as SSH passwords or future provider API tokens. Target application environment files use the env-file DSL, which is backed by the same secret reference type:
 
 ```elixir
