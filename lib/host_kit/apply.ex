@@ -2,7 +2,7 @@ defmodule HostKit.Apply do
   @moduledoc "Applies supported HostKit plan changes."
 
   alias HostKit.{Change, Plan, Runner}
-  alias HostKit.Resources.{Directory, File, User}
+  alias HostKit.Resources.{Directory, EnvFile, File, User}
   alias HostKit.Systemd
 
   @type result :: %{change: Change.t(), status: :dry_run | :applied | :skipped}
@@ -57,6 +57,11 @@ defmodule HostKit.Apply do
     apply_or_dry_run(change, opts, fn -> apply_file(file, opts) end)
   end
 
+  defp apply_change(%Change{action: action, after: %EnvFile{} = env_file} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> apply_env_file(env_file, opts) end)
+  end
+
   defp apply_change(%Change{action: action, after: %Systemd.Service{} = service} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn ->
@@ -109,6 +114,15 @@ defmodule HostKit.Apply do
     args = args ++ Enum.flat_map(user.groups, &["--groups", &1])
 
     cmd(opts, "useradd", args ++ [name])
+  end
+
+  defp apply_env_file(%EnvFile{path: path} = env_file, opts) do
+    with {:ok, content} <- HostKit.Env.render(env_file, opts),
+         :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, content, opts),
+         :ok <- chown(path, env_file.owner, env_file.group, opts) do
+      chmod(path, env_file.mode, opts)
+    end
   end
 
   defp apply_systemd_unit(name, content, opts) do

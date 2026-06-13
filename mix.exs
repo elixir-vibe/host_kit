@@ -33,6 +33,7 @@ defmodule HostKit.MixProject do
       {:unitctl, path: "../unitctl"},
       {:jason, "~> 1.4"},
       {:json_codec, "~> 0.1.3"},
+      {:dotenvy, "~> 1.1"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},

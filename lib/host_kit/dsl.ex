@@ -67,7 +67,25 @@ defmodule HostKit.DSL do
 
   defmacro set(key, value) do
     quote do
-      HostKit.DSL.Scope.put_provider_config(unquote(key), unquote(value))
+      if HostKit.DSL.EnvFile.Scope.active?() do
+        HostKit.DSL.EnvFile.Scope.put_set(unquote(key), unquote(value))
+      else
+        HostKit.DSL.Scope.put_provider_config(unquote(key), unquote(value))
+      end
+    end
+  end
+
+  defmacro env_file(path, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.EnvFile.Scope.start(unquote(path), unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.add_resource(HostKit.DSL.EnvFile.Scope.finish())
+    end
+  end
+
+  defmacro secret(key, opts) do
+    quote do
+      HostKit.DSL.EnvFile.Scope.put_secret(unquote(key), unquote(opts))
     end
   end
 

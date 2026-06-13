@@ -3,7 +3,7 @@ defmodule HostKit.Local do
 
   alias HostKit.Caddy
   alias HostKit.Reader.Helpers
-  alias HostKit.Resources.{Directory, File, User}
+  alias HostKit.Resources.{Directory, EnvFile, File, User}
   alias HostKit.Systemd
 
   @spec read(struct()) :: {:ok, struct() | nil} | {:error, term()}
@@ -47,6 +47,10 @@ defmodule HostKit.Local do
       {:metadata, {:error, reason}} -> {:error, reason}
       {:content, {:error, reason}} -> {:error, reason}
     end
+  end
+
+  def read(%EnvFile{} = desired) do
+    Helpers.read_env_file(desired, &read/1)
   end
 
   def read(%Systemd.Service{name: name} = desired) do
@@ -111,6 +115,10 @@ defmodule HostKit.Local do
       {:metadata, {:error, reason}} -> {:error, reason}
       {:content, {:error, reason}} -> {:error, reason}
     end
+  end
+
+  def read(%EnvFile{} = desired, context) do
+    Helpers.read_env_file(desired, &read(&1, context))
   end
 
   def read(resource, _context), do: read(resource)

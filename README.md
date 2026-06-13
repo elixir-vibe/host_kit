@@ -194,6 +194,18 @@ project :toys do
 end
 ```
 
+## Env files and secrets
+
+HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time and env-file drift compares metadata only by default.
+
+```elixir
+env_file root_path(:config, "env"), owner: "root", group: service_user(), mode: 0o640 do
+  set :MIX_ENV, :prod
+  set :PORT, 4000
+  secret :SECRET_KEY_BASE, env: "SECRET_KEY_BASE"
+end
+```
+
 ## Runtime isolation
 
 HostKit uses shared runtime isolation structs for persistent systemd units and future transient Unitctl workloads:

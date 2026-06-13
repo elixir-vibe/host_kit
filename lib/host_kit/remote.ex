@@ -3,7 +3,7 @@ defmodule HostKit.Remote do
 
   alias HostKit.Caddy
   alias HostKit.{Reader.Helpers, Runner, Systemd}
-  alias HostKit.Resources.{Directory, File, User}
+  alias HostKit.Resources.{Directory, EnvFile, File, User}
 
   @spec read(struct(), map()) :: {:ok, struct() | nil} | {:error, term()}
   def read(%User{name: name} = desired, context) do
@@ -20,6 +20,10 @@ defmodule HostKit.Remote do
 
   def read(%File{} = desired, context) do
     Helpers.read_file(desired, &stat_metadata(&1, context), &read_file(&1, context))
+  end
+
+  def read(%EnvFile{} = desired, context) do
+    Helpers.read_env_file(desired, &read(&1, context))
   end
 
   def read(%Systemd.Service{name: name} = desired, context) do

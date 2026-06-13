@@ -22,6 +22,33 @@ defmodule HostKit.Reader.Helpers do
     end
   end
 
+  def read_env_file(%HostKit.Resources.EnvFile{path: path} = desired, read_fun) do
+    desired_file = %File{
+      path: path,
+      content: :redacted,
+      owner: desired.owner,
+      group: desired.group,
+      mode: desired.mode
+    }
+
+    case read_fun.(desired_file) do
+      {:ok, nil} ->
+        {:ok, nil}
+
+      {:ok, actual} ->
+        {:ok,
+         %HostKit.Resources.EnvFile{
+           desired
+           | owner: actual.owner,
+             group: actual.group,
+             mode: actual.mode
+         }}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   def read_file(%File{path: path} = desired, stat_fun, read_fun) do
     with {:metadata, {:ok, %{type: :regular} = metadata}} <- {:metadata, stat_fun.(path)},
          {:content, {:ok, content}} <- {:content, read_fun.(path)} do
