@@ -6,8 +6,9 @@ defmodule HostKit.Workspace do
   @spec exec(Project.t(), atom(), atom(), [String.t()], keyword()) ::
           {:ok, term()} | {:error, term()}
   def exec(%Project{} = project, owner, workspace, argv, opts \\ []) do
-    with {:ok, spec} <- exec_spec(project, owner, workspace, argv, opts) do
-      Runtime.start(spec)
+    case Keyword.get(opts, :via, :unitctl) do
+      :agent -> exec_via_agent(project, owner, workspace, argv, opts)
+      :unitctl -> exec_via_unitctl(project, owner, workspace, argv, opts)
     end
   end
 
@@ -33,14 +34,13 @@ defmodule HostKit.Workspace do
     end
   end
 
-  @spec run_inside_monitors(Project.t(), keyword()) :: {:ok, [Monitor.Result.t()]}
-  def run_inside_monitors(%Project{} = project, _opts \\ []) do
-    results =
-      project
-      |> inside_monitors()
-      |> Enum.map(fn %{check: check} -> Monitor.Result.error(check, :pending_workspace_agent) end)
-
-    {:ok, results}
+  @spec run_inside_monitors(Project.t(), keyword()) ::
+          {:ok, [Monitor.Result.t()]} | {:error, term()}
+  def run_inside_monitors(%Project{} = project, opts \\ []) do
+    project
+    |> inside_monitors()
+    |> Enum.group_by(& &1.workspace)
+    |> Enum.reduce_while({:ok, []}, &run_workspace_inside_monitors(&1, &2, project, opts))
   end
 
   @spec inside_monitors(Project.t()) :: [map()]
@@ -53,6 +53,44 @@ defmodule HostKit.Workspace do
     end)
   end
 
+  defp exec_via_unitctl(project, owner, workspace, argv, opts) do
+    with {:ok, spec} <- exec_spec(project, owner, workspace, argv, opts) do
+      Runtime.start(spec)
+    end
+  end
+
+  defp exec_via_agent(project, owner, workspace, argv, opts) do
+    with {:ok, service} <-
+           workspace_service(project, owner, workspace, Keyword.get(opts, :service, :agent)),
+         {:ok, socket} <- agent_socket(service) do
+      HostKit.Workspace.Agent.Client.exec(socket, argv, opts)
+    end
+  end
+
+  defp run_workspace_inside_monitors({workspace, monitors}, {:ok, results}, project, opts) do
+    checks = Enum.map(monitors, & &1.check)
+
+    with {:ok, service} <-
+           workspace_service(
+             project,
+             workspace.owner,
+             workspace.name,
+             Keyword.get(opts, :service, :agent)
+           ),
+         {:ok, socket} <- agent_socket(service),
+         {:ok, workspace_results} <-
+           HostKit.Workspace.Agent.Client.run_checks(socket, checks, opts) do
+      {:cont, {:ok, results ++ workspace_results}}
+    else
+      {:error, :workspace_service_not_found} ->
+        pending = Enum.map(checks, &Monitor.Result.error(&1, :pending_workspace_agent))
+        {:cont, {:ok, results ++ pending}}
+
+      {:error, reason} ->
+        {:halt, {:error, reason}}
+    end
+  end
+
   defp workspace_service(project, owner, workspace, service_name) do
     Enum.find_value(project.services, {:error, :workspace_service_not_found}, fn service ->
       case service.meta[:workspace] do
@@ -60,6 +98,13 @@ defmodule HostKit.Workspace do
         _workspace -> nil
       end
     end)
+  end
+
+  defp agent_socket(service) do
+    case service.meta[:agent_socket] do
+      nil -> {:error, :missing_workspace_agent_socket}
+      socket -> {:ok, socket}
+    end
   end
 
   defp service_user(service), do: service.meta.identity_name && "hk-#{service.meta.identity_name}"
