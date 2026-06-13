@@ -543,8 +543,24 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro source(name, opts) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
+    quote do
+      opts =
+        Keyword.update(
+          unquote(opts),
+          :meta,
+          %{source: unquote(Macro.escape(source))},
+          &Map.put(&1, :source, unquote(Macro.escape(source)))
+        )
+
+      HostKit.DSL.Scope.add_resource(HostKit.Resources.Source.new(unquote(name), opts))
+    end
+  end
+
   defmacro package(name, opts \\ []) do
-    source = HostKit.Source.from_caller(__CALLER__)
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
 
     quote do
       opts =
@@ -572,7 +588,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro command(name, opts) do
-    source = HostKit.Source.from_caller(__CALLER__)
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
 
     quote do
       opts =
@@ -603,7 +619,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro bash(name, script, opts \\ []) do
-    source = HostKit.Source.from_caller(__CALLER__)
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
 
     quote do
       opts =

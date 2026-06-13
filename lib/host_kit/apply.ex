@@ -3,7 +3,7 @@ defmodule HostKit.Apply do
 
   alias HostKit.{Change, Firewall, Plan, Provider, Proxy, Resources, Runner, Systemd}
   alias HostKit.Package.Manager
-  alias Resources.{Command, Directory, EnvFile, File, Mise, Package, Shell, User}
+  alias Resources.{Command, Directory, EnvFile, File, Mise, Package, Shell, Source, User}
   alias Runner.Ops
 
   @type result :: %{change: Change.t(), status: :dry_run | :applied | :skipped}
@@ -83,6 +83,11 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %Shell{} = shell} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn -> apply_shell(shell, opts) end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Source{} = source} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> HostKit.Source.Git.apply(source, opts) end)
   end
 
   defp apply_change(%Change{action: action, after: %EnvFile{} = env_file} = change, opts)

@@ -1,4 +1,4 @@
-defmodule HostKit.Source do
+defmodule HostKit.SourceLocation do
   @moduledoc "Source location metadata for HostKit DSL resources."
 
   @type t :: %{file: String.t() | nil, line: pos_integer() | nil, column: pos_integer() | nil}

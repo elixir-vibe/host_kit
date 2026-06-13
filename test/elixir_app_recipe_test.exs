@@ -37,10 +37,19 @@ defmodule HostKit.ElixirAppRecipeTest do
              &match?(%HostKit.Resources.EnvFile{path: "/etc/hostkit/hello.env"}, &1)
            )
 
-    assert Enum.any?(
-             resources,
-             &match?(%HostKit.Resources.Command{name: "hello_checkout", exec: {"git", _}}, &1)
-           )
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Source{
+               name: "hello_source",
+               uri: "https://github.com/elixir-vibe/host_kit.git",
+               ref: "main",
+               checkout: "/opt/hostkit/apps/hello/source",
+               path: "examples/hello_phoenix"
+             } ->
+               true
+
+             _resource ->
+               false
+           end)
 
     assert Enum.any?(resources, fn
              %HostKit.Resources.Command{

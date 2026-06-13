@@ -47,11 +47,11 @@ defmodule HostKit.Recipes.ElixirApp do
         set("SECRET_KEY_BASE", app.phoenix.secret_key_base)
       end
 
-      git(
-        app.commands.checkout.name,
-        "clone --branch #{app.source.ref} #{app.source.repo} #{app.paths.source}",
-        creates: app.paths.source,
-        timeout: 120_000
+      source(app.commands.source.name,
+        git: app.source.repo,
+        ref: app.source.ref,
+        checkout: app.paths.source,
+        path: app.source.path
       )
 
       mix(
@@ -142,8 +142,9 @@ defmodule HostKit.Recipes.ElixirApp do
   defp repo_url(source) do
     cond do
       url = Keyword.get(source, :url) -> url
+      git = Keyword.get(source, :git) -> git
       github = Keyword.get(source, :github) -> "https://github.com/#{github}.git"
-      true -> raise ArgumentError, "elixir_app source expects :url or :github"
+      true -> raise ArgumentError, "elixir_app source expects :url, :git, or :github"
     end
   end
 
@@ -164,7 +165,7 @@ defmodule HostKit.Recipes.ElixirApp do
 
   defp commands(app, _paths) do
     %{
-      checkout: %{name: command_name(app, :checkout)},
+      source: %{name: command_name(app, :source)},
       deps: %{name: command_name(app, :deps)},
       assets: %{name: command_name(app, :assets)},
       release: %{name: command_name(app, :release)}

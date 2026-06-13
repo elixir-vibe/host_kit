@@ -77,6 +77,24 @@ defmodule HostKit.Plan.Format do
     ]
   end
 
+  defp format_details(%Change{after: %HostKit.Resources.Source{} = source}) do
+    [
+      "\n  type: ",
+      Atom.to_string(source.type),
+      "\n  uri: ",
+      source.uri,
+      "\n  ref: ",
+      source.ref,
+      " (",
+      Atom.to_string(source.ref_kind),
+      ")",
+      format_source_revision(source.revision),
+      "\n  checkout: ",
+      source.checkout,
+      format_source_path(source.path)
+    ]
+  end
+
   defp format_details(%Change{after: %{meta: %{resolution: %Resolution{} = resolution}}}) do
     [
       "\n  resolves to ",
@@ -90,6 +108,12 @@ defmodule HostKit.Plan.Format do
   defp format_details(_change), do: []
 
   defp format_exec({command, args}), do: Enum.join([command | args], " ")
+
+  defp format_source_revision(nil), do: []
+  defp format_source_revision(revision), do: ["\n  resolved: ", revision]
+
+  defp format_source_path("."), do: []
+  defp format_source_path(path), do: ["\n  path: ", path]
 
   defp format_runtime(nil), do: []
   defp format_runtime({kind, name}), do: ["\n  runtime: ", to_string(kind), ".", to_string(name)]

@@ -4,7 +4,7 @@ defmodule HostKit.Plan do
   alias HostKit.Addr
   alias HostKit.{Change, Project, Resource}
   alias HostKit.Package.{Manager, Resolver}
-  alias HostKit.Resources.{Capability, Package}
+  alias HostKit.Resources.{Capability, Package, Source}
 
   @type t :: %__MODULE__{
           project: Project.t(),
@@ -74,6 +74,8 @@ defmodule HostKit.Plan do
   defp resolve_resource(%Package{} = package, opts), do: Resolver.resolve(package, opts)
 
   defp resolve_resource(%Capability{} = capability, opts), do: Resolver.resolve(capability, opts)
+
+  defp resolve_resource(%Source{} = source, _opts), do: HostKit.Source.Git.resolve(source)
 
   defp resolve_resource(resource, _opts), do: {:ok, resource}
 
@@ -211,6 +213,11 @@ defmodule HostKit.Plan do
 
   defp equivalent?(%HostKit.Resources.EnvFile{} = desired, actual),
     do: comparable(desired, actual, [:path, :owner, :group, :mode])
+
+  defp equivalent?(%Source{} = desired, %Source{} = actual) do
+    comparable(desired, actual, [:type, :uri, :revision]) and
+      not Map.get(actual.meta, :dirty, false)
+  end
 
   defp equivalent?(%HostKit.Resources.User{} = desired, actual),
     do: comparable(desired, actual, [:name, :home, :shell, :groups])

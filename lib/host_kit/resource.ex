@@ -29,6 +29,7 @@ defmodule HostKit.Resource do
                       HostKit.Resources.Mise,
                       HostKit.Resources.Package,
                       HostKit.Resources.Shell,
+                      HostKit.Resources.Source,
                       HostKit.Resources.User,
                       HostKit.Secret,
                       HostKit.Service,
