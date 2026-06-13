@@ -48,6 +48,14 @@ defmodule HostKit.DSL.Systemd.Scope do
     update_current(&put_in(&1.meta[:telemetry], config))
   end
 
+  def put_logs(config) do
+    update_current(fn resource ->
+      resource
+      |> put_in([Access.key(:meta), :logs], config)
+      |> apply_log_directives(config)
+    end)
+  end
+
   def put_unit(values), do: update_current(&%{&1 | unit: merge_directives(&1.unit, values)})
   def put_unit(key, value), do: update_current(&%{&1 | unit: put_directive(&1.unit, key, value)})
 
@@ -107,6 +115,26 @@ defmodule HostKit.DSL.Systemd.Scope do
     Process.put(@timer_key, fun.(timer))
     :ok
   end
+
+  defp apply_log_directives(%HostKit.Systemd.Service{} = resource, config) when is_map(config) do
+    stdout = Map.get(config, :stdout, :journal)
+    stderr = Map.get(config, :stderr, :journal)
+
+    service =
+      resource.service
+      |> Keyword.put(:standard_output, stdout)
+      |> Keyword.put(:standard_error, stderr)
+      |> maybe_put_syslog_identifier(Map.get(config, :identifier))
+
+    %{resource | service: service}
+  end
+
+  defp apply_log_directives(resource, _config), do: resource
+
+  defp maybe_put_syslog_identifier(service, nil), do: service
+
+  defp maybe_put_syslog_identifier(service, identifier),
+    do: Keyword.put(service, :syslog_identifier, identifier)
 
   defp merge_directives(keywords, values) do
     Keyword.merge(keywords, normalize_values(values))

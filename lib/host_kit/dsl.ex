@@ -207,6 +207,16 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro logs(opts) do
+    quote do
+      if HostKit.DSL.Scope.observability_active?() do
+        HostKit.DSL.Scope.put_observability(:logs, HostKit.Logs.config(unquote(opts)))
+      else
+        HostKit.DSL.attach_logs(unquote(opts))
+      end
+    end
+  end
+
   def attach_telemetry(opts) do
     config = HostKit.Telemetry.config(opts)
 
@@ -219,6 +229,21 @@ defmodule HostKit.DSL do
 
       true ->
         HostKit.DSL.Scope.update_last_resource(&put_in(&1.meta[:telemetry], config))
+    end
+  end
+
+  def attach_logs(opts) do
+    config = HostKit.Logs.config(opts)
+
+    cond do
+      HostKit.DSL.Systemd.Scope.active?() ->
+        HostKit.DSL.Systemd.Scope.put_logs(config)
+
+      Code.ensure_loaded?(HostKit.Plugins.Caddy.Scope) and HostKit.Plugins.Caddy.Scope.active?() ->
+        HostKit.Plugins.Caddy.Scope.put_logs(config)
+
+      true ->
+        HostKit.DSL.Scope.update_last_resource(&put_in(&1.meta[:logs], config))
     end
   end
 

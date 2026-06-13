@@ -52,6 +52,10 @@ defmodule HostKit.Plugins.Caddy.Scope do
     update_site(&put_in(&1.meta[:telemetry], config))
   end
 
+  def put_logs(config) do
+    update_site(&put_in(&1.meta[:logs], config))
+  end
+
   defp append_directive(%Site{} = site, directive) do
     %{site | directives: site.directives ++ [directive]}
   end

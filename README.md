@@ -194,6 +194,34 @@ project :toys do
 end
 ```
 
+## Log management intent
+
+Log management can be declared globally, per service, or on individual resources:
+
+```elixir
+observability do
+  logs driver: :journald,
+       retention: "14d",
+       ship: true,
+       attributes: [deployment_environment: :prod]
+end
+```
+
+Systemd service log declarations also add unit directives:
+
+```elixir
+daemon unit_name() do
+  run exec_start: ["/usr/bin/env", "true"]
+  logs identifier: service_name(), stdout: :journal, stderr: :journal
+end
+```
+
+Extract log intent with:
+
+```elixir
+HostKit.Logs.configs(project)
+```
+
 ## OpenTelemetry collection intent
 
 Observability defaults can be enabled once at project or service scope and inherited by resources:
