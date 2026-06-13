@@ -12,6 +12,7 @@ defmodule HostKit.Resource do
                       HostKit.Caddy.Directive.Root,
                       HostKit.Caddy.Site,
                       HostKit.Change,
+                      HostKit.Apply.Event,
                       HostKit.CommandLine,
                       HostKit.Conventions,
                       HostKit.Diagnostic,

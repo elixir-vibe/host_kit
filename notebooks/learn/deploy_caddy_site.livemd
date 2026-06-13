@@ -231,20 +231,45 @@ If you used `password_env`, the artifact contains the environment variable name,
 ## Apply and start Caddy (explicit opt-in)
 
 ```elixir
+start_apply_log = fn ->
+  frame = Kino.Frame.new() |> Kino.render()
+
+  spawn(fn ->
+    loop = fn loop ->
+      receive do
+        {HostKit.Apply, event} ->
+          Kino.Frame.append(frame, HostKit.Apply.Event.format(event))
+          loop.(loop)
+
+        :stop ->
+          :ok
+      end
+    end
+
+    loop.(loop)
+  end)
+end
+
 restart_caddy = fn ->
   runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
 
   if host.sudo do
-    HostKit.Runner.cmd(runner, "sudo", ["systemctl", "restart", inputs.caddy_service_name], stderr_to_stdout: true)
+    HostKit.Runner.cmd(runner, "sudo", ["systemctl", "restart", caddy_service_name], stderr_to_stdout: true)
   else
-    HostKit.Runner.cmd(runner, "systemctl", ["restart", inputs.caddy_service_name], stderr_to_stdout: true)
+    HostKit.Runner.cmd(runner, "systemctl", ["restart", caddy_service_name], stderr_to_stdout: true)
   end
 end
 
 if inputs.apply do
-  with {:ok, results} <- HostKit.apply(plan, Keyword.merge(target_opts, confirm: true)),
-       {_output, 0} <- restart_caddy.() do
-    {:ok, results}
+  reporter = start_apply_log.()
+
+  try do
+    with {:ok, results} <- HostKit.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter)),
+         {_output, 0} <- restart_caddy.() do
+      {:ok, results}
+    end
+  after
+    send(reporter, :stop)
   end
 else
   {:skipped, "Check Apply changes above to modify the target"}

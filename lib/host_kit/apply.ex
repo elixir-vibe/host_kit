@@ -45,16 +45,33 @@ defmodule HostKit.Apply do
   end
 
   defp apply_changes(changes, opts) do
+    emit(opts, :apply_started)
+
     changes
     |> Enum.reduce_while({:ok, [], false}, fn change, {:ok, results, reload?} ->
+      report_change_start(change, opts)
+
       case apply_change(change, opts) do
-        {:ok, result} -> {:cont, {:ok, [result | results], reload? or systemd_change?(result)}}
-        {:error, reason} -> {:halt, {:error, {change.resource_id, reason}}}
+        {:ok, result} ->
+          report_change_result(change, result, opts)
+          {:cont, {:ok, [result | results], reload? or systemd_change?(result)}}
+
+        {:error, reason} ->
+          emit(opts, :change_failed, change: change, reason: reason)
+          {:halt, {:error, {change.resource_id, reason}}}
       end
     end)
     |> then(fn
-      {:ok, results, reload?} -> finish_apply(Enum.reverse(results), reload?, opts)
-      error -> error
+      {:ok, results, reload?} ->
+        results = Enum.reverse(results)
+
+        with {:ok, finished} <- finish_apply(results, reload?, opts) do
+          emit(opts, :apply_finished, result: %{results: finished})
+          {:ok, finished}
+        end
+
+      error ->
+        error
     end)
   end
 
@@ -142,6 +159,26 @@ defmodule HostKit.Apply do
   end
 
   defp apply_change(%Change{} = change, opts), do: apply_provider_change(change, opts)
+
+  defp report_change_start(%Change{action: action} = change, opts) when action in [:no_op, :read],
+    do: emit(opts, :change_skipped, change: change)
+
+  defp report_change_start(%Change{} = change, opts),
+    do: emit(opts, :change_started, change: change)
+
+  defp report_change_result(%Change{action: action}, _result, _opts)
+       when action in [:no_op, :read],
+       do: :ok
+
+  defp report_change_result(%Change{} = change, result, opts),
+    do: emit(opts, :change_finished, change: change, result: result)
+
+  defp emit(opts, type, attrs \\ []) do
+    case Keyword.get(opts, :reporter) do
+      pid when is_pid(pid) -> send(pid, {__MODULE__, HostKit.Apply.Event.new(type, attrs)})
+      nil -> :ok
+    end
+  end
 
   defp apply_or_dry_run(change, opts, fun) do
     if Keyword.get(opts, :dry_run, false) do

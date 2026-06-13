@@ -197,9 +197,34 @@ artifact_path
 ## Apply
 
 ```elixir
+start_apply_log = fn ->
+  frame = Kino.Frame.new() |> Kino.render()
+
+  spawn(fn ->
+    loop = fn loop ->
+      receive do
+        {HostKit.Apply, event} ->
+          Kino.Frame.append(frame, HostKit.Apply.Event.format(event))
+          loop.(loop)
+
+        :stop ->
+          :ok
+      end
+    end
+
+    loop.(loop)
+  end)
+end
+
 apply_result =
   if inputs.apply do
-    HostKit.apply(plan, Keyword.merge(target_opts, confirm: true))
+    reporter = start_apply_log.()
+
+    try do
+      HostKit.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
+    after
+      send(reporter, :stop)
+    end
   else
     {:skipped, :apply_not_checked}
   end

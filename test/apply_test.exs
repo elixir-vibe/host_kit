@@ -13,6 +13,49 @@ defmodule HostKit.ApplyTest do
     assert Apply.run(plan) == {:error, :confirmation_required}
   end
 
+  test "reports apply lifecycle messages" do
+    path =
+      Path.join(System.tmp_dir!(), "host-kit-apply-events-#{System.unique_integer([:positive])}")
+
+    plan = %Plan{
+      changes: [
+        %Change{action: :no_op, resource_id: {:directory, "/already-there"}},
+        %Change{
+          action: :create,
+          resource_id: {:directory, path},
+          after: %Directory{path: path}
+        }
+      ]
+    }
+
+    assert {:ok, [%{status: :skipped}, %{status: :applied}]} =
+             Apply.run(plan, confirm: true, reporter: self())
+
+    assert_received {HostKit.Apply, %HostKit.Apply.Event{type: :apply_started}}
+
+    assert_received {HostKit.Apply,
+                     %HostKit.Apply.Event{
+                       type: :change_skipped,
+                       resource_id: {:directory, "/already-there"}
+                     }}
+
+    assert_received {HostKit.Apply,
+                     %HostKit.Apply.Event{
+                       type: :change_started,
+                       resource_id: {:directory, ^path}
+                     }}
+
+    assert_received {HostKit.Apply,
+                     %HostKit.Apply.Event{
+                       type: :change_finished,
+                       resource_id: {:directory, ^path}
+                     }}
+
+    assert_received {HostKit.Apply, %HostKit.Apply.Event{type: :apply_finished}}
+
+    Elixir.File.rm_rf!(path)
+  end
+
   test "dry-runs supported changes without touching filesystem" do
     path =
       Path.join(System.tmp_dir!(), "host-kit-apply-dry-run-#{System.unique_integer([:positive])}")
