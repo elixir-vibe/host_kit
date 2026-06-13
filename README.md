@@ -244,6 +244,23 @@ HostKit.Firewall.policies(project)
 HostKit.Firewall.Nftables.render(policy)
 ```
 
+## Named listeners
+
+Services can declare named listeners and reuse them from provider declarations:
+
+```elixir
+daemon unit_name() do
+  run exec_start: ["/usr/bin/env", "true"]
+  listen :http, port: 3000, on: :loopback
+end
+
+caddy_site :web, "web.example.com" do
+  reverse_proxy listener(:http)
+end
+```
+
+Named listeners are stored as service metadata and render Caddy upstreams like `127.0.0.1:3000` at the provider boundary.
+
 ## Network addresses and policy
 
 Network addresses can use Elixir tuple forms and semantic aliases:

@@ -273,10 +273,30 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro listen(port, opts \\ []) do
+  defmacro listen(name_or_port, opts \\ []) do
     quote do
-      HostKit.DSL.Systemd.Scope.put_listen(unquote(port), unquote(opts))
+      HostKit.DSL.attach_listener(unquote(name_or_port), unquote(opts))
     end
+  end
+
+  defmacro listener(name) do
+    quote do
+      HostKit.DSL.Scope.listener_upstream(unquote(name))
+    end
+  end
+
+  def attach_listener(name, opts) when is_atom(name) do
+    listener = HostKit.DSL.Scope.put_listener(name, opts)
+
+    if HostKit.DSL.Systemd.Scope.active?() do
+      HostKit.DSL.Systemd.Scope.put_listen(listener.port, on: listener.on)
+    end
+
+    listener
+  end
+
+  def attach_listener(port, opts) when is_integer(port) do
+    HostKit.DSL.Systemd.Scope.put_listen(port, opts)
   end
 
   defmacro monitor(type, opts \\ []) do

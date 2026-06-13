@@ -174,6 +174,24 @@ defmodule HostKit.DSL.Scope do
     |> Enum.map(fn {_name, volume} -> volume end)
   end
 
+  def put_listener(name, opts) do
+    listener = HostKit.Listener.new(name, opts)
+
+    update_current(:service, fn service ->
+      listeners = service.meta |> Map.get(:listeners, %{}) |> Map.put(name, listener)
+      %{service | meta: Map.put(service.meta, :listeners, listeners)}
+    end)
+
+    listener
+  end
+
+  def listener(name) do
+    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service.meta |> Map.get(:listeners, %{}) |> Map.fetch!(name)
+  end
+
+  def listener_upstream(name), do: name |> listener() |> HostKit.Listener.upstream()
+
   def update_current(:host, fun) do
     host = Process.get(@host_key) || raise "no HostKit host in scope"
     Process.put(@host_key, fun.(host))
