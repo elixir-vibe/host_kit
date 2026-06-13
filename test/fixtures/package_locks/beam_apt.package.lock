@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "target": null,
+  "packages": {
+    "autoconf": "autoconf",
+    "ca_certificates": "ca-certificates",
+    "curl": "curl",
+    "cxx_compiler": "g++",
+    "gcc": "gcc",
+    "git": "git",
+    "m4": "m4",
+    "make": "make",
+    "ncurses_dev": "libncurses-dev",
+    "openssl_dev": "libssl-dev",
+    "perl": "perl",
+    "unzip": "unzip",
+    "xsltproc": "xsltproc"
+  }
+}

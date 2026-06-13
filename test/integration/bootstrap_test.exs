@@ -65,7 +65,7 @@ defmodule HostKit.BootstrapIntegrationTest do
     assert {:ok, package_repo} =
              HostKit.Package.TargetRepo.detect(runner: {LimaRunner, vm: vm}, sudo: true)
 
-    package_lock = package_lock(package_repo)
+    package_lock = %{package_lock_fixture() | target: package_repo}
 
     erlang_version = System.get_env("HOSTKIT_ERLANG_VERSION", "29.0.2")
     elixir_version = System.get_env("HOSTKIT_ELIXIR_VERSION", "1.20.1")
@@ -131,25 +131,10 @@ defmodule HostKit.BootstrapIntegrationTest do
     cleanup(vm, "/tmp/hostkit-integration")
   end
 
-  defp package_lock(package_repo) do
-    [
-      ca_certificates: "ca-certificates",
-      curl: "curl",
-      git: "git",
-      autoconf: "autoconf",
-      make: "make",
-      gcc: "gcc",
-      cxx_compiler: "g++",
-      perl: "perl",
-      m4: "m4",
-      openssl_dev: "libssl-dev",
-      ncurses_dev: "libncurses-dev",
-      unzip: "unzip",
-      xsltproc: "xsltproc"
-    ]
-    |> Enum.reduce(%HostKit.Package.Lock{}, fn {name, package}, lock ->
-      HostKit.Package.Lock.put(lock, name, package, package_repo)
-    end)
+  defp package_lock_fixture do
+    "../fixtures/package_locks/beam_apt.package.lock"
+    |> Path.expand(__DIR__)
+    |> HostKit.Package.Lock.load!()
   end
 
   defp cleanup(vm, path) do

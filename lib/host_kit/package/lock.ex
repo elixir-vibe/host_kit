@@ -23,6 +23,14 @@ defmodule HostKit.Package.Lock do
     end
   end
 
+  @spec load!(Path.t()) :: t()
+  def load!(path) do
+    case load(path) do
+      {:ok, lock} -> lock
+      {:error, reason} -> raise ArgumentError, "could not load package lock: #{inspect(reason)}"
+    end
+  end
+
   @spec save(Path.t(), t()) :: :ok | {:error, term()}
   def save(path, %__MODULE__{} = lock) do
     content = lock |> dump() |> Jason.encode_to_iodata!(pretty: true)

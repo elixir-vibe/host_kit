@@ -27,6 +27,16 @@ defmodule HostKit.Package.LockTest do
              {:error, {:package_lock_target_mismatch, "debian_13", "fedora_42"}}
   end
 
+  test "loads package lock or raises" do
+    path = Path.join(System.tmp_dir!(), "host-kit-package-lock-#{System.unique_integer()}.json")
+    on_exit(fn -> File.rm(path) end)
+
+    lock = Lock.put(%Lock{}, :curl, "curl", "debian_13")
+
+    assert :ok = Lock.save(path, lock)
+    assert %Lock{packages: %{"curl" => "curl"}} = Lock.load!(path)
+  end
+
   test "rejects unsupported lock versions" do
     assert {:error, %JSONCodec.Error{path: [:version], reason: :unsupported_package_lock_version}} =
              Lock.from_map(%{"version" => 2, "target" => "debian_13", "packages" => %{}})
