@@ -44,6 +44,46 @@ defmodule HostKit.Plan.ArtifactTest do
     assert loaded.opts == []
   end
 
+  test "serializes secret references without resolved secret values" do
+    env_var = "HOSTKIT_PLAN_ARTIFACT_SECRET_#{System.unique_integer([:positive])}"
+    System.put_env(env_var, "super-secret-value")
+
+    on_exit(fn -> System.delete_env(env_var) end)
+
+    plan = %HostKit.Plan{
+      project: %HostKit.Project{
+        name: :demo,
+        hosts: [
+          %HostKit.Host{
+            name: :prod,
+            hostname: "example.test",
+            user: "root",
+            meta: %{ssh: [password: HostKit.Secret.env(env_var)]}
+          }
+        ]
+      },
+      resources: [],
+      changes: [],
+      summary: %{}
+    }
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "host-kit-secret-plan-#{System.unique_integer([:positive])}.json"
+      )
+
+    assert :ok = Artifact.save(path, plan)
+
+    content = File.read!(path)
+    assert content =~ env_var
+    refute content =~ "super-secret-value"
+
+    assert {:ok, loaded} = Artifact.load(path)
+    assert [%HostKit.Host{} = host] = loaded.project.hosts
+    assert host.meta.ssh[:password] == HostKit.Secret.env(env_var)
+  end
+
   test "loads user atoms as strings instead of creating atoms" do
     assert HostKit.Resource.load(%{
              "$type" => "atom",

@@ -152,6 +152,15 @@ HOSTKIT_INCUS_SUDO=true scripts/incus_integration_vm.sh ip
 
 Set `HOSTKIT_INCUS_TYPE=vm` to launch an Incus VM instead of the default container, and `HOSTKIT_INCUS_INSTANCE=name` to change the instance name. Run the remote CLI integration against Incus with `HOSTKIT_INTEGRATION_TOOL=incus`, or against a pre-existing host declared in `.exs` config with `HOSTKIT_INTEGRATION_TOOL=remote HOSTKIT_INTEGRATION_CONFIG=examples/integration_hosts.example.exs`.
 
+A real remote validation can use the same host config and a shell-provided secret:
+
+```sh
+HOSTKIT_SSH_PASSWORD='...' \
+HOSTKIT_INTEGRATION_TOOL=remote \
+HOSTKIT_INTEGRATION_CONFIG=examples/integration_hosts.example.exs \
+mix test test/integration/cli_remote_test.exs --include integration
+```
+
 ## Project-local DSLs
 
 Use `HostKit.ProjectDSL` in consuming projects to build local conventions without baking them into HostKit.
