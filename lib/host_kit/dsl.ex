@@ -328,6 +328,12 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro sandbox(profile, opts \\ []) do
+    quote do
+      HostKit.DSL.Systemd.Scope.apply_sandbox(unquote(profile), unquote(opts))
+    end
+  end
+
   defmacro network_policy(opts) do
     quote do
       HostKit.DSL.Systemd.Scope.put_network_policy(unquote(opts))

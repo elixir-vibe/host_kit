@@ -279,6 +279,29 @@ Extract them with:
 HostKit.Workspace.inside_monitors(project)
 ```
 
+## Workspace sandbox profiles
+
+Systemd-backed sandbox profiles can be applied inside daemons:
+
+```elixir
+workspace :blog, owner: :alice do
+  service :preview do
+    daemon unit_name() do
+      run exec_start: ["mix", "phx.server"]
+      sandbox :vibe_dev
+    end
+  end
+end
+```
+
+Profiles include `:vibe_dev`, `:strict_app`, and `:untrusted`, and can be overridden:
+
+```elixir
+sandbox :untrusted,
+  resources: [memory_max: "256M"],
+  sandbox: [private_network: false]
+```
+
 ## Workspace preview helper
 
 Workspace services can expose a preview route with a named listener and Caddy site:

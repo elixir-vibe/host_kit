@@ -8,6 +8,7 @@ defmodule HostKit.Runtime.Sandbox do
           no_new_privileges: boolean() | nil,
           private_tmp: boolean() | nil,
           private_devices: boolean() | nil,
+          private_network: boolean() | nil,
           protect_system: protect_system(),
           protect_home: boolean() | String.t() | nil,
           protect_clock: boolean() | nil,
@@ -30,6 +31,7 @@ defmodule HostKit.Runtime.Sandbox do
   defstruct no_new_privileges: nil,
             private_tmp: nil,
             private_devices: nil,
+            private_network: nil,
             protect_system: nil,
             protect_home: nil,
             protect_clock: nil,
@@ -64,6 +66,23 @@ defmodule HostKit.Runtime.Sandbox do
       protect_home: true,
       restrict_address_families: [:inet, :inet6, :unix]
     )
+  end
+
+  def profile(:vibe_dev) do
+    new(
+      no_new_privileges: true,
+      private_tmp: true,
+      protect_system: :full,
+      restrict_suid_sgid: true,
+      restrict_address_families: [:inet, :inet6, :unix]
+    )
+  end
+
+  def profile(:strict_app), do: profile(:strict_web)
+
+  def profile(:untrusted) do
+    %__MODULE__{} = strict_web = profile(:strict_web)
+    %__MODULE__{strict_web | private_network: true}
   end
 
   def profile(:strict_web) do

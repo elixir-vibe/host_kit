@@ -98,6 +98,28 @@ defmodule HostKit.DSL.Systemd.Scope do
   def put_install(key, value),
     do: update_current(&%{&1 | install: Keyword.put(&1.install, key, value)})
 
+  def apply_sandbox(profile, opts \\ []) do
+    sandbox =
+      profile
+      |> HostKit.Runtime.Sandbox.new()
+      |> Map.merge(Map.new(Keyword.get(opts, :sandbox, [])))
+
+    resources =
+      profile
+      |> HostKit.Runtime.Resources.new()
+      |> Map.merge(Map.new(Keyword.get(opts, :resources, [])))
+
+    values =
+      HostKit.Runtime.Sandbox.to_systemd_service_options(sandbox) ++
+        HostKit.Runtime.Resources.to_systemd_service_options(resources)
+
+    put_service(values)
+
+    update_current(
+      &put_in(&1.meta[:sandbox], %{profile: profile, sandbox: sandbox, resources: resources})
+    )
+  end
+
   def apply_hardening(:web_service) do
     update(:service, fn service ->
       hardened =
