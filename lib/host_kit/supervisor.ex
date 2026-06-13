@@ -8,9 +8,10 @@ defmodule HostKit.Supervisor do
   end
 
   @impl true
-  def init(_opts) do
+  def init(opts) do
     children = [
-      HostKit.Agent.State
+      HostKit.Agent.State,
+      {HostKit.Agent.MonitorWorker, Keyword.get(opts, :monitor, [])}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

@@ -196,11 +196,12 @@ end
 
 ## HostKit agent
 
-HostKit can run as a supervised OTP application. The supervision tree currently starts a small agent state process:
+HostKit can run as a supervised OTP application. The supervision tree currently starts agent state and a monitor worker:
 
 ```elixir
 HostKit.Agent.status()
 HostKit.Agent.configure(project: project, target: HostKit.Target.local(:prod))
+HostKit.Agent.run_monitor()
 ```
 
 HostKit can also declare its own outer systemd supervisor unit:

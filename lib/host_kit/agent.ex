@@ -9,6 +9,18 @@ defmodule HostKit.Agent do
   @spec configure(keyword()) :: :ok
   def configure(opts), do: State.configure(opts)
 
+  @spec snapshot() :: map()
+  def snapshot, do: State.snapshot()
+
+  @spec reset() :: :ok
+  def reset, do: State.reset()
+
+  @spec record_monitor(term()) :: :ok
+  def record_monitor(result), do: State.record_monitor(result)
+
+  @spec run_monitor(keyword()) :: {:ok, [HostKit.Monitor.Result.t()]} | {:error, term()}
+  def run_monitor(opts \\ []), do: HostKit.Agent.MonitorWorker.run_once(opts)
+
   @spec record_event(term()) :: :ok
   def record_event(event), do: State.record_event(event)
 end
