@@ -194,6 +194,19 @@ project :toys do
 end
 ```
 
+## File modes
+
+Mode values can be raw octal, semantic aliases, tuples, keywords, or capability lists:
+
+```elixir
+mode: :secret_group_file
+mode: {:rw, :r, nil}
+mode: [owner: :rw, group: :r]
+mode: [:setgid, :owner_rwx, :group_rwx, :other_rx]
+```
+
+Resources store normalized integer modes, so plan/apply remains simple.
+
 ## Env files and secrets
 
 HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time and env-file drift compares metadata only by default.

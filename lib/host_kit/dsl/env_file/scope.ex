@@ -8,7 +8,7 @@ defmodule HostKit.DSL.EnvFile.Scope do
       path: path,
       owner: Keyword.get(opts, :owner),
       group: Keyword.get(opts, :group),
-      mode: Keyword.get(opts, :mode, 0o640)
+      mode: opts |> Keyword.get(:mode, :secret_group_file) |> HostKit.Mode.normalize!()
     })
   end
 

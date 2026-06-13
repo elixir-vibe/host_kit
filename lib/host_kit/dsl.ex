@@ -207,7 +207,7 @@ defmodule HostKit.DSL do
         path: unquote(path),
         owner: Keyword.get(unquote(opts), :owner),
         group: Keyword.get(unquote(opts), :group),
-        mode: Keyword.get(unquote(opts), :mode)
+        mode: HostKit.Mode.normalize!(Keyword.get(unquote(opts), :mode))
       })
     end
   end
@@ -219,7 +219,7 @@ defmodule HostKit.DSL do
         content: Keyword.get(unquote(opts), :content),
         owner: Keyword.get(unquote(opts), :owner),
         group: Keyword.get(unquote(opts), :group),
-        mode: Keyword.get(unquote(opts), :mode)
+        mode: HostKit.Mode.normalize!(Keyword.get(unquote(opts), :mode))
       })
     end
   end

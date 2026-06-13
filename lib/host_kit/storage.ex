@@ -7,6 +7,7 @@ defmodule HostKit.Storage do
   @spec volume(atom(), keyword()) :: Volume.t()
   def volume(name, opts) when is_atom(name) do
     opts
+    |> Keyword.update(:mode, nil, &HostKit.Mode.normalize!/1)
     |> Keyword.put(:name, name)
     |> then(&struct!(Volume, &1))
   end
