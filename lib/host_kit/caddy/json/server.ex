@@ -5,7 +5,7 @@ defmodule HostKit.Caddy.JSON.Server do
 
   alias HostKit.Caddy.JSON.Route
 
-  defstruct listen: [], routes: []
+  defstruct listen: [], routes: [], logs: nil
 
-  @type t :: %__MODULE__{listen: [String.t()], routes: [Route.t()]}
+  @type t :: %__MODULE__{listen: [String.t()], routes: [Route.t()], logs: map() | nil}
 end

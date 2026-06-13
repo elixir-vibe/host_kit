@@ -95,6 +95,16 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro tenant(name, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Scope.put_tenant(unquote(name), unquote(opts))
+
+      workspace unquote(name), Keyword.put_new(unquote(opts), :owner, unquote(name)) do
+        unquote(block)
+      end
+    end
+  end
+
   defmacro host(name, opts \\ [], do: block) do
     quote do
       HostKit.DSL.Scope.start_host(unquote(name), unquote(opts))
@@ -122,6 +132,12 @@ defmodule HostKit.DSL do
   defmacro path_name(value) do
     quote do
       HostKit.DSL.Scope.set_service_path_name(unquote(value))
+    end
+  end
+
+  defmacro put_in_meta(key, value) do
+    quote do
+      HostKit.DSL.Scope.update_current(:service, &put_in(&1.meta[unquote(key)], unquote(value)))
     end
   end
 
@@ -263,6 +279,12 @@ defmodule HostKit.DSL do
           restart(:on_failure)
           wanted_by(:multi_user)
           listen(:agent, port: Keyword.get(unquote(opts), :port, 4173), on: :loopback)
+
+          put_in_meta(
+            :agent_socket,
+            Keyword.get(unquote(opts), :socket, "/run/hostkit/workspaces/#{service_user()}.sock")
+          )
+
           logs(identifier: service_user(), stdout: :journal, stderr: :journal)
           telemetry(logs: true, metrics: true, service_name: service_user())
           monitor(:systemd, expect: [state: :active], severity: :critical)

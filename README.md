@@ -279,6 +279,33 @@ Extract them with:
 HostKit.Workspace.inside_monitors(project)
 ```
 
+## Workspace execution and tenants
+
+Tenants can own workspaces:
+
+```elixir
+tenant :alice, quota: [memory: "4G"] do
+  agent port: 4173
+end
+```
+
+Workspace command specs can be built for transient execution:
+
+```elixir
+HostKit.Workspace.exec_spec(project, :alice, :blog, ["mix", "test"])
+HostKit.Workspace.exec(project, :alice, :blog, ["mix", "test"])
+```
+
+Inside monitors currently return `:pending_workspace_agent`, reserving execution for the sandbox agent boundary.
+
+## OpenTelemetry Collector config
+
+Telemetry declarations can be converted to an OpenTelemetry Collector config map:
+
+```elixir
+HostKit.OtelCollector.config(project, endpoint: "otel.example:4317")
+```
+
 ## Workspace sandbox profiles
 
 Systemd-backed sandbox profiles can be applied inside daemons:

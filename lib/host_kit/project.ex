@@ -1,11 +1,12 @@
 defmodule HostKit.Project do
   @moduledoc "Project-level declaration loaded from HostKit DSL files."
 
-  alias HostKit.{Conventions, Firewall, Provider, ProviderConfig, Service}
+  alias HostKit.{Conventions, Firewall, Provider, ProviderConfig, Service, Tenant}
 
   @type t :: %__MODULE__{
           name: atom(),
           hosts: [HostKit.Host.t()],
+          tenants: [Tenant.t()],
           services: [Service.t()],
           providers: [module()],
           provider_configs: %{optional(atom()) => ProviderConfig.t()},
@@ -15,6 +16,7 @@ defmodule HostKit.Project do
 
   defstruct name: nil,
             hosts: [],
+            tenants: [],
             services: [],
             providers: [],
             provider_configs: %{},
@@ -63,6 +65,10 @@ defmodule HostKit.Project do
 
   @spec add_host(t(), HostKit.Host.t()) :: t()
   def add_host(%__MODULE__{} = project, host), do: %{project | hosts: project.hosts ++ [host]}
+
+  @spec add_tenant(t(), Tenant.t()) :: t()
+  def add_tenant(%__MODULE__{} = project, tenant),
+    do: %{project | tenants: project.tenants ++ [tenant]}
 
   @spec add_service(t(), Service.t()) :: t()
   def add_service(%__MODULE__{} = project, service),

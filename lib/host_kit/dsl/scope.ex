@@ -82,6 +82,10 @@ defmodule HostKit.DSL.Scope do
     update_project(&Project.put_provider_config(&1, config))
   end
 
+  def put_tenant(name, opts) do
+    update_project(&Project.add_tenant(&1, HostKit.Tenant.new(name, opts)))
+  end
+
   def start_host(name, opts) do
     Process.put(@host_key, %Host{
       name: name,
@@ -120,7 +124,7 @@ defmodule HostKit.DSL.Scope do
   def start_workspace(name, opts) do
     workspace = %{
       name: name,
-      owner: Keyword.fetch!(opts, :owner),
+      owner: Keyword.get(opts, :owner, name),
       path_name: Keyword.get(opts, :path, name),
       identity: Keyword.get(opts, :identity)
     }

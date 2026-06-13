@@ -10,7 +10,11 @@ defmodule HostKit.Caddy.JSON do
       apps: %JSON.Apps{
         http: %JSON.HTTP{
           servers: %{
-            "srv0" => %JSON.Server{listen: [":443"], routes: Enum.map(sites, &route_for_site/1)}
+            "srv0" => %JSON.Server{
+              listen: [":443"],
+              routes: Enum.map(sites, &route_for_site/1),
+              logs: logs_for_sites(sites)
+            }
           }
         }
       }
@@ -31,6 +35,12 @@ defmodule HostKit.Caddy.JSON do
 
   @spec encode!(struct(), keyword()) :: String.t()
   def encode!(struct, opts \\ [pretty: true]), do: struct |> to_map() |> Jason.encode!(opts)
+
+  defp logs_for_sites(sites) do
+    if Enum.any?(sites, &(get_in(&1.meta, [:logs, :driver]) == :caddy_access)) do
+      %{default_logger_name: "hostkit_caddy_access"}
+    end
+  end
 
   defp handlers_for(site) do
     site.directives

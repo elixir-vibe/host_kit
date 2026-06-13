@@ -72,4 +72,13 @@ defmodule HostKit.CaddyJSONTest do
     assert %{"handler" => "vars", "root" => "/srv/toys/www/elixir.toys"} in handlers
     assert %{"browse" => nil, "handler" => "file_server"} in handlers
   end
+
+  test "includes access log marker when Caddy access logs are declared" do
+    site = %Site{name: :web, host: "web.example.com", meta: %{logs: %{driver: :caddy_access}}}
+
+    config = HostKit.Caddy.JSON.config_for_sites([site]) |> HostKit.Caddy.JSON.to_map()
+
+    assert get_in(config, ["apps", "http", "servers", "srv0", "logs", "default_logger_name"]) ==
+             "hostkit_caddy_access"
+  end
 end
