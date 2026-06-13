@@ -15,8 +15,14 @@ defmodule HostKit.Agent do
   @spec reset() :: :ok
   def reset, do: State.reset()
 
+  @spec record_plan(term()) :: :ok
+  def record_plan(result), do: State.record_plan(result)
+
   @spec record_monitor(term()) :: :ok
   def record_monitor(result), do: State.record_monitor(result)
+
+  @spec run_plan(keyword()) :: {:ok, HostKit.Plan.t()} | {:error, term()}
+  def run_plan(opts \\ []), do: HostKit.Agent.DriftWorker.run_once(opts)
 
   @spec run_monitor(keyword()) :: {:ok, [HostKit.Monitor.Result.t()]} | {:error, term()}
   def run_monitor(opts \\ []), do: HostKit.Agent.MonitorWorker.run_once(opts)

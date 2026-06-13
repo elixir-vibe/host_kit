@@ -11,6 +11,7 @@ defmodule HostKit.Supervisor do
   def init(opts) do
     children = [
       HostKit.Agent.State,
+      {HostKit.Agent.DriftWorker, Keyword.get(opts, :drift, [])},
       {HostKit.Agent.MonitorWorker, Keyword.get(opts, :monitor, [])}
     ]
 

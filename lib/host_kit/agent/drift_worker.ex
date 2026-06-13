@@ -1,5 +1,5 @@
-defmodule HostKit.Agent.MonitorWorker do
-  @moduledoc "Supervised worker for scheduled monitoring checks."
+defmodule HostKit.Agent.DriftWorker do
+  @moduledoc "Supervised worker for scheduled drift planning."
 
   use GenServer
 
@@ -9,11 +9,11 @@ defmodule HostKit.Agent.MonitorWorker do
     GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, __MODULE__))
   end
 
-  @spec run_once(keyword()) :: {:ok, [HostKit.Monitor.Result.t()]} | {:error, term()}
+  @spec run_once(keyword()) :: {:ok, HostKit.Plan.t()} | {:error, term()}
   def run_once(opts \\ []) do
     opts
-    |> run_monitor()
-    |> tap(&State.record_monitor/1)
+    |> run_plan()
+    |> tap(&State.record_plan/1)
   end
 
   @impl true
@@ -27,7 +27,7 @@ defmodule HostKit.Agent.MonitorWorker do
     {:noreply, Schedule.reschedule(state)}
   end
 
-  defp run_monitor(opts) do
+  defp run_plan(opts) do
     snapshot = State.snapshot()
 
     case snapshot.project do
@@ -35,10 +35,10 @@ defmodule HostKit.Agent.MonitorWorker do
         {:error, :agent_not_configured}
 
       project ->
-        monitor_opts =
-          opts |> Keyword.get(:monitor_opts, []) |> Keyword.put_new(:target, snapshot.target)
+        plan_opts =
+          opts |> Keyword.get(:plan_opts, []) |> Keyword.put_new(:target, snapshot.target)
 
-        HostKit.Monitor.run(project, monitor_opts)
+        HostKit.plan(project, plan_opts)
     end
   end
 end

@@ -201,6 +201,7 @@ HostKit can run as a supervised OTP application. The supervision tree currently 
 ```elixir
 HostKit.Agent.status()
 HostKit.Agent.configure(project: project, target: HostKit.Target.local(:prod))
+HostKit.Agent.run_plan()
 HostKit.Agent.run_monitor()
 ```
 

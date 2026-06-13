@@ -33,6 +33,10 @@ defmodule HostKit.Agent.State do
     GenServer.call(__MODULE__, :snapshot)
   end
 
+  def record_plan(result) do
+    GenServer.call(__MODULE__, {:record_plan, result})
+  end
+
   def record_monitor(result) do
     GenServer.call(__MODULE__, {:record_monitor, result})
   end
@@ -70,6 +74,15 @@ defmodule HostKit.Agent.State do
     {:reply, :ok, state}
   end
 
+  def handle_call({:record_plan, result}, _from, state) do
+    state =
+      state
+      |> Map.put(:last_plan, result)
+      |> put_event({:plan_completed, plan_summary(result)})
+
+    {:reply, :ok, state}
+  end
+
   def handle_call({:record_monitor, result}, _from, state) do
     state =
       state
@@ -99,6 +112,9 @@ defmodule HostKit.Agent.State do
 
   defp maybe_put(state, _key, nil), do: state
   defp maybe_put(state, key, value), do: Map.put(state, key, value)
+
+  defp plan_summary({:ok, plan}), do: plan.summary
+  defp plan_summary({:error, reason}), do: %{error: reason}
 
   defp monitor_summary({:ok, results}) do
     %{
