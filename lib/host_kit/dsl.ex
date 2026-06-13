@@ -346,6 +346,27 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro preview(name, opts) do
+    quote do
+      listen(unquote(name),
+        port: Keyword.fetch!(unquote(opts), :port),
+        on: Keyword.get(unquote(opts), :on, :loopback)
+      )
+
+      caddy_site unquote(name), Keyword.fetch!(unquote(opts), :domain) do
+        reverse_proxy(listener(unquote(name)))
+
+        monitor(:http,
+          url: "https://#{Keyword.fetch!(unquote(opts), :domain)}",
+          expect: [status: Keyword.get(unquote(opts), :status, 200)]
+        )
+
+        telemetry(logs: true, metrics: :http, service_name: to_string(unquote(name)))
+        logs(driver: :caddy_access, format: :json, ship: true)
+      end
+    end
+  end
+
   def attach_listener(name, opts) when is_atom(name) do
     listener = HostKit.DSL.Scope.put_listener(name, opts)
 

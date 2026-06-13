@@ -279,6 +279,24 @@ Extract them with:
 HostKit.Workspace.inside_monitors(project)
 ```
 
+## Workspace preview helper
+
+Workspace services can expose a preview route with a named listener and Caddy site:
+
+```elixir
+workspace :blog, owner: :alice do
+  service :preview do
+    daemon unit_name() do
+      run exec_start: ["mix", "phx.server"]
+    end
+
+    preview :http, port: 4000, domain: "alice-blog.dev.example.com"
+  end
+end
+```
+
+This expands to `listen :http`, a Caddy reverse proxy to that listener, an HTTP monitor, telemetry metadata, and Caddy access-log metadata.
+
 ## Workspace agent helper
 
 Workspaces can declare the default sandbox agent service as ordinary HostKit resources:
