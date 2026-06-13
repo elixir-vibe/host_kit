@@ -44,6 +44,10 @@ defmodule HostKit.DSL.Systemd.Scope do
     end)
   end
 
+  def put_telemetry(config) do
+    update_current(&put_in(&1.meta[:telemetry], config))
+  end
+
   def put_unit(values), do: update_current(&%{&1 | unit: merge_directives(&1.unit, values)})
   def put_unit(key, value), do: update_current(&%{&1 | unit: put_directive(&1.unit, key, value)})
 

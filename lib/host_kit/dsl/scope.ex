@@ -7,6 +7,7 @@ defmodule HostKit.DSL.Scope do
   @host_key {__MODULE__, :host}
   @service_key {__MODULE__, :service}
   @provider_config_key {__MODULE__, :provider_config}
+  @observability_key {__MODULE__, :observability}
 
   def start_project(name, opts) do
     Process.put(@project_key, Project.new(name, opts))
@@ -14,6 +15,25 @@ defmodule HostKit.DSL.Scope do
 
   def finish_project do
     Process.delete(@project_key) || raise "no HostKit project in scope"
+  end
+
+  def start_observability do
+    scope = if Process.get(@service_key), do: :service, else: :project
+    Process.put(@observability_key, scope)
+  end
+
+  def finish_observability do
+    Process.delete(@observability_key) || raise "no HostKit observability in scope"
+  end
+
+  def observability_active?, do: Process.get(@observability_key) != nil
+
+  def put_observability(kind, value) do
+    case Process.get(@observability_key) do
+      :project -> update_project(&put_observability_value(&1, kind, value))
+      :service -> update_current(:service, &put_observability_value(&1, kind, value))
+      nil -> raise "no HostKit observability in scope"
+    end
   end
 
   def put_providers(providers) do
@@ -168,6 +188,11 @@ defmodule HostKit.DSL.Scope do
 
         :ok
     end
+  end
+
+  defp put_observability_value(%{meta: meta} = parent, kind, value) do
+    observability = meta |> Map.get(:observability, %{}) |> Map.put(kind, value)
+    %{parent | meta: Map.put(meta, :observability, observability)}
   end
 
   defp storage_opts(opts) do

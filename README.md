@@ -194,6 +194,41 @@ project :toys do
 end
 ```
 
+## OpenTelemetry collection intent
+
+Observability defaults can be enabled once at project or service scope and inherited by resources:
+
+```elixir
+observability do
+  telemetry logs: true,
+            metrics: true,
+            traces: false,
+            attributes: [deployment_environment: :prod]
+end
+```
+
+Resource-level overrides are still available:
+
+```elixir
+daemon unit_name() do
+  run exec_start: ["/usr/bin/env", "true"]
+  telemetry logs: :journald, metrics: false, service_name: service_name()
+end
+```
+
+Extract collection intent with:
+
+```elixir
+HostKit.Telemetry.signals(project)
+```
+
+Systemd services and Caddy sites get default collection intent even without global defaults:
+
+```elixir
+# systemd: logs: :journald, metrics: :systemd
+# caddy: logs: :access, metrics: :http
+```
+
 ## Monitoring metadata
 
 Declarations can carry monitoring intent for a later monitoring service or config generator:

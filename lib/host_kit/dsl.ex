@@ -189,6 +189,39 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro observability(do: block) do
+    quote do
+      HostKit.DSL.Scope.start_observability()
+      unquote(block)
+      HostKit.DSL.Scope.finish_observability()
+    end
+  end
+
+  defmacro telemetry(opts) do
+    quote do
+      if HostKit.DSL.Scope.observability_active?() do
+        HostKit.DSL.Scope.put_observability(:telemetry, HostKit.Telemetry.config(unquote(opts)))
+      else
+        HostKit.DSL.attach_telemetry(unquote(opts))
+      end
+    end
+  end
+
+  def attach_telemetry(opts) do
+    config = HostKit.Telemetry.config(opts)
+
+    cond do
+      HostKit.DSL.Systemd.Scope.active?() ->
+        HostKit.DSL.Systemd.Scope.put_telemetry(config)
+
+      Code.ensure_loaded?(HostKit.Plugins.Caddy.Scope) and HostKit.Plugins.Caddy.Scope.active?() ->
+        HostKit.Plugins.Caddy.Scope.put_telemetry(config)
+
+      true ->
+        HostKit.DSL.Scope.update_last_resource(&put_in(&1.meta[:telemetry], config))
+    end
+  end
+
   defmacro monitor(type, opts \\ []) do
     quote do
       cond do
