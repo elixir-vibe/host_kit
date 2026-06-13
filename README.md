@@ -257,6 +257,28 @@ HostKit.apply(plan, confirm: true, nft_reload: true)
 
 Firewall policy is written to `/etc/nftables.d/hostkit.nft` by default and validated with `nft -c -f` before optional reload.
 
+## Workspace inside monitoring
+
+Workspace services can declare checks that are intended to run inside the sandbox later via a workspace agent:
+
+```elixir
+workspace :blog, owner: :alice do
+  service :preview do
+    inside do
+      monitor :mix, task: "test", every: "5m"
+      monitor :port, port: 4000
+      monitor :git, clean: true
+    end
+  end
+end
+```
+
+Extract them with:
+
+```elixir
+HostKit.Workspace.inside_monitors(project)
+```
+
 ## Workspace scope
 
 `workspace` scopes ordinary HostKit DSL for user sandboxes while keeping resources inspectable:

@@ -225,6 +225,20 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro inside(do: block) do
+    quote do
+      HostKit.DSL.Scope.start_inside()
+      unquote(block)
+      HostKit.DSL.Scope.finish_inside()
+    end
+  end
+
+  defmacro inside_monitor(type, opts \\ []) do
+    quote do
+      HostKit.DSL.Scope.add_inside_monitor(unquote(type), unquote(opts))
+    end
+  end
+
   defmacro telemetry(opts) do
     quote do
       if HostKit.DSL.Scope.observability_active?() do
@@ -310,6 +324,9 @@ defmodule HostKit.DSL do
   defmacro monitor(type, opts \\ []) do
     quote do
       cond do
+        HostKit.DSL.Scope.inside_active?() ->
+          HostKit.DSL.Scope.add_inside_monitor(unquote(type), unquote(opts))
+
         HostKit.DSL.Systemd.Scope.active?() ->
           HostKit.DSL.Systemd.Scope.put_monitor(unquote(type), unquote(opts))
 

@@ -7,6 +7,7 @@ defmodule HostKit.DSL.Scope do
   @host_key {__MODULE__, :host}
   @service_key {__MODULE__, :service}
   @workspace_key {__MODULE__, :workspace}
+  @inside_key {__MODULE__, :inside}
   @provider_config_key {__MODULE__, :provider_config}
   @observability_key {__MODULE__, :observability}
   @firewall_key {__MODULE__, :firewall}
@@ -129,6 +130,27 @@ defmodule HostKit.DSL.Scope do
 
   def finish_workspace do
     Process.delete(@workspace_key) || raise "no HostKit workspace in scope"
+    :ok
+  end
+
+  def start_inside do
+    Process.put(@inside_key, true)
+  end
+
+  def finish_inside do
+    Process.delete(@inside_key) || raise "no HostKit inside scope"
+    :ok
+  end
+
+  def inside_active?, do: Process.get(@inside_key) == true
+
+  def add_inside_monitor(type, opts) do
+    service =
+      Process.get(@service_key) || raise "inside monitors must be declared inside service/2"
+
+    check = HostKit.Monitor.check(type, opts)
+    monitors = service.meta |> Map.get(:inside_monitor, []) |> Kernel.++([check])
+    Process.put(@service_key, %{service | meta: Map.put(service.meta, :inside_monitor, monitors)})
     :ok
   end
 
