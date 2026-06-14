@@ -96,8 +96,8 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     archive = Path.join(System.tmp_dir!(), "hostkit-gatehouse-source-#{unique}.tgz")
     repo = "/tmp/hostkit-gatehouse-source-#{unique}.git"
 
-    File.rm_rf!(work)
-    File.rm_rf!(repo)
+    HostKit.SafeTmp.rm_rf!(work, "hostkit-gatehouse-source-")
+    HostKit.SafeTmp.rm_rf!(repo, "hostkit-gatehouse-source-")
     File.rm(archive)
     File.mkdir_p!(work)
 
@@ -144,7 +144,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     assert {_, 0} =
              sudo_cmd(host, runner, ["git", "config", "--global", "--add", "safe.directory", repo])
 
-    File.rm_rf!(work)
+    HostKit.SafeTmp.rm_rf!(work, "hostkit-gatehouse-source-")
     File.rm(archive)
     repo
   end

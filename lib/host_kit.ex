@@ -9,7 +9,7 @@ defmodule HostKit do
   structs that can be inspected and consumed through the runtime API.
   """
 
-  alias HostKit.{Apply, Loader, Plan, Project, Target}
+  alias HostKit.{Apply, Loader, Plan, Project, Rollback, Target}
 
   defmacro __using__(opts \\ []) do
     quote do
@@ -69,6 +69,13 @@ defmodule HostKit do
       {:error, reason} ->
         raise ArgumentError, "could not apply HostKit plan: #{inspect(reason)}"
     end
+  end
+
+  @doc "Rolls back applied changes that captured previous state."
+  @spec rollback([Apply.result()], keyword()) :: {:ok, [Rollback.result()]} | {:error, term()}
+  def rollback(results, opts \\ []) when is_list(results) do
+    opts = expand_target_opts(opts)
+    Rollback.run(results, opts)
   end
 
   @doc "Formats a HostKit plan for human-readable output."

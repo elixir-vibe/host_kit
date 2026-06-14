@@ -19,27 +19,43 @@ The deployment declaration lives directly in the notebook. The integration test 
 
 ## Demo settings
 
-Edit these values and re-run the notebook.
+A small target picker keeps notebook input separate from the HostKit declaration. Advanced SSH values come from ordinary environment variables.
 
 ```elixir
+settings_form =
+  Kino.Control.form(
+    [
+      server: Kino.Input.text("Server", default: System.get_env("HOSTKIT_TARGET_HOST", "127.0.0.1")),
+      user: Kino.Input.text("SSH user", default: System.get_env("HOSTKIT_TARGET_USER", "root")),
+      public_port: Kino.Input.number("Public port", default: 18_080),
+      message: Kino.Input.text("Message", default: "Deployed by HostKit"),
+      apply?: Kino.Input.checkbox("Apply now", default: false),
+      verify?: Kino.Input.checkbox("Verify after apply", default: false)
+    ],
+    submit: "Plan deployment"
+  )
+
+Kino.render(settings_form)
+settings = Kino.Control.await(settings_form)
+
 target = %{
-  host: System.get_env("HOSTKIT_TARGET_HOST", "127.0.0.1"),
-  user: System.get_env("HOSTKIT_TARGET_USER", "root"),
+  host: settings.server,
+  user: settings.user,
   sudo: true,
   ssh: [
-    port: 22,
-    identity_file: Path.expand("~/.ssh/id_ed25519"),
+    port: String.to_integer(System.get_env("HOSTKIT_TARGET_PORT", "22")),
+    identity_file: Path.expand(System.get_env("HOSTKIT_IDENTITY_FILE", "~/.ssh/id_ed25519")),
     silently_accept_hosts: true
   ]
 }
 
 site = %{
-  address: ":18080",
-  message: "Deployed by HostKit"
+  address: ":#{settings.public_port}",
+  message: settings.message
 }
 
-apply? = false
-verify? = false
+apply? = settings.apply?
+verify? = settings.verify?
 ```
 
 ```elixir

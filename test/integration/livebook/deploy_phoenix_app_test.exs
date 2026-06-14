@@ -75,7 +75,7 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
     on_exit(fn ->
       cleanup.("/tmp/#{deployment_name}")
       cleanup.(source_repo)
-      File.rm_rf(source_repo)
+      HostKit.SafeTmp.rm_rf!(source_repo, "hostkit-phoenix-source-")
       File.rm(artifact_path)
     end)
 
@@ -200,8 +200,8 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
     work = Path.join(System.tmp_dir!(), "hostkit-phoenix-work-#{unique}")
     archive = Path.join(System.tmp_dir!(), "hostkit-phoenix-source-#{unique}.tgz")
 
-    File.rm_rf!(work)
-    File.rm_rf!(repo)
+    HostKit.SafeTmp.rm_rf!(work, "hostkit-phoenix-work-")
+    HostKit.SafeTmp.rm_rf!(repo, "hostkit-phoenix-source-")
     File.rm(archive)
     File.mkdir_p!(Path.join(work, "examples"))
     File.cp_r!("examples/hello_phoenix", Path.join(work, "examples/hello_phoenix"))
@@ -227,7 +227,7 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
     assert {_, 0} =
              sudo_cmd(host, runner, ["git", "config", "--global", "--add", "safe.directory", repo])
 
-    File.rm_rf!(work)
+    HostKit.SafeTmp.rm_rf!(work, "hostkit-phoenix-work-")
     File.rm(archive)
     repo
   end
