@@ -117,6 +117,7 @@ The notebooks are self-contained and their deployment DSL cells are also exercis
 - [Deploy a Phoenix app Livebook](notebooks/learn/deploy_phoenix_app.livemd)
 - [CLI reference](guides/reference/cli.md)
 - [Full DSL/reference notes](guides/reference/full-reference.md)
+- [Internal architecture](guides/reference/internal-architecture.md)
 - [Changelog](CHANGELOG.md)
 
 ## Development
