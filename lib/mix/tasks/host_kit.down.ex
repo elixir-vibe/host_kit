@@ -72,14 +72,17 @@ defmodule Mix.Tasks.HostKit.Down do
   end
 
   defp load_plan_artifact!(path, target_opts) do
-    case HostKit.Plan.Artifact.load(path, target_opts) do
+    case HostKit.Plan.Artifact.load(path, expand_target_opts(target_opts)) do
       {:ok, plan} -> plan
       {:error, reason} -> Mix.raise("could not load HostKit plan artifact: #{inspect(reason)}")
     end
   end
 
   defp latest_plan_artifact!(opts, target_opts) do
-    run_opts = put_present(target_opts, :hostkit_runs_root, Keyword.get(opts, :runs_root))
+    run_opts =
+      target_opts
+      |> expand_target_opts()
+      |> put_present(:hostkit_runs_root, Keyword.get(opts, :runs_root))
 
     case HostKit.RunRecord.latest(run_opts) do
       {:ok, %{artifacts: %{"up_plan" => path}} = record} when is_binary(path) ->
@@ -99,6 +102,13 @@ defmodule Mix.Tasks.HostKit.Down do
     []
     |> put_filter(:only, Keyword.get_values(opts, :only))
     |> put_filter(:except, Keyword.get_values(opts, :except))
+  end
+
+  defp expand_target_opts(opts) do
+    case Keyword.pop(opts, :target) do
+      {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
+      {nil, opts} -> opts
+    end
   end
 
   defp put_filter(opts, _key, []), do: opts

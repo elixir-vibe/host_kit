@@ -52,7 +52,15 @@ defmodule Mix.Tasks.HostKit.Runs do
 
   defp run_opts(opts, target_opts) do
     target_opts
+    |> expand_target_opts()
     |> put_present(:hostkit_runs_root, Keyword.get(opts, :runs_root))
+  end
+
+  defp expand_target_opts(opts) do
+    case Keyword.pop(opts, :target) do
+      {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
+      {nil, opts} -> opts
+    end
   end
 
   defp format_records(records, opts) do

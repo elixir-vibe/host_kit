@@ -134,8 +134,16 @@ defmodule Mix.Tasks.HostKit.Plan do
 
   defp plan_opts(opts, target_opts) do
     target_opts
+    |> expand_target_opts()
     |> Keyword.put(:ignore, Options.ignored_resources(opts))
     |> put_package_lock(opts)
+  end
+
+  defp expand_target_opts(opts) do
+    case Keyword.pop(opts, :target) do
+      {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
+      {nil, opts} -> opts
+    end
   end
 
   defp put_package_lock(plan_opts, opts) do

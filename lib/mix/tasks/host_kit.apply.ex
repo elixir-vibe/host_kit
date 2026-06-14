@@ -214,7 +214,9 @@ defmodule Mix.Tasks.HostKit.Apply do
   end
 
   defp apply_opts(opts, target_opts) do
-    Keyword.merge(target_opts,
+    target_opts
+    |> expand_target_opts()
+    |> Keyword.merge(
       dry_run: Keyword.get(opts, :dry_run, false),
       confirm: Keyword.get(opts, :confirm, false),
       sudo: Keyword.get(opts, :sudo, Keyword.get(target_opts, :sudo, false)),
