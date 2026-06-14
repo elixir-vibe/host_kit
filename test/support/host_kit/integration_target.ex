@@ -63,8 +63,10 @@ defmodule HostKit.IntegrationTarget do
       script = Path.expand("../../../scripts/incus_integration_vm.sh", __DIR__)
       env = incus_env()
 
-      assert_cmd!(script, ["create"], env: env)
-      {ip, 0} = System.cmd(script, ["ip"], env: env, stderr_to_stdout: true)
+      timed("incus create", fn -> assert_cmd!(script, ["create"], env: env) end)
+
+      {ip, 0} =
+        timed("incus ip", fn -> System.cmd(script, ["ip"], env: env, stderr_to_stdout: true) end)
 
       host = %HostKit.Host{
         name: :integration,
@@ -160,10 +162,32 @@ defmodule HostKit.IntegrationTarget do
     end
   end
 
-  defp assert_cmd!(command, args, opts) do
-    case System.cmd(command, args, Keyword.put(opts, :stderr_to_stdout, true)) do
-      {_output, 0} -> :ok
-      {output, status} -> raise "command failed #{command}: #{status}\n#{output}"
+  defp timed(label, fun) do
+    started = System.monotonic_time(:millisecond)
+    IO.puts("[hostkit:integration-target] start #{label}")
+
+    try do
+      fun.()
+    after
+      duration = System.monotonic_time(:millisecond) - started
+      IO.puts("[hostkit:integration-target] finish #{label} #{duration}ms")
     end
   end
+
+  defp assert_cmd!(command, args, opts) do
+    command_opts = Keyword.put(opts, :stderr_to_stdout, true)
+    IO.puts("[hostkit:integration-target] exec #{command} #{Enum.join(args, " ")}")
+
+    case System.cmd(command, args, command_opts) do
+      {output, 0} ->
+        print_command_output(output)
+        :ok
+
+      {output, status} ->
+        raise "command failed #{command}: #{status}\n#{output}"
+    end
+  end
+
+  defp print_command_output(""), do: :ok
+  defp print_command_output(output), do: IO.puts(output)
 end

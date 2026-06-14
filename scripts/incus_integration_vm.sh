@@ -120,13 +120,21 @@ wait_ready() {
 }
 
 install_ssh() {
+  echo "[hostkit:incus] apt-get update" >&2
   incus_cmd exec "$INSTANCE_NAME" -- env DEBIAN_FRONTEND=noninteractive apt-get update
-  incus_cmd exec "$INSTANCE_NAME" -- env DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo ca-certificates curl
+  echo "[hostkit:incus] apt-get install openssh-server sudo ca-certificates curl git" >&2
+  incus_cmd exec "$INSTANCE_NAME" -- env DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo ca-certificates curl git
   incus_cmd exec "$INSTANCE_NAME" -- mkdir -p /root/.ssh
   incus_cmd exec "$INSTANCE_NAME" -- chmod 700 /root/.ssh
   incus_cmd file push "$PUBKEY" "$INSTANCE_NAME/root/.ssh/authorized_keys" --uid 0 --gid 0 --mode 0600
-  incus_cmd exec "$INSTANCE_NAME" -- systemctl enable --now ssh >/dev/null 2>&1 || \
-    incus_cmd exec "$INSTANCE_NAME" -- service ssh start
+
+  if incus_cmd exec "$INSTANCE_NAME" -- systemctl is-active --quiet ssh >/dev/null 2>&1; then
+    echo "[hostkit:incus] ssh already active" >&2
+    return 0
+  fi
+
+  echo "[hostkit:incus] start ssh" >&2
+  incus_cmd exec "$INSTANCE_NAME" -- sh -c 'timeout 30s systemctl enable --now ssh >/dev/null 2>&1 || service ssh start'
 }
 
 instance_ip() {
