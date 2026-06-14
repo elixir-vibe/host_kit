@@ -8,7 +8,7 @@ defmodule HostKit.GatehouseRecipeTest do
 
       project :edge do
         gatehouse_release :edge,
-          source: [git: "https://github.com/dannote/gatehouse.git", ref: "main"],
+          source: [git: "https://github.com/elixir-vibe/gatehouse.git", ref: "master"],
           release_path: "/opt/gatehouse",
           runtime: [erlang: "29.0.2", elixir: "1.20.1"]
       end

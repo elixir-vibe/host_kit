@@ -19,7 +19,7 @@ project :edge do
   end
 
   gatehouse_release :edge,
-    source: [github: "dannote/gatehouse", ref: "main"],
+    source: [github: "elixir-vibe/gatehouse", ref: "master"],
     release_path: "/opt/gatehouse"
 
   service :edge do
@@ -55,5 +55,7 @@ HOSTKIT_INTEGRATION_TOOL=incus \
 HOSTKIT_INCUS_INTEGRATION=1 \
 mix test test/integration/gatehouse_deploy_test.exs
 ```
+
+Source deploy mode clones the public `elixir-vibe/gatehouse` repository directly on the target and lets Mix resolve dependencies through normal package/Git sources.
 
 There is also an experimental `HOSTKIT_GATEHOUSE_DEPLOY_MODE=prebuilt` path that builds a local release and uploads it to the target. Use it only when the local build host is ABI-compatible with the target OS; otherwise the release ERTS may require a newer glibc than the target provides.

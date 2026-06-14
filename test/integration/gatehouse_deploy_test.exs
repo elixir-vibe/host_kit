@@ -28,9 +28,6 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     mode = System.get_env("HOSTKIT_GATEHOUSE_DEPLOY_MODE", "source")
     runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
 
-    source_repo =
-      if mode == "source", do: create_gatehouse_fixture_repo!(host, unique), else: nil
-
     cleanup.(root)
 
     if mode == "prebuilt" do
@@ -40,18 +37,12 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     on_exit(fn ->
       sudo_cmd(host, runner, ["systemctl", "stop", service_unit])
       cleanup.(root)
-
-      if source_repo do
-        cleanup.(source_repo)
-        HostKit.SafeTmp.rm_rf!(source_repo, "hostkit-gatehouse-source-")
-      end
     end)
 
     project =
       project(%{
         host: host,
         mode: mode,
-        source_repo: source_repo,
         release_path: release_path,
         config_path: config_path,
         state_path: state_path,
@@ -95,7 +86,6 @@ defmodule HostKit.Integration.GatehouseDeployTest do
   defp project(%{
          host: host,
          mode: mode,
-         source_repo: source_repo,
          release_path: release_path,
          config_path: config_path,
          state_path: state_path,
@@ -119,7 +109,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
 
         if unquote(mode) == "source" do
           gatehouse_release(:edge,
-            source: [git: unquote(source_repo), path: "gatehouse", ref: "main"],
+            source: [github: "elixir-vibe/gatehouse", path: ".", ref: "master"],
             release_path: unquote(release_path)
           )
         end
@@ -189,110 +179,6 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     case System.cmd("mix", args, cd: cwd, env: env, stderr_to_stdout: true) do
       {_output, 0} -> :ok
       {output, status} -> raise "mix #{Enum.join(args, " ")} failed with #{status}:\n#{output}"
-    end
-  end
-
-  # Fixture for exercising source deploys from the current Gatehouse checkout while
-  # the upstream repository is private to the target. End-user deployments should
-  # point Gatehouse at a normal reachable Git source and let Mix resolve Hex deps.
-  defp create_gatehouse_fixture_repo!(host, unique) do
-    workspace = Path.expand("..", File.cwd!())
-    archive = Path.join(System.tmp_dir!(), "hostkit-gatehouse-source-#{unique}.tgz")
-    remote_archive = "/tmp/hostkit-gatehouse-source-#{unique}.tgz"
-    remote_work = "/tmp/hostkit-gatehouse-source-#{unique}.work"
-    repo = "/tmp/hostkit-gatehouse-source-#{unique}.git"
-
-    work = Path.join(System.tmp_dir!(), "hostkit-gatehouse-source-#{unique}.work")
-
-    HostKit.SafeTmp.rm_rf!(work, "hostkit-gatehouse-source-")
-    HostKit.SafeTmp.rm_rf!(repo, "hostkit-gatehouse-source-")
-    File.rm(archive)
-
-    File.mkdir_p!(work)
-
-    assert {_, 0} =
-             System.cmd(
-               "tar",
-               [
-                 "-C",
-                 workspace,
-                 "-czf",
-                 archive,
-                 "--exclude=.git",
-                 "--exclude=_build",
-                 "--exclude=deps",
-                 "gatehouse"
-               ],
-               stderr_to_stdout: true
-             )
-
-    assert {_, 0} = System.cmd("tar", ["-C", work, "-xzf", archive], stderr_to_stdout: true)
-
-    git!(work, ["init", "--initial-branch=main"])
-    git!(work, ["config", "user.email", "hostkit@example.invalid"])
-    git!(work, ["config", "user.name", "HostKit Test"])
-    git!(work, ["add", "gatehouse"])
-    git!(work, ["commit", "-m", "gatehouse source fixture"])
-    git!(Path.dirname(work), ["clone", "--bare", work, repo])
-
-    assert {_, 0} =
-             System.cmd("tar", ["-C", Path.dirname(repo), "-czf", archive, Path.basename(repo)],
-               stderr_to_stdout: true
-             )
-
-    upload_file!(host, archive, remote_archive)
-    project = source_fixture_project(host, remote_archive, remote_work, repo)
-    target_opts = HostKit.Host.target_opts(host)
-
-    assert {:ok, plan} = HostKit.plan(project, target_opts)
-    assert {:ok, _results} = HostKit.apply(plan, Keyword.merge(target_opts, confirm: true))
-
-    HostKit.SafeTmp.rm_rf!(work, "hostkit-gatehouse-source-")
-    File.rm(archive)
-    repo
-  end
-
-  defp source_fixture_project(host, remote_archive, remote_work, repo) do
-    script = """
-    set -eu
-    rm -rf #{HostKit.Shell.escape(remote_work)} #{HostKit.Shell.escape(repo)}
-    mkdir -p #{HostKit.Shell.escape(remote_work)}
-    tar -C #{HostKit.Shell.escape(remote_work)} -xzf #{HostKit.Shell.escape(remote_archive)}
-    mv #{HostKit.Shell.escape(Path.join(remote_work, Path.basename(repo)))} #{HostKit.Shell.escape(repo)}
-    git config --global --add safe.directory #{HostKit.Shell.escape(repo)}
-    rm -rf #{HostKit.Shell.escape(remote_work)} #{HostKit.Shell.escape(remote_archive)}
-    """
-
-    command_name =
-      "gatehouse_source_fixture_#{Path.basename(repo, ".git") |> String.replace("-", "_")}"
-
-    quote do
-      use HostKit.DSL
-
-      project :gatehouse_source_fixture do
-        host :target do
-          hostname(unquote(host.hostname))
-          user(unquote(host.user))
-          sudo(unquote(host.sudo))
-          ssh(unquote(Macro.escape(host.meta[:ssh] || [])))
-        end
-
-        service :source_fixture do
-          command(unquote(command_name),
-            exec: ["sh", "-c", unquote(script)],
-            timeout: 300_000
-          )
-        end
-      end
-    end
-    |> Code.eval_quoted()
-    |> elem(0)
-  end
-
-  defp git!(cwd, args) do
-    case System.cmd("git", args, cd: cwd, stderr_to_stdout: true) do
-      {_output, 0} -> :ok
-      {output, status} -> raise "git #{Enum.join(args, " ")} failed with #{status}:\n#{output}"
     end
   end
 

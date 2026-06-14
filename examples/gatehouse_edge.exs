@@ -4,7 +4,7 @@ project :gatehouse_edge do
   account(:gatehouse, system: true, home: "/var/lib/gatehouse")
 
   gatehouse_release(:edge,
-    source: [github: "dannote/gatehouse", ref: "main"],
+    source: [github: "elixir-vibe/gatehouse", ref: "master"],
     release_path: "/opt/gatehouse"
   )
 
