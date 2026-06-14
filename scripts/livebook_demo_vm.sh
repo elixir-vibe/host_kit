@@ -87,10 +87,19 @@ configure_proxy() {
     incus_cmd config device remove "$INSTANCE_NAME" sshproxy >/dev/null 2>&1 || true
   fi
 
+  if incus_cmd config device show "$INSTANCE_NAME" | grep -q '^web18080:'; then
+    incus_cmd config device remove "$INSTANCE_NAME" web18080 >/dev/null 2>&1 || true
+  fi
+
   echo "[hostkit:livebook-demo] expose ssh on 127.0.0.1:$SSH_PORT" >&2
   incus_cmd config device add "$INSTANCE_NAME" sshproxy proxy \
     "listen=tcp:127.0.0.1:$SSH_PORT" \
     connect=tcp:127.0.0.1:22
+
+  echo "[hostkit:livebook-demo] expose demo site on 127.0.0.1:18080" >&2
+  incus_cmd config device add "$INSTANCE_NAME" web18080 proxy \
+    listen=tcp:127.0.0.1:18080 \
+    connect=tcp:127.0.0.1:18080
 }
 
 ensure() {

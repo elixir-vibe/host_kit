@@ -139,6 +139,7 @@ defmodule HostKit.LivebookSessionRunner do
   defp evaluate_notebook_cells!(session_pid, settings) do
     session_pid
     |> evaluable_regular_cells()
+    |> Enum.reject(&skip_cell?(&1, settings))
     |> Enum.reduce(nil, fn cell, form ->
       if settings_receive_cell?(cell) and form != nil do
         submit_form!(form, settings)
@@ -197,8 +198,21 @@ defmodule HostKit.LivebookSessionRunner do
     end
   end
 
+  defp skip_cell?(cell, settings) do
+    (deploy_cell?(cell) and not settings.apply?) or (verify_cell?(cell) and not settings.verify?)
+  end
+
+  defp deploy_cell?(cell) do
+    String.contains?(cell.source, "HK.apply(") or String.contains?(cell.source, "HostKit.apply(")
+  end
+
+  defp verify_cell?(cell) do
+    String.contains?(cell.source, "Req.get!(")
+  end
+
   defp settings_receive_cell?(cell) do
-    String.contains?(cell.source, "{:demo_settings")
+    String.contains?(cell.source, "{:demo_settings") or
+      String.contains?(cell.source, ".await_target(")
   end
 
   defp submit_form!(%{destination: destination, ref: ref}, data) do
@@ -224,10 +238,10 @@ defmodule HostKit.LivebookSessionRunner do
       "deploy_caddy_site.livemd" ->
         %{
           server: env("HOSTKIT_LIVEBOOK_SERVER", "127.0.0.1"),
-          user: env("HOSTKIT_LIVEBOOK_USER", System.get_env("USER") || "root"),
-          ssh_port: env_integer("HOSTKIT_LIVEBOOK_SSH_PORT", 22),
-          identity_file: env("HOSTKIT_LIVEBOOK_IDENTITY_FILE", "~/.ssh/id_ed25519"),
-          password: env("HOSTKIT_LIVEBOOK_SSH_PASSWORD", ""),
+          user: env("HOSTKIT_LIVEBOOK_USER", "root"),
+          ssh_port: env_integer("HOSTKIT_LIVEBOOK_SSH_PORT", 2222),
+          identity_file: env("HOSTKIT_LIVEBOOK_IDENTITY_FILE", ""),
+          password: env("HOSTKIT_LIVEBOOK_SSH_PASSWORD", "hostkit-demo"),
           ssh_retries: env_integer("HOSTKIT_LIVEBOOK_SSH_RETRIES", 3),
           public_port: env_integer("HOSTKIT_LIVEBOOK_CADDY_PORT", 18_080),
           message: "Validated by HostKit Livebook session runner",
@@ -238,10 +252,10 @@ defmodule HostKit.LivebookSessionRunner do
       "deploy_phoenix_app.livemd" ->
         %{
           server: env("HOSTKIT_LIVEBOOK_SERVER", "127.0.0.1"),
-          user: env("HOSTKIT_LIVEBOOK_USER", System.get_env("USER") || "root"),
-          ssh_port: env_integer("HOSTKIT_LIVEBOOK_SSH_PORT", 22),
-          identity_file: env("HOSTKIT_LIVEBOOK_IDENTITY_FILE", "~/.ssh/id_ed25519"),
-          password: env("HOSTKIT_LIVEBOOK_SSH_PASSWORD", ""),
+          user: env("HOSTKIT_LIVEBOOK_USER", "root"),
+          ssh_port: env_integer("HOSTKIT_LIVEBOOK_SSH_PORT", 2222),
+          identity_file: env("HOSTKIT_LIVEBOOK_IDENTITY_FILE", ""),
+          password: env("HOSTKIT_LIVEBOOK_SSH_PASSWORD", "hostkit-demo"),
           ssh_retries: env_integer("HOSTKIT_LIVEBOOK_SSH_RETRIES", 3),
           public_hostname: env("HOSTKIT_LIVEBOOK_PHOENIX_HOSTNAME", "phoenix.example.com"),
           public_port: env_integer("HOSTKIT_LIVEBOOK_PHOENIX_PORT", 18_081),
