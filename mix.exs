@@ -34,8 +34,8 @@ defmodule HostKit.MixProject do
   defp deps do
     [
       {:pi_bridge, "== 0.6.19", only: :dev},
-      {:systemdkit, path: "../systemdkit", override: true},
-      {:unitctl, path: "../unitctl"},
+      {:systemdkit, "~> 0.1.3"},
+      {:unitctl, "~> 0.1.0"},
       {:jason, "~> 1.4"},
       {:json_codec, "~> 0.1.4"},
       {:req, "~> 0.5"},
