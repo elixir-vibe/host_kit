@@ -149,20 +149,30 @@ defmodule HostKit.DSL.Scope do
 
   def add_proxy_target(name, opts) do
     target =
-      if Keyword.has_key?(opts, :safe_rpc) do
-        %{
-          name: name,
-          safe_rpc: Keyword.fetch!(opts, :safe_rpc),
-          active: Keyword.get(opts, :active, false),
-          metadata: Keyword.get(opts, :metadata, %{})
-        }
-      else
-        %{
-          name: name,
-          url: Keyword.fetch!(opts, :url),
-          active: Keyword.get(opts, :active, false),
-          metadata: Keyword.get(opts, :metadata, %{})
-        }
+      cond do
+        Keyword.has_key?(opts, :safe_rpc) ->
+          %{
+            name: name,
+            safe_rpc: Keyword.fetch!(opts, :safe_rpc),
+            active: Keyword.get(opts, :active, false),
+            metadata: Keyword.get(opts, :metadata, %{})
+          }
+
+        Keyword.has_key?(opts, :to) ->
+          %{
+            name: name,
+            to: Keyword.fetch!(opts, :to),
+            active: Keyword.get(opts, :active, false),
+            metadata: Keyword.get(opts, :metadata, %{})
+          }
+
+        true ->
+          %{
+            name: name,
+            url: Keyword.fetch!(opts, :url),
+            active: Keyword.get(opts, :active, false),
+            metadata: Keyword.get(opts, :metadata, %{})
+          }
       end
 
     update_proxy_service(&%{&1 | targets: &1.targets ++ [target]})

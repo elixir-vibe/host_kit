@@ -573,6 +573,12 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro endpoint(service, name \\ :default, opts \\ []) do
+    quote do
+      HostKit.Endpoint.new(unquote(service), unquote(name), unquote(opts))
+    end
+  end
+
   defmacro source(name, opts) do
     source = HostKit.SourceLocation.from_caller(__CALLER__)
 

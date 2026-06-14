@@ -50,8 +50,20 @@ defmodule HostKit.Proxy do
     {:target, [], [name, target_opts(target, safe_rpc: safe_rpc)]}
   end
 
+  defp target_quoted(%{name: name, to: %HostKit.Endpoint{} = endpoint} = target) do
+    {:target, [], [name, endpoint_quoted(endpoint), target_opts(target)]}
+  end
+
   defp target_quoted(%{name: name, url: url} = target) do
     {:target, [], [name, url, target_opts(target)]}
+  end
+
+  defp endpoint_quoted(%HostKit.Endpoint{service: service, name: :default}) do
+    {:endpoint, [], [service]}
+  end
+
+  defp endpoint_quoted(%HostKit.Endpoint{service: service, name: name}) do
+    {:endpoint, [], [service, name]}
   end
 
   defp target_opts(target, opts \\ []) do
