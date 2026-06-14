@@ -15,7 +15,8 @@ defmodule HostKit.Instance.Backends.Incus do
 
   @impl true
   def apply(%Instance{} = instance, opts) do
-    with :ok <- ensure_present(instance, opts) do
+    with :ok <- ensure_present(instance, opts),
+         :ok <- ensure_exposed(instance, opts) do
       ensure_running(instance, opts)
     end
   end
@@ -50,6 +51,55 @@ defmodule HostKit.Instance.Backends.Incus do
     end
   end
 
+  defp ensure_exposed(%Instance{ports: ports} = instance, opts) do
+    Enum.reduce_while(ports, :ok, fn port, :ok ->
+      case ensure_port(instance, port, opts) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp ensure_port(_instance, %{host: nil}, _opts), do: :ok
+
+  defp ensure_port(instance, %{name: name, host: host, guest: guest, protocol: protocol}, opts) do
+    device = "hostkit-#{name}"
+
+    args = [
+      "config",
+      "device",
+      "add",
+      instance_name(instance),
+      device,
+      "proxy",
+      "listen=#{protocol}:0.0.0.0:#{host}",
+      "connect=#{protocol}:127.0.0.1:#{guest}"
+    ]
+
+    case cmd(args, opts) do
+      {_output, 0} ->
+        :ok
+
+      {output, status} ->
+        maybe_replace_existing_device(instance, device, args, output, status, opts)
+    end
+  end
+
+  defp maybe_replace_existing_device(instance, device, add_args, output, _status, opts) do
+    if String.contains?(output, "already exists") do
+      with {_output, 0} <-
+             cmd(["config", "device", "remove", instance_name(instance), device], opts),
+           {_output, 0} <- cmd(add_args, opts) do
+        :ok
+      else
+        {replace_output, replace_status} ->
+          {:error, {:incus_device_replace_failed, replace_status, replace_output}}
+      end
+    else
+      {:error, {:incus_device_add_failed, output}}
+    end
+  end
+
   defp ensure_running(instance, opts) do
     case cmd(["start", instance_name(instance)], opts) do
       {_output, 0} -> :ok
@@ -69,6 +119,13 @@ defmodule HostKit.Instance.Backends.Incus do
     command = Keyword.get(opts, :incus, System.get_env("INCUS", "incus"))
     args = maybe_project(args, opts)
 
+    case Keyword.get(opts, :incus_runner) do
+      nil -> system_cmd(command, args, opts)
+      runner when is_function(runner, 2) -> runner.(command, args)
+    end
+  end
+
+  defp system_cmd(command, args, opts) do
     if Keyword.get(opts, :incus_sudo, incus_sudo_default()) do
       System.cmd("sudo", [command | args], stderr_to_stdout: true)
     else

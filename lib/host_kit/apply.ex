@@ -161,6 +161,7 @@ defmodule HostKit.Apply do
 
   defp apply_change_step(change, {:ok, results, reload?}, opts) do
     report_change_start(change, opts)
+    opts = change_opts(change, opts)
 
     case timed_change(change, fn -> apply_change(change, opts) end) do
       {:ok, result} ->
@@ -193,6 +194,30 @@ defmodule HostKit.Apply do
       %{resource_id: change.resource_id, action: change.action},
       fun
     )
+  end
+
+  defp change_opts(%Change{} = change, opts) do
+    change
+    |> change_resource()
+    |> resource_opts(opts)
+  end
+
+  defp change_resource(%Change{after: resource}) when not is_nil(resource), do: resource
+  defp change_resource(%Change{before: resource}), do: resource
+
+  defp resource_opts(%{meta: %{target_opts: target_opts}}, opts) when is_list(target_opts) do
+    target_opts
+    |> expand_target_opts()
+    |> then(fn resource_opts -> opts |> Keyword.drop([:conn]) |> Keyword.merge(resource_opts) end)
+  end
+
+  defp resource_opts(_resource, opts), do: opts
+
+  defp expand_target_opts(opts) do
+    case Keyword.pop(opts, :target) do
+      {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
+      {_other, opts} -> opts
+    end
   end
 
   defp apply_change(%Change{action: :no_op} = change, _opts), do: {:ok, skipped(change)}

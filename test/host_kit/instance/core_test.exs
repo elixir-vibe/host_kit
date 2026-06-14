@@ -97,6 +97,16 @@ defmodule HostKit.InstanceTest do
 
     assert site.host == ":18080"
     assert [%HostKit.Caddy.Directive.ReverseProxy{upstreams: ["127.0.0.1:80"]}] = site.directives
+
+    project_resources = HostKit.Project.resources(project)
+    assert [%HostKit.Instance{name: :demo_vm} | nested_resources] = project_resources
+    assert Enum.any?(nested_resources, &match?(%HostKit.Caddy.Site{}, &1))
+
+    assert Enum.all?(nested_resources, fn resource ->
+             resource.meta.instance == :demo_vm and
+               resource.meta.host == :guest and
+               resource.meta.target_opts[:reader] == HostKit.Remote
+           end)
   end
 
   test "instances participate in project resources plans and ephemeral down plans" do

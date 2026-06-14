@@ -329,9 +329,39 @@ defmodule HostKit.Plan do
   defp observed_change_for(resource, _project, _opts, nil), do: desired_change(resource)
 
   defp observed_change_for(resource, project, opts, reader) do
+    opts = resource_opts(resource, opts)
+    reader = Keyword.get(opts, :reader, reader)
+
     timed_resource(:read, resource, fn ->
       compare_with_actual(resource, reader, %{project: project, opts: opts})
     end)
+  end
+
+  defp resource_opts(resource, opts) do
+    resource
+    |> resource_target_opts()
+    |> expand_target_opts()
+    |> merge_resource_opts(opts)
+  end
+
+  defp resource_target_opts(%{meta: %{target_opts: target_opts}}) when is_list(target_opts),
+    do: target_opts
+
+  defp resource_target_opts(_resource), do: []
+
+  defp expand_target_opts(opts) do
+    case Keyword.pop(opts, :target) do
+      {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
+      {_other, opts} -> opts
+    end
+  end
+
+  defp merge_resource_opts([], opts), do: opts
+
+  defp merge_resource_opts(resource_opts, opts) do
+    opts
+    |> Keyword.drop([:conn])
+    |> Keyword.merge(resource_opts)
   end
 
   defp ignored?(resource, opts) do

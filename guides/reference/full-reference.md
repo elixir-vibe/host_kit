@@ -231,9 +231,9 @@ project :demo do
 end
 ```
 
-The instance owns compute lifecycle metadata (`backend`, `image`, `kind`, `lifecycle`, `expose`). The nested host owns connection metadata. Nested services/resources are ordinary HostKit declarations scoped to the instance contents.
+The instance owns compute lifecycle metadata (`backend`, `image`, `kind`, `lifecycle`, `expose`). The nested host owns connection metadata. Nested services/resources are ordinary HostKit declarations scoped to the instance contents. Plans emit the instance lifecycle resource first, then nested content resources annotated with the nested host target so read/apply operations run through that endpoint.
 
-Backend implementations are intentionally separate from the generic DSL. Incus should be implemented as a backend for `instance`, not as a user-facing `incus_machine` DSL.
+Backend implementations are intentionally separate from the generic DSL. Incus is implemented as a backend for `instance`, not as a user-facing `incus_machine` DSL. The Incus backend maps `expose` declarations to Incus proxy devices.
 
 ## Host bootstrap packages and mise-managed runtimes
 

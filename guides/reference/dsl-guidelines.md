@@ -132,7 +132,7 @@ instance :demo do
 end
 ```
 
-Rule: `instance` manages the compute lifecycle; nested `host` describes how HostKit connects into that instance.
+Rule: `instance` manages the compute lifecycle; nested `host` describes how HostKit connects into that instance. Plans order the instance lifecycle resource before nested content resources, and nested content carries the nested host target metadata so read/apply operations execute inside the managed compute boundary.
 
 ## References between declarations
 

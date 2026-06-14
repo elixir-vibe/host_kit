@@ -4,6 +4,7 @@ defmodule HostKit.Project do
   alias HostKit.{
     Conventions,
     Firewall,
+    Host,
     Instance,
     Provider,
     ProviderConfig,
@@ -120,11 +121,41 @@ defmodule HostKit.Project do
   @spec resources(t()) :: [struct()]
   def resources(%__MODULE__{} = project) do
     project.resources
-    |> Kernel.++(project.instances)
+    |> Kernel.++(Enum.flat_map(project.instances, &instance_resources/1))
     |> Kernel.++(project.proxies)
     |> Kernel.++(project.services |> Enum.flat_map(&expand_resources(&1.resources)))
     |> Kernel.++(Firewall.policies(project))
     |> Kernel.++(workspace_egress(project))
+  end
+
+  defp instance_resources(%Instance{} = instance) do
+    [instance | instance_content_resources(instance)]
+  end
+
+  defp instance_content_resources(%Instance{} = instance) do
+    host = List.first(instance.hosts)
+
+    instance.resources
+    |> Kernel.++(instance.services |> Enum.flat_map(&expand_resources(&1.resources)))
+    |> Enum.map(&put_instance_target(&1, instance, host))
+  end
+
+  defp put_instance_target(resource, _instance, nil), do: resource
+
+  defp put_instance_target(resource, instance, %Host{} = host) do
+    put_meta(resource, %{
+      instance: instance.name,
+      host: host.name,
+      target_opts: Host.target_opts(host)
+    })
+  end
+
+  defp put_meta(resource, values) do
+    if Map.has_key?(resource, :meta) do
+      %{resource | meta: Map.merge(resource.meta, values)}
+    else
+      resource
+    end
   end
 
   defp expand_resources(resources) do
