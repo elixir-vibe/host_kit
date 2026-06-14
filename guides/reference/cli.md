@@ -90,6 +90,28 @@ mix host_kit.apply --host prod --plan host_kit.plan.json --confirm infra/config.
 mix host_kit.apply --host prod --package-lock host_kit.package.lock --dry-run infra/config.exs
 ```
 
+## `mix host_kit.runs`
+
+List minimal tracked run records. Records are written by `mix host_kit.apply --track`.
+
+```sh
+mix host_kit.runs [options] [config.exs]
+```
+
+Common options:
+
+- `--host NAME` — list runs from a declared remote host.
+- `--remote HOST` — raw SSH target escape hatch.
+- `--runs-root PATH` — override the HostKit runs root.
+- `--format text|json|inspect` — output format.
+
+Examples:
+
+```sh
+mix host_kit.apply --host prod --track --plan up.plan.json --confirm infra/config.exs
+mix host_kit.runs --host prod infra/config.exs
+```
+
 ## Target selection
 
 Prefer `--host` with a declared host:

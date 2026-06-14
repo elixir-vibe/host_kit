@@ -25,5 +25,12 @@ defmodule HostKit.RunRecordTest do
     assert record["project"] == "tracked"
     assert record["direction"] == "up"
     assert [%{"action" => "create", "status" => "applied"}] = record["changes"]
+
+    assert {:ok, [listed]} = HostKit.RunRecord.list(hostkit_runs_root: runs_root)
+    assert listed["id"] == record["id"]
+    assert {:ok, latest} = HostKit.RunRecord.latest(hostkit_runs_root: runs_root)
+    assert latest["id"] == record["id"]
+    assert {:ok, loaded} = HostKit.RunRecord.load(record["id"], hostkit_runs_root: runs_root)
+    assert loaded["id"] == record["id"]
   end
 end

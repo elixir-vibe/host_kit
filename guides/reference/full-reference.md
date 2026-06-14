@@ -94,6 +94,17 @@ mix host_kit.down up.plan.json --out down.plan.json
 mix host_kit.apply --plan down.plan.json --confirm
 ```
 
+## Run tracking
+
+Tracked applies write minimal run records under the project-configured HostKit runs root:
+
+```sh
+mix host_kit.apply --track --plan up.plan.json --confirm
+mix host_kit.runs --host prod infra/config.exs
+```
+
+Run records are intentionally compact: they identify the run, project, direction, timestamp, and applied change statuses. They do not replace plan artifacts; use plan artifacts for inspectable up/down plan contents.
+
 ## Elixir app lifecycle helpers
 
 The Elixir app recipe can emit lifecycle commands for common BEAM deployment operations. Ecto migrations are represented as normal commands with explicit down commands:
