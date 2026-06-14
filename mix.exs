@@ -77,6 +77,7 @@ defmodule HostKit.MixProject do
         "guides/deployment/remote-bootstrap.md",
         "guides/deployment/systemd-isolation.md",
         "guides/deployment/firewall-and-networking.md",
+        "guides/deployment/gatehouse.md",
         "guides/workspaces/workspaces-and-tenants.md",
         "guides/operations/observability-and-monitors.md",
         "guides/operations/timers-and-jobs.md",

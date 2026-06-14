@@ -146,6 +146,12 @@ defmodule HostKit.DSL.Systemd do
     end
   end
 
+  defmacro exec_stop(value) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_service(:exec_stop, unquote(value))
+    end
+  end
+
   defmacro restart(value) do
     quote do
       HostKit.DSL.Systemd.Scope.put_service(:restart, unquote(value))
