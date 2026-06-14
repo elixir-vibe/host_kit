@@ -12,7 +12,7 @@ This notebook deploys the example Phoenix app from the HostKit repository:
 
 ```elixir
 alias HostKit, as: HK
-alias HostKit.{Apply, Host, Ingress, Project, Runner}
+alias HostKit.{Apply, Host, Ingress, Project}
 alias HostKit.Apply.Event, as: ApplyEvent
 alias HostKit.Plan.{Artifact, Format}
 alias HostKit.Providers.{Caddy, Elixir}
@@ -146,6 +146,11 @@ project =
         restart :on_failure
         wanted_by :multi_user
       end
+
+      ready :phoenix_caddy do
+        systemd caddy_service_name, restart: true
+        http public_url
+      end
     end
 
     elixir_app app_name,
@@ -234,24 +239,8 @@ progress =
 
 ```elixir
 if verify? do
-  runner = {Runner.SSH, Host.ssh_options(host)}
-
-  restart_app =
-    if host.sudo do
-      Runner.cmd(runner, "sudo", ["systemctl", "restart", app_service_name], stderr_to_stdout: true)
-    else
-      Runner.cmd(runner, "systemctl", ["restart", app_service_name], stderr_to_stdout: true)
-    end
-
-  restart_caddy =
-    if host.sudo do
-      Runner.cmd(runner, "sudo", ["systemctl", "restart", caddy_service_name], stderr_to_stdout: true)
-    else
-      Runner.cmd(runner, "systemctl", ["restart", caddy_service_name], stderr_to_stdout: true)
-    end
-
-  response = Runner.cmd(runner, "curl", ["-fsS", "http://127.0.0.1:#{http_port}"], stderr_to_stdout: true)
-  {restart_app, restart_caddy, response, public_url}
+  response = Req.get!(public_url)
+  {response.status, response.body, public_url}
 else
   {:skipped, public_url}
 end
