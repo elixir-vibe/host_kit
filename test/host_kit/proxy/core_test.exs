@@ -90,8 +90,9 @@ defmodule HostKit.ProxyTest do
     assert [service] = proxy.services
     assert [%{to: %HostKit.Endpoint{host: "127.0.0.1", port: 4000}}] = service.targets
 
-    assert HostKit.Proxy.render(proxy) =~
-             "target(:main, \"http://127.0.0.1:4000\", active: true)"
+    rendered = HostKit.Proxy.render(proxy)
+
+    assert rendered =~ "target(:main, \"http://127.0.0.1:4000\", active: true)"
   end
 
   test "builds endpoint targets from generic DSL" do
