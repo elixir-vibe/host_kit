@@ -1,10 +1,10 @@
 defmodule HostKit.ProxyTest do
   use ExUnit.Case, async: true
 
-  test "renders xamal_proxy config from quoted AST" do
+  test "renders Gatehouse config from quoted AST" do
     proxy = %HostKit.Proxy{
       name: :edge,
-      provider: :xamal_proxy,
+      provider: :gatehouse,
       services: [
         %{
           name: :app,
@@ -17,7 +17,7 @@ defmodule HostKit.ProxyTest do
     }
 
     expected =
-      "import XamalProxy.Config\nservice(:app) do\n  host(\"app.example.com\")\n  target(:main, safe_rpc: [socket: \"/run/app.sock\"], active: true)\nend"
+      "import Gatehouse.Config\nservice(:app) do\n  host(\"app.example.com\")\n  target(:main, safe_rpc: [socket: \"/run/app.sock\"], active: true)\nend"
 
     assert HostKit.Proxy.render(proxy) == expected
   end
@@ -28,7 +28,7 @@ defmodule HostKit.ProxyTest do
       use HostKit.DSL
 
       project :demo do
-        proxy :edge, provider: :xamal_proxy do
+        proxy :edge, provider: :gatehouse do
           service :app do
             host "app.example.com"
             target :main, safe_rpc: [socket: "/run/app.sock"], active: true
@@ -38,7 +38,7 @@ defmodule HostKit.ProxyTest do
       """)
       |> elem(0)
 
-    assert [%HostKit.Proxy{name: :edge, provider: :xamal_proxy} = proxy] = project.proxies
+    assert [%HostKit.Proxy{name: :edge, provider: :gatehouse} = proxy] = project.proxies
     assert [proxy] == HostKit.Project.resources(project)
     assert [service] = proxy.services
     assert service.name == :app

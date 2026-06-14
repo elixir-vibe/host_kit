@@ -121,7 +121,7 @@ defmodule HostKit.DSL.Scope do
     Process.put(@proxy_key, %HostKit.Proxy{
       name: name,
       provider: Keyword.fetch!(opts, :provider),
-      path: Keyword.get(opts, :path, "/etc/xamal-proxy/config.exs"),
+      path: Keyword.get(opts, :path, "/etc/gatehouse/config.exs"),
       meta: Keyword.get(opts, :meta, %{})
     })
   end

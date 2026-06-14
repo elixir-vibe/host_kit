@@ -9,7 +9,7 @@ defmodule HostKit.Proxy do
           meta: map()
         }
 
-  defstruct [:name, :provider, path: "/etc/xamal-proxy/config.exs", services: [], meta: %{}]
+  defstruct [:name, :provider, path: "/etc/gatehouse/config.exs", services: [], meta: %{}]
 
   def id(%__MODULE__{name: name}), do: {:proxy, name}
 
@@ -25,19 +25,19 @@ defmodule HostKit.Proxy do
     |> IO.iodata_to_binary()
   end
 
-  def to_quoted(%__MODULE__{provider: :xamal_proxy} = proxy) do
-    block([import_xamal_config() | Enum.map(proxy.services, &xamal_service_quoted/1)])
+  def to_quoted(%__MODULE__{provider: :gatehouse} = proxy) do
+    block([import_gatehouse_config() | Enum.map(proxy.services, &gatehouse_service_quoted/1)])
   end
 
   def to_quoted(%__MODULE__{provider: provider}) do
     raise ArgumentError, "unsupported proxy provider #{inspect(provider)}"
   end
 
-  defp import_xamal_config do
-    {:import, [], [{:__aliases__, [], [:XamalProxy, :Config]}]}
+  defp import_gatehouse_config do
+    {:import, [], [{:__aliases__, [], [:Gatehouse, :Config]}]}
   end
 
-  defp xamal_service_quoted(service) do
+  defp gatehouse_service_quoted(service) do
     expressions =
       Enum.map(service.hosts, &host_quoted/1) ++ Enum.map(service.targets, &target_quoted/1)
 

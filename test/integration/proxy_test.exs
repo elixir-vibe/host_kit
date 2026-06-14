@@ -3,15 +3,16 @@ defmodule HostKit.ProxyIntegrationTest do
 
   @moduletag :integration
 
-  test "applies proxy config to a temp path and xamal_proxy can parse it" do
-    path = Path.join(System.tmp_dir!(), "hostkit-xamal-#{System.unique_integer([:positive])}.exs")
+  test "applies Gatehouse proxy config to a temp path" do
+    path =
+      Path.join(System.tmp_dir!(), "hostkit-gatehouse-#{System.unique_integer([:positive])}.exs")
 
     project =
       Code.eval_string("""
       use HostKit.DSL
 
       project :demo do
-        proxy :edge, provider: :xamal_proxy, path: #{inspect(path)} do
+        proxy :edge, provider: :gatehouse, path: #{inspect(path)} do
           service :app do
             host "app.example.com"
             target :main, safe_rpc: [socket: "/tmp/app.sock"], active: true
