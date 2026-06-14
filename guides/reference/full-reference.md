@@ -86,6 +86,15 @@ command :warm_cache,
 
 The down command is emitted as an ordinary command change in the down plan. `down: :irreversible` records an explicit warning and omits the command from the down plan.
 
+Created resources use conservative rollback policies. File-like resources can be deleted by a down plan, but directories are kept unless explicitly opted in:
+
+```elixir
+directory "/tmp/demo", rollback: :delete_if_created
+directory "/srv/app", rollback: :keep
+account :app, system: true, rollback: :keep
+package :caddy, rollback: :keep
+```
+
 CLI usage mirrors this:
 
 ```sh

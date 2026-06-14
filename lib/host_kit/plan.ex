@@ -162,7 +162,8 @@ defmodule HostKit.Plan do
 
   defp delete_supported?(%File{}), do: true
   defp delete_supported?(%EnvFile{}), do: true
-  defp delete_supported?(%Directory{}), do: true
+  defp delete_supported?(%Directory{rollback: :delete_if_created}), do: true
+  defp delete_supported?(%Directory{}), do: false
   defp delete_supported?(%HostKit.Firewall{}), do: true
   defp delete_supported?(%HostKit.Proxy{}), do: true
   defp delete_supported?(%HostKit.Systemd.Service{}), do: true

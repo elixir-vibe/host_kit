@@ -6,6 +6,7 @@ defmodule HostKit.Resources.Directory do
           owner: String.t() | nil,
           group: String.t() | nil,
           mode: non_neg_integer() | nil,
+          rollback: :keep | :delete_if_created,
           depends_on: [term()],
           meta: map()
         }
@@ -14,6 +15,7 @@ defmodule HostKit.Resources.Directory do
             owner: nil,
             group: nil,
             mode: nil,
+            rollback: :keep,
             depends_on: [],
             meta: %{}
 
@@ -24,6 +26,7 @@ defmodule HostKit.Resources.Directory do
       owner: normalize_account_name(Keyword.get(opts, :owner)),
       group: normalize_account_name(Keyword.get(opts, :group)),
       mode: opts |> Keyword.get(:mode) |> HostKit.Mode.normalize!(),
+      rollback: Keyword.get(opts, :rollback, :keep),
       depends_on: Keyword.get(opts, :depends_on, []),
       meta: Keyword.get(opts, :meta, %{})
     }

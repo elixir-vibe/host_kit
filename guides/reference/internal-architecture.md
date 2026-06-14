@@ -231,13 +231,24 @@ Recipes such as `elixir_app` can emit readiness automatically. During apply, rea
 
 Run records are minimal tracking artifacts written when apply is called with `track: true` or `mix host_kit.apply --track`.
 
+```mermaid
+flowchart LR
+  ApplyTrack[apply --track --plan up.plan.json] --> Copy[copy up plan under runs root]
+  Copy --> Record[run record JSON]
+  Record --> Runs[mix host_kit.runs]
+  Record --> Last[mix host_kit.down --last]
+  Last --> UpPlan[copied up plan artifact]
+  UpPlan --> DownPlan[generated down plan]
+```
+
 They intentionally do not replace plans. They store compact metadata such as:
 
 - run id,
 - project,
 - direction,
 - applied timestamp,
-- resource ids/actions/statuses.
+- resource ids/actions/statuses,
+- copied up/down plan artifact references when available.
 
 The storage roots are based on project conventions:
 

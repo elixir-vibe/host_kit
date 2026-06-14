@@ -7,6 +7,7 @@ defmodule HostKit.Resources.Account do
           home: String.t() | nil,
           shell: String.t() | nil,
           groups: [String.t()],
+          rollback: :keep,
           depends_on: [term()],
           meta: map()
         }
@@ -16,6 +17,7 @@ defmodule HostKit.Resources.Account do
             home: nil,
             shell: nil,
             groups: [],
+            rollback: :keep,
             depends_on: [],
             meta: %{}
 

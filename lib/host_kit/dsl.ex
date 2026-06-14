@@ -666,6 +666,7 @@ defmodule HostKit.DSL do
         home: Keyword.get(unquote(opts), :home),
         shell: Keyword.get(unquote(opts), :shell, "/usr/sbin/nologin"),
         groups: Keyword.get(unquote(opts), :groups, []),
+        rollback: Keyword.get(unquote(opts), :rollback, :keep),
         meta: Keyword.get(unquote(opts), :meta, %{})
       })
     end

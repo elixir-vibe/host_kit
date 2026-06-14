@@ -9,6 +9,7 @@ defmodule HostKit.Resources.Package do
           version: String.t() | nil,
           source: source(),
           update: boolean(),
+          rollback: :keep,
           depends_on: [term()],
           meta: map()
         }
@@ -18,6 +19,7 @@ defmodule HostKit.Resources.Package do
             version: nil,
             source: :semantic,
             update: false,
+            rollback: :keep,
             depends_on: [],
             meta: %{}
 
@@ -29,6 +31,7 @@ defmodule HostKit.Resources.Package do
       version: Keyword.get(opts, :version),
       source: Keyword.get(opts, :source, default_source(opts)),
       update: Keyword.get(opts, :update, false),
+      rollback: Keyword.get(opts, :rollback, :keep),
       depends_on: Keyword.get(opts, :depends_on, []),
       meta: opts |> Keyword.get(:meta, %{}) |> maybe_put_provides(opts)
     }

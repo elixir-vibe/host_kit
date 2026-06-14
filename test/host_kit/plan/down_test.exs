@@ -84,6 +84,27 @@ defmodule HostKit.Plan.DownTest do
     refute File.exists?(path)
   end
 
+  test "down plan only deletes created directories when explicitly opted in" do
+    keep = %HostKit.Resources.Directory{path: "/tmp/keep"}
+    delete = %HostKit.Resources.Directory{path: "/tmp/delete", rollback: :delete_if_created}
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :rollback_test},
+      changes: [
+        %Change{action: :create, resource_id: {:directory, keep.path}, after: keep},
+        %Change{action: :create, resource_id: {:directory, delete.path}, after: delete}
+      ]
+    }
+
+    assert {:ok, down_plan} = HostKit.down(plan)
+
+    assert [%Change{action: :delete, resource_id: {:directory, "/tmp/delete"}}] =
+             down_plan.changes
+
+    assert [%HostKit.Diagnostic{resource_id: {:directory, "/tmp/keep"}}] =
+             down_plan.diagnostics.warnings
+  end
+
   test "down plan uses explicit command down steps" do
     migrate =
       HostKit.Resources.Command.new(:migrate,
