@@ -75,7 +75,6 @@ public_url = "http://#{target.host}#{site_address}"
 ```
 
 ```elixir
-# hostkit:deploy-caddy-site-dsl
 html = """
 <!doctype html>
 <html>
@@ -196,5 +195,9 @@ Readiness checks in the declaration already restart and wait for the service dur
 
 ```elixir
 response = Req.get!(public_url)
-Demo.verify_summary(response, public_url)
+
+[
+  Demo.verify_summary(response, public_url),
+  Kino.HTML.new(response.body)
+]
 ```

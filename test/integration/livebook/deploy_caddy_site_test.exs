@@ -136,11 +136,11 @@ defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
   defp notebook_dsl! do
     content = File.read!("notebooks/learn/deploy_caddy_site.livemd")
 
-    regex = ~r/```elixir\n(?<source>[^`]*# hostkit:deploy-caddy-site-dsl.*?)\n```/s
+    regex = ~r/```elixir\n(?<source>.*?project\s+:deploy_caddy_site\s+do.*?)\n```/s
 
     case Regex.run(regex, content, capture: ["source"]) do
       [source] -> source
-      nil -> raise "could not find marked HostKit DSL cell in deploy_caddy_site.livemd"
+      nil -> raise "could not find HostKit DSL cell in deploy_caddy_site.livemd"
     end
   end
 end

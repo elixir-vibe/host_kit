@@ -98,26 +98,29 @@ defmodule HostKit.LivebookDemo do
     counts = Enum.frequencies_by(plan.changes, & &1.action)
 
     Markdown.new("""
-    ### Plan summary
+    ### Plan
 
-    - Create: #{Map.get(counts, :create, 0)}
-    - Update: #{Map.get(counts, :update, 0)}
-    - Delete: #{Map.get(counts, :delete, 0)}
-    - Read errors: #{Map.get(counts, :read, 0)}
-    - Unchanged: #{Map.get(counts, :no_op, 0)}
+    **#{Map.get(counts, :create, 0)}** create · **#{Map.get(counts, :update, 0)}** update · **#{Map.get(counts, :delete, 0)}** delete · **#{Map.get(counts, :no_op, 0)}** unchanged · **#{Map.get(counts, :read, 0)}** read errors
     """)
   end
 
   def plan_table(plan) do
     plan.changes
     |> Enum.map(fn change ->
+      resource = resource_parts(change.resource_id)
+
       %{
         action: change.action,
-        resource: format_resource(change.resource_id),
+        type: resource.type,
+        name: resource.name,
         status: format_reason(change.reason)
       }
     end)
-    |> Kino.DataTable.new(keys: [:action, :resource, :status], name: "Plan changes", num_rows: 20)
+    |> Kino.DataTable.new(
+      keys: [:action, :type, :name, :status],
+      name: "Plan changes",
+      num_rows: 20
+    )
   end
 
   def collect_apply_progress do
@@ -157,15 +160,17 @@ defmodule HostKit.LivebookDemo do
     results
     |> Enum.map(fn result ->
       change = Map.get(result, :change)
+      resource = change && resource_parts(change.resource_id)
 
       %{
         status: Map.get(result, :status),
         action: change && change.action,
-        resource: change && format_resource(change.resource_id)
+        type: resource && resource.type,
+        name: resource && resource.name
       }
     end)
     |> Kino.DataTable.new(
-      keys: [:status, :action, :resource],
+      keys: [:status, :action, :type, :name],
       name: "Deploy results",
       num_rows: 20
     )
@@ -178,13 +183,19 @@ defmodule HostKit.LivebookDemo do
     Markdown.new("""
     ### Verify
 
-    ✅ `#{response.status}` from [#{public_url}](#{public_url})
+    ✅ Site is reachable
+
+    - Status: `#{response.status}`
+    - URL: [#{public_url}](#{public_url})
     """)
   end
 
-  defp format_resource(%HostKit.Addr.Resource{} = resource), do: to_string(resource)
-  defp format_resource({type, name}), do: "#{type}.#{name}"
-  defp format_resource(other), do: inspect(other)
+  defp resource_parts(%HostKit.Addr.Resource{} = resource) do
+    %{type: to_string(resource.type), name: to_string(resource.name)}
+  end
+
+  defp resource_parts({type, name}), do: %{type: to_string(type), name: to_string(name)}
+  defp resource_parts(other), do: %{type: "resource", name: inspect(other)}
 
   defp format_reason(nil), do: "in sync"
   defp format_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
