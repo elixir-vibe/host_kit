@@ -16,8 +16,10 @@ defmodule HostKit.Instance.Backends.Incus do
   @impl true
   def apply(%Instance{} = instance, opts) do
     with :ok <- ensure_present(instance, opts),
-         :ok <- ensure_exposed(instance, opts) do
-      ensure_running(instance, opts)
+         :ok <- ensure_exposed(instance, opts),
+         :ok <- ensure_running(instance, opts),
+         :ok <- wait_ready(instance, opts) do
+      configure_nested_hosts(instance, opts)
     end
   end
 
@@ -62,8 +64,13 @@ defmodule HostKit.Instance.Backends.Incus do
 
   defp ensure_port(_instance, %{host: nil}, _opts), do: :ok
 
-  defp ensure_port(instance, %{name: name, host: host, guest: guest, protocol: protocol}, opts) do
+  defp ensure_port(
+         instance,
+         %{name: name, host: host, guest: guest, protocol: protocol} = port,
+         opts
+       ) do
     device = "hostkit-#{name}"
+    bind = Map.get(port, :bind, "127.0.0.1")
 
     args = [
       "config",
@@ -72,7 +79,7 @@ defmodule HostKit.Instance.Backends.Incus do
       instance_name(instance),
       device,
       "proxy",
-      "listen=#{protocol}:0.0.0.0:#{host}",
+      "listen=#{protocol}:#{bind}:#{host}",
       "connect=#{protocol}:127.0.0.1:#{guest}"
     ]
 
@@ -105,6 +112,68 @@ defmodule HostKit.Instance.Backends.Incus do
       {_output, 0} -> :ok
       {output, status} -> maybe_already_running(output, status)
     end
+  end
+
+  defp wait_ready(instance, opts) do
+    attempts = Keyword.get(opts, :incus_ready_attempts, 120)
+    wait_ready(instance, opts, attempts)
+  end
+
+  defp wait_ready(_instance, _opts, 0), do: {:error, :incus_instance_not_ready}
+
+  defp wait_ready(instance, opts, attempts) do
+    case cmd(["exec", instance_name(instance), "--", "true"], opts) do
+      {_output, 0} ->
+        :ok
+
+      {_output, _status} ->
+        if Keyword.get(opts, :incus_no_sleep, false), do: :ok, else: Process.sleep(1_000)
+        wait_ready(instance, opts, attempts - 1)
+    end
+  end
+
+  defp configure_nested_hosts(%Instance{hosts: hosts} = instance, opts) do
+    Enum.reduce_while(hosts, :ok, fn host, :ok ->
+      case configure_host(instance, host, opts) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp configure_host(instance, %{user: "root", meta: %{ssh: ssh}}, opts) do
+    case Keyword.fetch(ssh, :password) do
+      {:ok, password} -> configure_root_ssh(instance, password, opts)
+      :error -> :ok
+    end
+  end
+
+  defp configure_host(_instance, _host, _opts), do: :ok
+
+  defp configure_root_ssh(instance, password, opts) do
+    script = """
+    set -eu
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y openssh-server sudo ca-certificates curl git
+    printf 'root:%s\\n' #{shell_quote(password)} | chpasswd
+    install -d -m 0755 /etc/ssh/sshd_config.d
+    cat >/etc/ssh/sshd_config.d/99-hostkit-livebook-demo.conf <<'EOF'
+    PermitRootLogin yes
+    PasswordAuthentication yes
+    KbdInteractiveAuthentication yes
+    EOF
+    systemctl restart ssh 2>/dev/null || service ssh restart
+    """
+
+    case cmd(["exec", instance_name(instance), "--", "sh", "-c", script], opts) do
+      {_output, 0} -> :ok
+      {output, status} -> {:error, {:incus_configure_ssh_failed, status, output}}
+    end
+  end
+
+  defp shell_quote(value) do
+    "'" <> String.replace(to_string(value), "'", "'\\''") <> "'"
   end
 
   defp maybe_already_running(output, _status) do

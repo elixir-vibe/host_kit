@@ -5,7 +5,8 @@ defmodule HostKit.Instance do
           name: atom(),
           host: non_neg_integer() | nil,
           guest: non_neg_integer(),
-          protocol: :tcp | :udp
+          protocol: :tcp | :udp,
+          bind: String.t()
         }
 
   @type t :: %__MODULE__{
@@ -63,7 +64,8 @@ defmodule HostKit.Instance do
       name: name,
       host: Keyword.get(opts, :host),
       guest: Keyword.fetch!(opts, :guest),
-      protocol: Keyword.get(opts, :protocol, :tcp)
+      protocol: Keyword.get(opts, :protocol, :tcp),
+      bind: Keyword.get(opts, :bind, "127.0.0.1")
     }
 
     %{instance | ports: instance.ports ++ [port]}

@@ -121,7 +121,7 @@ HOSTKIT_INTEGRATION_TOOL=incus HOSTKIT_INCUS_SUDO=true \
 
 Use `HOSTKIT_INCUS_TYPE=vm` for an Incus VM instead of the default container.
 
-The same demo target can now be represented declaratively with the generic instance DSL in [`examples/livebook_demo_instance.exs`](../../examples/livebook_demo_instance.exs). The current shell script remains useful as operational glue while instance backends grow full content-plan orchestration.
+The same demo target is represented declaratively with the generic instance DSL in [`examples/livebook_demo_instance.exs`](../../examples/livebook_demo_instance.exs). `scripts/livebook_demo_vm.sh` is now a thin wrapper around HostKit's Incus instance backend, preserving the convenient `ensure`, `status`, and `destroy` commands while keeping lifecycle behavior in HostKit.
 
 ## Real remote validation
 

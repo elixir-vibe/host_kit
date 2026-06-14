@@ -34,7 +34,7 @@ defmodule HostKit.Instance.IncusBackendTest do
                        "demo",
                        "hostkit-ssh",
                        "proxy",
-                       "listen=tcp:0.0.0.0:2222",
+                       "listen=tcp:127.0.0.1:2222",
                        "connect=tcp:127.0.0.1:22"
                      ]}
 
@@ -46,11 +46,42 @@ defmodule HostKit.Instance.IncusBackendTest do
                        "demo",
                        "hostkit-web",
                        "proxy",
-                       "listen=tcp:0.0.0.0:18080",
+                       "listen=tcp:127.0.0.1:18080",
                        "connect=tcp:127.0.0.1:80"
                      ]}
 
     assert_received {"incus", ["start", "demo"]}
+    assert_received {"incus", ["exec", "demo", "--", "true"]}
+  end
+
+  test "apply configures root password ssh when a nested host declares it" do
+    parent = self()
+
+    runner = fn _command, args ->
+      send(parent, args)
+
+      case args do
+        ["info", "demo"] -> {"present", 0}
+        _args -> {"", 0}
+      end
+    end
+
+    host = %HostKit.Host{
+      name: :guest,
+      hostname: "127.0.0.1",
+      user: "root",
+      meta: %{ssh: [password: "secret"]}
+    }
+
+    instance = %Instance{name: :demo, backend: :incus, hosts: [host]}
+
+    assert :ok = Incus.apply(instance, incus_runner: runner)
+
+    assert_received ["exec", "demo", "--", "true"]
+    assert_received ["exec", "demo", "--", "sh", "-c", script]
+    assert script =~ "apt-get install -y openssh-server"
+    assert script =~ "PermitRootLogin yes"
+    assert script =~ "'secret' | chpasswd"
   end
 
   test "apply uses vm launch flag for VM instances" do

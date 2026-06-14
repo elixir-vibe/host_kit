@@ -61,8 +61,8 @@ defmodule HostKit.InstanceTest do
     assert instance.lifecycle == :ephemeral
 
     assert instance.ports == [
-             %{name: :ssh, host: 2222, guest: 22, protocol: :tcp},
-             %{name: :web, host: 18_080, guest: 80, protocol: :tcp}
+             %{name: :ssh, host: 2222, guest: 22, protocol: :tcp, bind: "127.0.0.1"},
+             %{name: :web, host: 18_080, guest: 80, protocol: :tcp, bind: "127.0.0.1"}
            ]
 
     assert [host] = instance.hosts
