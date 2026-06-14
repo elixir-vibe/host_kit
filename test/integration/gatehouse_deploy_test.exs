@@ -23,6 +23,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     state_path = Path.join(root, "state/state.etf")
     env_path = Path.join(root, "env")
     service_unit = "hostkit-gatehouse-#{unique}.service"
+    account_name = "hk-gh-#{rem(unique, 100_000)}"
     source_repo = create_source_repo!(host, unique)
 
     cleanup.(root)
@@ -46,7 +47,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
           ssh #{inspect(host.meta[:ssh] || [])}
         end
 
-        account :gatehouse, system: true, home: #{inspect(Path.dirname(state_path))}
+        account #{inspect(account_name)}, system: true, home: #{inspect(Path.dirname(state_path))}
 
         gatehouse_release :edge,
           source: [git: #{inspect(source_repo)}, path: "gatehouse", ref: "main"],
@@ -68,7 +69,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
           state_path: #{inspect(state_path)},
           env_path: #{inspect(env_path)},
           service_unit: #{inspect(service_unit)},
-          run_as: account(:gatehouse)
+          run_as: #{inspect(account_name)}
       end
       """)
       |> elem(0)
@@ -80,6 +81,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
         :package_repo,
         System.get_env("HOSTKIT_INTEGRATION_PACKAGE_REPO", "ubuntu_24_04")
       )
+      |> Keyword.put_new(:package_lock, "test/fixtures/package_locks/beam_apt.package.lock")
 
     assert {:ok, plan} = HostKit.plan(project, target_opts)
     assert {:ok, _results} = HostKit.apply(plan, Keyword.merge(target_opts, confirm: true))
@@ -130,7 +132,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
              )
 
     runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
-    :ok = HostKit.Runner.write_file(runner, archive, File.read!(archive), [])
+    upload_file!(host, archive, archive)
     assert {_, 0} = HostKit.Runner.cmd(runner, "rm", ["-rf", repo], stderr_to_stdout: true)
 
     assert {_, 0} =
@@ -138,10 +140,36 @@ defmodule HostKit.Integration.GatehouseDeployTest do
                stderr_to_stdout: true
              )
 
+    assert {_, 0} =
+             sudo_cmd(host, runner, ["git", "config", "--global", "--add", "safe.directory", repo])
+
     File.rm_rf!(work)
     File.rm(archive)
     repo
   end
+
+  defp upload_file!(host, local_path, remote_path) do
+    ssh = host.meta[:ssh] || []
+
+    args =
+      []
+      |> add_scp_option("-P", ssh[:port])
+      |> add_scp_option("-i", ssh[:identity_file])
+      |> Kernel.++([
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        local_path,
+        "#{host.user}@#{host.hostname}:#{remote_path}"
+      ])
+
+    case System.cmd("scp", args, stderr_to_stdout: true) do
+      {_output, 0} -> :ok
+      {output, status} -> raise "scp failed with #{status}:\n#{output}"
+    end
+  end
+
+  defp add_scp_option(args, _option, nil), do: args
+  defp add_scp_option(args, option, value), do: args ++ [option, to_string(value)]
 
   defp git!(cwd, args) do
     case System.cmd("git", args, cd: cwd, stderr_to_stdout: true) do

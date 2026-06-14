@@ -133,13 +133,30 @@ defmodule HostKit.IntegrationTarget do
     |> put_env("INCUS", System.get_env("INCUS"))
     |> put_env("HOSTKIT_INCUS_INSTANCE", System.get_env("HOSTKIT_INCUS_INSTANCE"))
     |> put_env("HOSTKIT_INCUS_VM", System.get_env("HOSTKIT_INCUS_VM"))
-    |> put_env("HOSTKIT_INCUS_SUDO", System.get_env("HOSTKIT_INCUS_SUDO"))
+    |> put_env("HOSTKIT_INCUS_SUDO", System.get_env("HOSTKIT_INCUS_SUDO") || incus_sudo_default())
     |> put_env("HOSTKIT_INCUS_IMAGE", System.get_env("HOSTKIT_INCUS_IMAGE"))
     |> put_env("HOSTKIT_INCUS_TYPE", System.get_env("HOSTKIT_INCUS_TYPE"))
     |> put_env(
       "HOSTKIT_SSH_PUBLIC_KEY",
       System.get_env("HOSTKIT_SSH_PUBLIC_KEY", Path.expand("~/.ssh/id_ed25519.pub"))
     )
+  end
+
+  defp incus_sudo_default do
+    incus = System.get_env("INCUS", "incus")
+
+    case System.cmd(incus, ["list"], stderr_to_stdout: true) do
+      {_output, 0} -> "false"
+      {_output, _status} -> if sudo_without_password?(), do: "true", else: "false"
+    end
+  rescue
+    ErlangError -> "false"
+  end
+
+  defp sudo_without_password? do
+    match?({_output, 0}, System.cmd("sudo", ["-n", "true"], stderr_to_stdout: true))
+  rescue
+    ErlangError -> false
   end
 
   defp put_env(env, _key, nil), do: env
@@ -175,19 +192,34 @@ defmodule HostKit.IntegrationTarget do
   end
 
   defp assert_cmd!(command, args, opts) do
-    command_opts = Keyword.put(opts, :stderr_to_stdout, true)
     IO.puts("[hostkit:integration-target] exec #{command} #{Enum.join(args, " ")}")
 
-    case System.cmd(command, args, command_opts) do
-      {output, 0} ->
-        print_command_output(output)
+    env =
+      opts
+      |> Keyword.get(:env, [])
+      |> Enum.map(fn {key, value} -> {to_charlist(key), to_charlist(value)} end)
+
+    port_opts = [:binary, :exit_status, :stderr_to_stdout, args: args]
+    port_opts = if env == [], do: port_opts, else: [{:env, env} | port_opts]
+    port = Port.open({:spawn_executable, command}, port_opts)
+
+    case collect_port(port, []) do
+      {0, _output} ->
         :ok
 
-      {output, status} ->
-        raise "command failed #{command}: #{status}\n#{output}"
+      {status, output} ->
+        raise "command failed #{command}: #{status}\n#{IO.iodata_to_binary(Enum.reverse(output))}"
     end
   end
 
-  defp print_command_output(""), do: :ok
-  defp print_command_output(output), do: IO.puts(output)
+  defp collect_port(port, output) do
+    receive do
+      {^port, {:data, data}} ->
+        IO.write(data)
+        collect_port(port, [data | output])
+
+      {^port, {:exit_status, status}} ->
+        {status, output}
+    end
+  end
 end

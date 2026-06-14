@@ -81,6 +81,7 @@ create_instance() {
   fi
 
   if ! instance_exists; then
+    echo "[hostkit:incus] launch $TYPE $INSTANCE_NAME from $IMAGE" >&2
     case "$TYPE" in
       container)
         incus_cmd launch "$IMAGE" "$INSTANCE_NAME"
@@ -94,6 +95,7 @@ create_instance() {
         ;;
     esac
   else
+    echo "[hostkit:incus] start existing $INSTANCE_NAME" >&2
     incus_cmd start "$INSTANCE_NAME" >/dev/null 2>&1 || true
   fi
 
@@ -102,10 +104,14 @@ create_instance() {
 }
 
 wait_ready() {
+  echo "[hostkit:incus] wait for instance exec readiness" >&2
   i=0
   while [ "$i" -lt 120 ]; do
     if incus_cmd exec "$INSTANCE_NAME" -- true >/dev/null 2>&1; then
       break
+    fi
+    if [ $((i % 10)) -eq 0 ]; then
+      echo "[hostkit:incus] still waiting for $INSTANCE_NAME (${i}s)" >&2
     fi
     i=$((i + 1))
     sleep 1
@@ -116,7 +122,9 @@ wait_ready() {
     exit 1
   fi
 
+  echo "[hostkit:incus] wait for cloud-init (if present)" >&2
   incus_cmd exec "$INSTANCE_NAME" -- cloud-init status --wait >/dev/null 2>&1 || true
+  echo "[hostkit:incus] instance ready" >&2
 }
 
 install_ssh() {
