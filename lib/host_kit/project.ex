@@ -110,6 +110,20 @@ defmodule HostKit.Project do
   def add_instance(%__MODULE__{} = project, %Instance{} = instance),
     do: %{project | instances: project.instances ++ [instance]}
 
+  @spec fetch_instance(t(), atom() | String.t()) :: {:ok, Instance.t()} | :error
+  def fetch_instance(%__MODULE__{} = project, name) when is_atom(name) do
+    case Enum.find(project.instances, &(&1.name == name)) do
+      nil -> :error
+      instance -> {:ok, instance}
+    end
+  end
+
+  def fetch_instance(%__MODULE__{} = project, name) when is_binary(name) do
+    fetch_instance(project, String.to_existing_atom(name))
+  rescue
+    ArgumentError -> :error
+  end
+
   @spec add_resource(t(), struct()) :: t()
   def add_resource(%__MODULE__{} = project, resource),
     do: %{project | resources: project.resources ++ [resource]}

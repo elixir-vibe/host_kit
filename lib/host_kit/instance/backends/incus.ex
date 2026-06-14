@@ -8,8 +8,14 @@ defmodule HostKit.Instance.Backends.Incus do
   @impl true
   def read(%Instance{} = instance, opts) do
     case cmd(["info", instance_name(instance)], opts) do
-      {_output, 0} -> {:ok, %{instance | meta: Map.put(instance.meta, :present, true)}}
-      {_output, _status} -> {:ok, nil}
+      {_output, 0} ->
+        {:ok, %{instance | meta: Map.put(instance.meta, :present, true)}}
+
+      {"HOSTKIT_INCUS_EXEC_ERROR:" <> reason, _status} ->
+        {:error, {:incus_command_failed, reason}}
+
+      {_output, _status} ->
+        {:ok, nil}
     end
   end
 
@@ -224,6 +230,9 @@ defmodule HostKit.Instance.Backends.Incus do
     else
       System.cmd(command, args, stderr_to_stdout: true)
     end
+  rescue
+    error in ErlangError ->
+      {"HOSTKIT_INCUS_EXEC_ERROR: #{Exception.message(error)}", 127}
   end
 
   defp maybe_project(args, opts) do

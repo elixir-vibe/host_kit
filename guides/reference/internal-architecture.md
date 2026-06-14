@@ -7,8 +7,12 @@ This guide describes the core HostKit runtime shape. It is for contributors and 
 ```mermaid
 flowchart LR
   DSL[HostKit DSL / .exs] --> Project[HostKit.Project]
+  Project --> Instances[HostKit.Instance]
   Project --> Resources[Plain resource structs]
+  Instances --> NestedHosts[Nested Host endpoints]
+  Instances --> InstanceResources[Nested resources]
   Resources --> Plan[HostKit.Plan]
+  InstanceResources --> Plan
   Plan --> Changes[HostKit.Change before/after pairs]
   Changes --> Apply[HostKit.Apply]
   Apply --> Runner[HostKit.Runner Local/SSH]
@@ -29,10 +33,23 @@ classDiagram
   class Project {
     name
     hosts
+    hosts
     services
+    instances
     resources
     providers
     conventions
+  }
+
+  class Instance {
+    backend
+    image
+    kind
+    lifecycle
+    ports
+    hosts
+    services
+    resources
   }
 
   class Resource {
@@ -74,7 +91,9 @@ classDiagram
     changes
   }
 
+  Project --> Instance
   Project --> Resource
+  Instance --> Resource : nested contents
   Plan --> Project
   Plan --> Change
   Change --> Resource : before/after
@@ -89,11 +108,14 @@ A project is the compiled form of a HostKit declaration. The DSL is only a build
 A project owns:
 
 - declared hosts,
+- lifecycle-managed instances,
 - services and their scoped resources,
 - top-level resources,
 - enabled providers,
 - provider config,
 - project conventions such as path roots and naming prefixes.
+
+Top-level hosts describe existing connection endpoints. Instances describe lifecycle-managed compute boundaries. A host nested inside an instance describes how HostKit connects into that managed boundary.
 
 ### Resource structs
 
@@ -108,6 +130,28 @@ Resources describe desired state or an operational step. Examples:
 - `%HostKit.Ingress{}`
 
 Resources are intentionally ordinary structs. `HostKit.Resource.id/1` gives each resource a stable resource id.
+
+### `HostKit.Instance`
+
+Instances are planned as lifecycle resources before their nested contents. The instance backend is selected by `backend`, while nested hosts remain ordinary connection endpoints.
+
+```mermaid
+flowchart TD
+  Project[Project] --> Instance[Instance lifecycle resource]
+  Instance --> Backend[Instance backend]
+  Instance --> NestedHost[Nested host target]
+  NestedHost --> NestedResources[Nested service/resources]
+  Instance --> Plan[Plan ordering]
+  NestedResources --> Plan
+```
+
+The generic ordering rule is:
+
+1. create/start/update the instance through its backend,
+2. resolve the nested host target,
+3. read/apply nested resources through that target.
+
+This keeps `host` and `instance` separate: `host` is how HostKit connects; `instance` is what HostKit manages as compute lifecycle.
 
 ### `HostKit.Plan`
 

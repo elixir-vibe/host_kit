@@ -98,6 +98,28 @@ mix host_kit.apply --host prod --plan host_kit.plan.json --confirm infra/config.
 mix host_kit.apply --host prod --package-lock host_kit.package.lock --dry-run infra/config.exs
 ```
 
+## `mix host_kit.instance`
+
+Manage lifecycle for a declared `instance`. The CLI boundary is backend-neutral: HostKit loads the instance declaration and delegates to the instance's declared backend. Backend-specific operational knobs should live in backend configuration or environment, not in generic `plan`/`apply` flags.
+
+```sh
+mix host_kit.instance status INSTANCE [config.exs]
+mix host_kit.instance ensure INSTANCE [config.exs]
+mix host_kit.instance destroy INSTANCE [config.exs]
+```
+
+Common options:
+
+- `--require PATH` — load project-local DSL/support code before config.
+
+Examples:
+
+```sh
+mix host_kit.instance status hostkit_livebook_demo examples/livebook_demo_instance.exs
+mix host_kit.instance ensure hostkit_livebook_demo examples/livebook_demo_instance.exs
+mix host_kit.instance destroy hostkit_livebook_demo examples/livebook_demo_instance.exs
+```
+
 ## `mix host_kit.runs`
 
 List minimal tracked run records. Records are written by `mix host_kit.apply --track`.

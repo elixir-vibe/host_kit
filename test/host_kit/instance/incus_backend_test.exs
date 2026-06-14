@@ -4,6 +4,15 @@ defmodule HostKit.Instance.IncusBackendTest do
   alias HostKit.Instance
   alias HostKit.Instance.Backends.Incus
 
+  test "read reports missing Incus command as an error" do
+    instance = Instance.new(:demo, backend: :incus, image: "images:ubuntu/24.04")
+
+    assert {:error, {:incus_command_failed, reason}} =
+             Incus.read(instance, incus: "/definitely/missing/incus")
+
+    assert reason =~ ":enoent"
+  end
+
   test "apply launches exposes ports and starts the instance" do
     parent = self()
 
