@@ -29,6 +29,7 @@ Uploaded keys are copied to a temporary `0600` file in the Livebook runtime and 
 
 ```elixir
 status = Kino.Frame.new() |> Kino.render()
+Kino.Frame.render(status, Kino.Markdown.new("Enter SSH details and click **Check SSH connection**."))
 notebook = self()
 
 form =
