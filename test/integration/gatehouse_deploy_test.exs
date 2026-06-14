@@ -98,11 +98,13 @@ defmodule HostKit.Integration.GatehouseDeployTest do
       use HostKit.DSL, providers: [HostKit.Providers.Gatehouse]
 
       project :gatehouse_deploy do
-        host :target do
-          hostname(unquote(host.hostname))
-          user(unquote(host.user))
-          sudo(unquote(host.sudo))
-          ssh(unquote(Macro.escape(host.meta[:ssh] || [])))
+        host :target, at: unquote(host.hostname) do
+          ssh(
+            Keyword.merge(unquote(Macro.escape(host.meta[:ssh] || [])),
+              user: unquote(host.user),
+              sudo: unquote(host.sudo)
+            )
+          )
         end
 
         account(unquote(account_name), system: true, home: unquote(Path.dirname(state_path)))

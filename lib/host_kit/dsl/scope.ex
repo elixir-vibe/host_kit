@@ -27,7 +27,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp project_opts(opts) do
-    if Keyword.has_key?(opts, :providers) or Keyword.has_key?(opts, :plugins) do
+    if Keyword.has_key?(opts, :providers) do
       opts
     else
       Keyword.put(opts, :providers, Process.get(@default_providers_key, []))
@@ -215,9 +215,9 @@ defmodule HostKit.DSL.Scope do
   def start_host(name, opts) do
     Process.put(@host_key, %Host{
       name: name,
-      hostname: Keyword.get(opts, :at, Keyword.get(opts, :hostname)),
-      user: Keyword.get(opts, :user),
-      sudo: Keyword.get(opts, :sudo, false),
+      hostname: Keyword.fetch!(opts, :at),
+      user: nil,
+      sudo: false,
       meta: Keyword.get(opts, :meta, %{})
     })
   end

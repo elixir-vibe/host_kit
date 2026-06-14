@@ -34,7 +34,7 @@ defmodule HostKit.Provider do
   def resolve(opts) when is_list(opts) do
     providers =
       if Keyword.keyword?(opts) do
-        Keyword.get(opts, :providers, Keyword.get(opts, :plugins, []))
+        Keyword.get(opts, :providers, [])
       else
         opts
       end

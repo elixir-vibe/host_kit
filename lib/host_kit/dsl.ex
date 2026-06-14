@@ -7,9 +7,9 @@ defmodule HostKit.DSL do
   """
 
   defmacro __using__(opts) do
-    plugins =
+    providers =
       opts
-      |> Keyword.get(:providers, Keyword.get(opts, :plugins, []))
+      |> Keyword.get(:providers, [])
       |> Enum.map(&Macro.expand(&1, __CALLER__))
       |> HostKit.Provider.resolve()
 
@@ -21,7 +21,7 @@ defmodule HostKit.DSL do
     import_sigils? = Keyword.get(opts, :sigils, true)
 
     provider_imports =
-      plugins
+      providers
       |> HostKit.Provider.dsl_modules()
       |> Enum.map(fn dsl ->
         quote do
@@ -44,7 +44,7 @@ defmodule HostKit.DSL do
       end
 
     quote do
-      HostKit.DSL.Scope.put_default_providers(unquote(plugins))
+      HostKit.DSL.Scope.put_default_providers(unquote(providers))
       import HostKit.DSL
       import HostKit.DSL.Systemd
       unquote(sigil_import)
@@ -263,12 +263,6 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro plugins(plugins) do
-    quote do
-      HostKit.DSL.Scope.put_providers(unquote(plugins))
-    end
-  end
-
   defmacro tenant(name, opts \\ [], do: block) do
     quote do
       HostKit.DSL.Scope.put_tenant(unquote(name), unquote(opts))
@@ -409,29 +403,15 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro hostname(value) do
-    quote do
-      HostKit.DSL.Scope.update_current(:host, &Map.put(&1, :hostname, unquote(value)))
-    end
-  end
-
   defmacro user(value) do
     quote do
-      if HostKit.DSL.Scope.ssh_active?() do
-        HostKit.DSL.Scope.put_ssh(:user, unquote(value))
-      else
-        HostKit.DSL.Scope.update_current(:host, &Map.put(&1, :user, unquote(value)))
-      end
+      HostKit.DSL.Scope.put_ssh(:user, unquote(value))
     end
   end
 
   defmacro sudo(value) do
     quote do
-      if HostKit.DSL.Scope.ssh_active?() do
-        HostKit.DSL.Scope.put_ssh(:sudo, unquote(value))
-      else
-        HostKit.DSL.Scope.update_current(:host, &Map.put(&1, :sudo, unquote(value)))
-      end
+      HostKit.DSL.Scope.put_ssh(:sudo, unquote(value))
     end
   end
 
@@ -649,12 +629,6 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro sandbox(profile, opts \\ []) do
-    quote do
-      HostKit.DSL.Systemd.Scope.apply_sandbox(unquote(profile), unquote(opts))
-    end
-  end
-
   defmacro isolate(do: block) do
     quote do
       HostKit.DSL.Systemd.Scope.start_isolation(:strict_app, [])
@@ -689,6 +663,12 @@ defmodule HostKit.DSL do
   defmacro writable(path) do
     quote do
       HostKit.DSL.Systemd.Scope.put_isolation_sandbox(:read_write_paths, unquote(path))
+    end
+  end
+
+  defmacro private_network(value) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_isolation_sandbox(:private_network, unquote(value))
     end
   end
 

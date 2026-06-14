@@ -1,10 +1,11 @@
 use HostKit.DSL
 
 project :toys do
-  host :elixir_toys do
-    hostname("elixir.toys")
-    user("dannote")
-    sudo(true)
+  host :elixir_toys, at: "elixir.toys" do
+    ssh do
+      user("dannote")
+      sudo(true)
+    end
   end
 
   service :exograph do

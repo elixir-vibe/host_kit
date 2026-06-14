@@ -67,11 +67,10 @@ defmodule Mix.Tasks.HostKit.OptionsTest do
     use HostKit.DSL
 
     project :demo do
-      host :integration do
-        hostname "example.test"
-        user "root"
-        sudo true
+      host :integration, at: "example.test" do
         ssh port: 2222,
+            user: "root",
+            sudo: true,
             identity_file: "/tmp/id",
             password: secret_env(#{inspect(env_var)}),
             silently_accept_hosts: true

@@ -123,7 +123,7 @@ Use `HOSTKIT_INCUS_TYPE=vm` for an Incus VM instead of the default container.
 
 ## Real remote validation
 
-Copy `examples/integration_hosts.example.exs`, set the hostname/auth settings, then run:
+Copy `examples/integration_hosts.example.exs`, set the host/auth settings, then run:
 
 ```sh
 HOSTKIT_SSH_PASSWORD='...' \

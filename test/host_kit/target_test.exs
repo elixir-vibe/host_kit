@@ -32,10 +32,8 @@ defmodule HostKit.TargetTest do
     use HostKit.DSL
 
     project :demo do
-      host :prod do
-        hostname "example.test"
-        user "root"
-        ssh retry: [attempts: 3, base_delay: 0], silently_accept_hosts: true
+      host :prod, at: "example.test" do
+        ssh retry: [attempts: 3, base_delay: 0], silently_accept_hosts: true, user: "root"
       end
     end
     """

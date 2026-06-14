@@ -36,7 +36,7 @@ defmodule HostKit.FirewallTest do
     use HostKit.DSL
 
     project :demo do
-      host :prod, hostname: "example.com" do
+      host :prod, at: "example.com" do
         firewall do
           allow tcp: 22, from: :any
           deny :all

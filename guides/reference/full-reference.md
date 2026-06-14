@@ -475,7 +475,7 @@ end
 Host-scoped policy lives inside `host`:
 
 ```elixir
-host :prod, hostname: "elixir.toys" do
+host :prod, at: "elixir.toys" do
   firewall do
     allow tcp: 22, from: :any
     deny :all
@@ -545,25 +545,30 @@ HostKit.OtelCollector.config(project, endpoint: "otel.example:4317")
 
 ## Workspace sandbox profiles
 
-Systemd-backed sandbox profiles can be applied inside daemons:
+Systemd-backed isolation profiles can be applied inside daemons:
 
 ```elixir
 workspace :blog, owner: :alice do
   service :preview do
-    daemon unit_name() do
-      run exec_start: ["mix", "phx.server"]
-      sandbox :vibe_dev
+    daemon do
+      exec ["mix", "phx.server"]
+
+      isolate :vibe_dev do
+        writable root_path(:data)
+        network :loopback
+      end
     end
   end
 end
 ```
 
-Profiles include `:vibe_dev`, `:strict_app`, and `:untrusted`, and can be overridden:
+Profiles include `:vibe_dev`, `:strict_app`, and `:untrusted`, and can be overridden inside `isolate`:
 
 ```elixir
-sandbox :untrusted,
-  resources: [memory_max: "256M"],
-  sandbox: [private_network: false]
+isolate :untrusted do
+  memory_max "256M"
+  private_network false
+end
 ```
 
 ## Workspace preview helper

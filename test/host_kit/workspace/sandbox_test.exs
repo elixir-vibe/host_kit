@@ -8,9 +8,10 @@ defmodule HostKit.WorkspaceSandboxTest do
     project :demo do
       workspace :blog, owner: :alice do
         service :preview do
-          daemon unit_name() do
-            run exec_start: ["mix", "phx.server"]
-            sandbox :vibe_dev
+          daemon do
+            exec ["mix", "phx.server"]
+            isolate :vibe_dev do
+            end
           end
         end
       end
@@ -39,8 +40,12 @@ defmodule HostKit.WorkspaceSandboxTest do
     project :demo do
       service :app do
         daemon unit_name() do
-          run exec_start: ["/usr/bin/env", "true"]
-          sandbox :untrusted, resources: [memory_max: "256M"], sandbox: [private_network: false]
+          exec ["/usr/bin/env", "true"]
+
+          isolate :untrusted do
+            memory_max "256M"
+            private_network false
+          end
         end
       end
     end

@@ -57,4 +57,4 @@ end
 - `LockPersonality=`
 - `SystemCallArchitectures=native`
 
-Use `isolate :profile do ... end` only when selecting a specific isolation profile is the point. Lower-level systemd directives remain available through `unit`, `service`, `run`, `install`, and specific helpers such as `after_target`, `wants`, `requires`, `read_write_paths`, `sandbox`, and `hardening`.
+Use `isolate :profile do ... end` only when selecting a specific isolation profile is the point. Lower-level systemd directives remain available through `unit`, `service`, `run`, `install`, and specific helpers such as `after_target`, `wants`, `requires`, `read_write_paths`, and `hardening`.

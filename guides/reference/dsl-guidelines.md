@@ -193,7 +193,7 @@ The profile name is an internal preset selected by the DSL default. Advanced use
 
 Profile names must describe security intent, not implementation mechanics. Avoid vague names in first-touch docs. `:strict_app` currently means the default strict service sandbox: no new privileges, protected system/home/kernel surfaces, restricted address families, explicit writable paths, and resource controls.
 
-## Escape-hatch and deprecation policy
+## DSL layering policy
 
 HostKit keeps low-level directives when they expose a real Linux/systemd/provider primitive that advanced users may need. Those directives are **escape hatches**, not canonical application DSL.
 
@@ -204,7 +204,6 @@ These stay available and documented in the directive inventory/reference because
 - `systemd_service`, `systemd_timer`
 - `unit`, `service`, `timer`, `install`
 - `environment_file`, `exec_start`, `exec_stop`, `wanted_by`, `read_write_paths`
-- `sandbox` for direct profile/options application
 - explicit `env_file path do ... end`
 - explicit `listener(:name)` when a string upstream is required
 - explicit named Caddy sites: `caddy_site :name, "host" do ... end`
@@ -213,19 +212,15 @@ These stay available and documented in the directive inventory/reference because
 
 These should not appear in README/getting-started/tutorial happy paths unless the section is explicitly about the low-level primitive:
 
-- `hostname` inside `host`; use `host :name, at: ...`
+- split host declarations; use `host :name, at: ...`
 - root SSH plus `sudo true`; root does not need sudo
 - `service :bootstrap`; use `bootstrap do`
 - paired `env_file` and `environment_file`; use contextual `env`
 - raw `exec_start`; use `exec`
 - raw `wanted_by :multi_user`; `daemon do` defaults it
 - raw `read_write_paths`; use `writable :storage`
-- `sandbox :strict_app`; use `isolate do`
+- raw sandbox keyword lists; use `isolate do`
 - `reverse_proxy listener(:http)`; use `reverse_proxy :http`
-
-### Deprecation threshold
-
-Do not deprecate an escape hatch just because it is low-level. Deprecate only when there is a strictly better directive that preserves the same power and the old spelling creates ambiguity or unsafe behavior. Deprecations should include migration examples and should not break existing plan/apply projects silently.
 
 ## README standard
 
@@ -259,7 +254,6 @@ Legend:
 | --- | --- | --- |
 | `project` | Canonical | Top-level declaration that returns a `%HostKit.Project{}`. |
 | `providers` | Reference | Set provider modules for the project. Prefer `use HostKit.DSL, providers: [...]` in examples. |
-| `plugins` | Reference | Older spelling for provider modules. Prefer `providers`. |
 | `provider` | Reference | Configure one provider, such as Caddy paths. |
 | `roots` | Reference | Declare project path roots. |
 | `prefixes` | Reference | Declare naming prefixes for users, units, etc. |
@@ -280,8 +274,7 @@ Legend:
 | `port` | Reference | SSH port inside `ssh`. |
 | `accept_hosts` | Canonical | Accept unknown host keys for bootstrap/demo environments. |
 | `retry` | Canonical | SSH connection retry policy. |
-| `sudo` | Reference | Enable sudo for non-root SSH users. Root examples should not set it. |
-| `hostname` | Escape hatch | Old split host address directive. Prefer `host :name, at: ...`. |
+| `sudo` | Reference | Enable sudo for non-root SSH users inside `ssh`. Root examples should not set it. |
 | `secret_env` | Reference | HostKit control-plane secret from an environment variable. |
 
 ### Bootstrap, packages, commands, files
@@ -360,7 +353,7 @@ Legend:
 | `every` | Canonical | Timer calendar shorthand. |
 | `persistent` | Reference | Timer persistence. |
 | `on_boot` | Reference | Timer boot delay. |
-| `sandbox` | Escape hatch | Older direct sandbox profile application. Prefer `isolate`. |
+| `private_network` | Reference | Override private network behavior inside `isolate`. |
 | `network_policy` | Reference | Explicit network policy. Prefer `network` inside `isolate` for simple cases. |
 
 ### Ingress, proxy, readiness, observability

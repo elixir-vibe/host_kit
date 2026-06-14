@@ -30,8 +30,7 @@ defmodule HostKit.Project do
 
   @spec new(atom(), keyword()) :: t()
   def new(name, opts \\ []) when is_atom(name) do
-    providers =
-      opts |> Keyword.get(:providers, Keyword.get(opts, :plugins, [])) |> Provider.resolve()
+    providers = opts |> Keyword.get(:providers, []) |> Provider.resolve()
 
     %__MODULE__{
       name: name,

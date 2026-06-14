@@ -115,11 +115,13 @@ defmodule HostKit.RemoteDownLastIntegrationTest do
       use HostKit.DSL
 
       project :remote_down_last do
-        host unquote(host_name) do
-          hostname(unquote(hostname))
-          user(unquote(user))
-          sudo(unquote(sudo))
-          ssh(unquote(Macro.escape(ssh_opts)))
+        host unquote(host_name), at: unquote(hostname) do
+          ssh(
+            Keyword.merge(unquote(Macro.escape(ssh_opts)),
+              user: unquote(user),
+              sudo: unquote(sudo)
+            )
+          )
         end
 
         service :demo do
