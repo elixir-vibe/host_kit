@@ -207,3 +207,186 @@ The README example should showcase killer features without plumbing:
 - Caddy reverse proxy by listener name.
 
 It should not show repeated paths, explicit `multi-user.target`, `environment_file`, `read_write_paths`, or `listener(:http)` unless explaining internals.
+
+## Directive inventory
+
+This inventory lists the public macros exported by HostKit's core DSL, systemd DSL, Caddy provider DSL, and Elixir app recipe DSL. It is intentionally explicit so the reference does not drift from the actual directive surface.
+
+Legend:
+
+- **Canonical** — preferred in README and normal project examples.
+- **Reference** — useful, but belongs in reference/provider/recipe docs rather than the first example.
+- **Escape hatch** — low-level backend vocabulary for advanced cases.
+
+### Core project and composition
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `project` | Canonical | Top-level declaration that returns a `%HostKit.Project{}`. |
+| `providers` | Reference | Set provider modules for the project. Prefer `use HostKit.DSL, providers: [...]` in examples. |
+| `plugins` | Reference | Older spelling for provider modules. Prefer `providers`. |
+| `provider` | Reference | Configure one provider, such as Caddy paths. |
+| `roots` | Reference | Declare project path roots. |
+| `prefixes` | Reference | Declare naming prefixes for users, units, etc. |
+| `tenant` | Reference | Declare a tenant and corresponding workspace scope. |
+| `workspace` | Reference | Scope path and identity conventions for per-user/per-workspace services. |
+| `path_name` | Reference | Override the service path/identity slug. |
+| `put_in_meta` | Escape hatch | Attach arbitrary metadata to the current service. |
+
+### Host and SSH
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `host` | Canonical | Declare a named deployment host; use `host :app, at: "example.com" do ... end`. |
+| `ssh` | Canonical | Configure host SSH transport as a block. |
+| `user` | Canonical | SSH user inside `ssh`; host user in old host syntax. |
+| `identity_file` | Canonical | SSH key path inside `ssh`. |
+| `password` | Reference | SSH password/secret inside `ssh`. |
+| `port` | Reference | SSH port inside `ssh`. |
+| `accept_hosts` | Canonical | Accept unknown host keys for bootstrap/demo environments. |
+| `retry` | Canonical | SSH connection retry policy. |
+| `sudo` | Reference | Enable sudo for non-root SSH users. Root examples should not set it. |
+| `hostname` | Escape hatch | Old split host address directive. Prefer `host :name, at: ...`. |
+| `secret_env` | Reference | HostKit control-plane secret from an environment variable. |
+
+### Bootstrap, packages, commands, files
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `bootstrap` | Canonical | Group host bootstrap resources without pretending they are an app service. |
+| `package` | Canonical | Declare one OS package. |
+| `packages` | Reference | Declare several OS packages with shared options. |
+| `mise` | Canonical | Bootstrap system-wide mise and managed tools. |
+| `tool` | Canonical | Declare a mise-managed tool version. |
+| `directory` | Reference | Declare an explicit directory resource. Prefer `storage` for service data. |
+| `file` | Reference | Declare an explicit file resource. |
+| `source` | Reference | Declare a source artifact/repository. |
+| `source_ref` | Reference | Reference a declared source. |
+| `command` | Escape hatch | Low-level command resource. |
+| `run` | Reference | Command resource helper; also systemd service-option helper in systemd scope. |
+| `git` | Reference | Git command resource helper. |
+| `bash` | Reference | Bash command resource helper. |
+
+### Service conventions, storage, env
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `service` | Canonical | Declare an application/service boundary. |
+| `account` | Canonical | Declare/ref service account; `account system: true` derives the service user. |
+| `storage` | Canonical | Declare named service storage and its directory resource. |
+| `env` | Canonical | Declare a managed env file in service scope; attach it in daemon scope. |
+| `secret` | Canonical | Add a secret entry inside env/env_file. |
+| `set` | Canonical | Add non-secret config inside env/env_file or provider config. |
+| `service_name` | Reference | Return current service name. |
+| `service_user` | Reference | Return convention-derived service user; systemd setter in systemd scope. |
+| `unit_name` | Reference | Return convention-derived systemd unit name. |
+| `root_path` | Reference | Resolve a service path under a project root. |
+| `storage_volume` | Reference | Return named storage metadata. |
+| `storage_path` | Reference | Return named storage path. |
+| `writable_storage_paths` | Reference | Return paths for writable storage volumes. |
+| `backup_storage` | Reference | Return storage volumes marked for backup. |
+| `env_file` | Escape hatch | Declare an env file at an explicit path. Prefer contextual `env`. |
+
+### Daemons and systemd
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `daemon` | Canonical | Declare a persistent service unit; defaults unit name and multi-user install. |
+| `exec` | Canonical | Human spelling for service command. |
+| `listen` | Canonical | Declare a logical listener and systemd listen metadata in daemon scope. |
+| `isolate` | Canonical | Apply default strict service isolation as a block. |
+| `memory_max` | Canonical | Set memory limit inside `isolate`. |
+| `writable` | Canonical | Allow a storage/path as writable inside `isolate`. |
+| `network` | Canonical | Network policy inside `isolate`; currently supports `:loopback`. |
+| `systemd_service` | Escape hatch | Declare a raw systemd service resource. |
+| `systemd_timer` | Escape hatch | Declare a raw systemd timer resource. |
+| `job` | Reference | Systemd service intended as a job. |
+| `schedule` | Reference | Systemd timer helper. |
+| `unit` | Escape hatch | Set raw `[Unit]` directives. |
+| `systemd` | Reference | Readiness check for a systemd unit. |
+| `service` | Escape hatch | Set raw `[Service]` directives in systemd scope. |
+| `timer` | Escape hatch | Set raw `[Timer]` directives. |
+| `install` | Escape hatch | Set raw `[Install]` directives. |
+| `description` | Reference | Set unit description. |
+| `after_units` | Escape hatch | Set raw systemd `After=` units. |
+| `after_target` | Reference | Set `After=` using target aliases. |
+| `wants` | Reference | Set `Wants=` using target aliases. |
+| `requires` | Reference | Set `Requires=` using target aliases. |
+| `service_group` | Reference | Set systemd service group. |
+| `working_directory` | Reference | Set service working directory. |
+| `environment_file` | Escape hatch | Set raw systemd env file path. Prefer `env :name`. |
+| `exec_start` | Escape hatch | Raw systemd spelling. Prefer `exec`. |
+| `exec_stop` | Reference | Set stop command. |
+| `restart` | Reference | Set restart policy. |
+| `restart_sec` | Reference | Set restart delay. |
+| `wanted_by` | Escape hatch | Set install target. Omit for normal daemons. |
+| `hardening` | Reference | Apply older hardening presets. Prefer `isolate`. |
+| `read_write_paths` | Escape hatch | Raw writable paths. Prefer `writable :storage`. |
+| `every` | Canonical | Timer calendar shorthand. |
+| `persistent` | Reference | Timer persistence. |
+| `on_boot` | Reference | Timer boot delay. |
+| `sandbox` | Escape hatch | Older direct sandbox profile application. Prefer `isolate`. |
+| `network_policy` | Reference | Explicit network policy. Prefer `network` inside `isolate` for simple cases. |
+
+### Ingress, proxy, readiness, observability
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `ingress` | Reference | Declare provider-neutral ingress. |
+| `server` | Reference | Declare ingress server block. |
+| `tls` | Reference | Set ingress/proxy TLS mode. |
+| `route` | Reference | Declare ingress route. |
+| `proxy` | Reference | Configure generic proxy or proxy resource depending on arity/context. |
+| `http` | Reference | Readiness HTTP check or proxy listener depending on context. |
+| `https` | Reference | Proxy HTTPS listener. |
+| `state` | Reference | Proxy state path. |
+| `acme` | Reference | Proxy ACME config. |
+| `balance` | Reference | Proxy balancing policy. |
+| `health` | Reference | Proxy health check. |
+| `drain` | Reference | Proxy drain timeout. |
+| `target` | Reference | Proxy upstream target. |
+| `ready` | Reference | Declare readiness checks. |
+| `endpoint` | Reference | Declare or reference service endpoints. |
+| `listener` | Reference | Resolve listener upstream. Prefer symbolic references in provider DSLs. |
+| `monitor` | Reference | Attach monitor checks. |
+| `observability` | Reference | Group observability declarations. |
+| `telemetry` | Reference | Attach telemetry metadata/config. |
+| `logs` | Reference | Attach log metadata/config. |
+| `preview` | Reference | Compose listener, Caddy preview, monitor, telemetry, and logs. |
+
+### Firewall, workspace, agents
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `firewall` | Reference | Declare firewall policy. |
+| `allow` | Reference | Add allow firewall rule. |
+| `deny` | Reference | Add deny firewall rule. |
+| `egress` | Reference | Service egress policy. |
+| `inside` | Reference | Declare checks intended to run inside a workspace sandbox. |
+| `inside_monitor` | Reference | Add an inside-sandbox monitor. |
+| `agent` | Reference | Declare default workspace agent service. |
+| `workspace_agent` | Reference | Alias for workspace agent declaration. |
+
+### Caddy provider
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `caddy_site` | Canonical | Declare a Caddy site. README form is `caddy_site "host" do ... end`. |
+| `reverse_proxy` | Canonical | Proxy to a listener symbol, endpoint, string upstream, or upstream list. |
+| `encode` | Reference | Add Caddy encoding directive. |
+| `root` | Reference | Add Caddy root directive. |
+| `file_server` | Reference | Add Caddy file server directive. |
+
+### Elixir app recipe
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `elixir_app` | Reference | Compose source, runtime, release, env, systemd, and optional Caddy for an Elixir app. |
+| `source` | Reference | Recipe source config. |
+| `phoenix` | Reference | Phoenix-specific recipe config. |
+| `runtime` | Reference | Runtime config. |
+| `release` | Reference | Release config. |
+| `caddy` | Reference | Recipe Caddy config. |
+| `ecto` | Reference | Ecto migration/rollback config. |
+| `repo` | Reference | Ecto repo entry. |
+| `mix` | Reference | Mix command entry for recipe operations. |
