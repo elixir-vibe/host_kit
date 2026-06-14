@@ -25,55 +25,35 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     env_path = Path.join(root, "env")
     service_unit = "hostkit-gatehouse-#{unique}.service"
     account_name = "hk-gh-#{rem(unique, 100_000)}"
-    source_repo = create_source_repo!(host, unique)
+    mode = System.get_env("HOSTKIT_GATEHOUSE_DEPLOY_MODE", "source")
+    runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
+    source_repo = if mode == "source", do: create_source_repo!(host, unique), else: nil
 
     cleanup.(root)
 
+    if mode == "prebuilt" do
+      create_prebuilt_release!(host, release_path, unique)
+    end
+
     on_exit(fn ->
-      runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
       sudo_cmd(host, runner, ["systemctl", "stop", service_unit])
       cleanup.(root)
-      cleanup.(source_repo)
+      if source_repo, do: cleanup.(source_repo)
     end)
 
     project =
-      Code.eval_string("""
-      use HostKit.DSL, providers: [HostKit.Providers.Gatehouse]
-
-      project :gatehouse_deploy do
-        host :target do
-          hostname #{inspect(host.hostname)}
-          user #{inspect(host.user)}
-          sudo #{inspect(host.sudo)}
-          ssh #{inspect(host.meta[:ssh] || [])}
-        end
-
-        account #{inspect(account_name)}, system: true, home: #{inspect(Path.dirname(state_path))}
-
-        gatehouse_release :edge,
-          source: [git: #{inspect(source_repo)}, path: "gatehouse", ref: "main"],
-          release_path: #{inspect(release_path)}
-
-        service :edge do
-          ingress :web, path: #{inspect(config_path)}, state: #{inspect(state_path)} do
-            server ":#{http_port}" do
-              route host: "gatehouse.example.test" do
-                proxy to: "http://127.0.0.1:9"
-              end
-            end
-          end
-        end
-
-        gatehouse :edge,
-          release_path: #{inspect(release_path)},
-          config_path: #{inspect(config_path)},
-          state_path: #{inspect(state_path)},
-          env_path: #{inspect(env_path)},
-          service_unit: #{inspect(service_unit)},
-          run_as: #{inspect(account_name)}
-      end
-      """)
-      |> elem(0)
+      project(%{
+        host: host,
+        mode: mode,
+        source_repo: source_repo,
+        release_path: release_path,
+        config_path: config_path,
+        state_path: state_path,
+        env_path: env_path,
+        service_unit: service_unit,
+        account_name: account_name,
+        http_port: http_port
+      })
 
     target_opts =
       host
@@ -85,8 +65,6 @@ defmodule HostKit.Integration.GatehouseDeployTest do
       |> Keyword.put_new(:package_lock, "test/fixtures/package_locks/beam_apt.package.lock")
 
     assert {:ok, plan} = HostKit.plan(project, target_opts)
-
-    runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
 
     down_plan =
       HostKit.IntegrationCase.on_exit_rollback(plan, target_opts,
@@ -106,6 +84,109 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     assert {:ok, _results} = HostKit.apply(plan, Keyword.merge(target_opts, confirm: true))
 
     assert {:ok, "active\n"} = wait_until_active(host, runner, service_unit, 120)
+  end
+
+  defp project(%{
+         host: host,
+         mode: mode,
+         source_repo: source_repo,
+         release_path: release_path,
+         config_path: config_path,
+         state_path: state_path,
+         env_path: env_path,
+         service_unit: service_unit,
+         account_name: account_name,
+         http_port: http_port
+       }) do
+    Code.eval_string("""
+    use HostKit.DSL, providers: [HostKit.Providers.Gatehouse]
+
+    project :gatehouse_deploy do
+      host :target do
+        hostname #{inspect(host.hostname)}
+        user #{inspect(host.user)}
+        sudo #{inspect(host.sudo)}
+        ssh #{inspect(host.meta[:ssh] || [])}
+      end
+
+      account #{inspect(account_name)}, system: true, home: #{inspect(Path.dirname(state_path))}
+
+      #{gatehouse_release_dsl(mode, source_repo, release_path)}
+
+      service :edge do
+        ingress :web, path: #{inspect(config_path)}, state: #{inspect(state_path)} do
+          server ":#{http_port}" do
+            route host: "gatehouse.example.test" do
+              proxy to: "http://127.0.0.1:9"
+            end
+          end
+        end
+      end
+
+      gatehouse :edge,
+        release_path: #{inspect(release_path)},
+        config_path: #{inspect(config_path)},
+        state_path: #{inspect(state_path)},
+        env_path: #{inspect(env_path)},
+        service_unit: #{inspect(service_unit)},
+        run_as: #{inspect(account_name)}
+    end
+    """)
+    |> elem(0)
+  end
+
+  defp gatehouse_release_dsl("source", source_repo, release_path) do
+    """
+    gatehouse_release :edge,
+      source: [git: #{inspect(source_repo)}, path: "gatehouse", ref: "main"],
+      release_path: #{inspect(release_path)}
+    """
+  end
+
+  defp gatehouse_release_dsl(_mode, _source_repo, _release_path), do: ""
+
+  defp create_prebuilt_release!(host, release_path, unique) do
+    gatehouse = Path.expand("../gatehouse", File.cwd!())
+    archive = Path.join(System.tmp_dir!(), "hostkit-gatehouse-release-#{unique}.tgz")
+
+    File.rm(archive)
+
+    mix!(gatehouse, ["deps.get"], [{"MIX_ENV", "prod"}])
+    mix!(gatehouse, ["deps.compile"], [{"MIX_ENV", "prod"}])
+    mix!(gatehouse, ["release", "--overwrite"], [{"MIX_ENV", "prod"}])
+
+    release_dir = Path.join(gatehouse, "_build/prod/rel/gatehouse")
+
+    assert {_, 0} =
+             System.cmd("tar", ["-C", release_dir, "-czf", archive, "."], stderr_to_stdout: true)
+
+    runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
+    remote_archive = "/tmp/#{Path.basename(archive)}"
+    upload_file!(host, archive, remote_archive)
+
+    assert {_, 0} =
+             sudo_cmd(host, runner, [
+               "sh",
+               "-c",
+               "set -eu; rm -rf #{HostKit.Shell.escape(release_path)}; mkdir -p #{HostKit.Shell.escape(release_path)}; tar -C #{HostKit.Shell.escape(release_path)} -xzf #{HostKit.Shell.escape(remote_archive)}"
+             ])
+
+    File.rm(archive)
+  end
+
+  defp mix!(cwd, args, env) do
+    env =
+      Keyword.merge(
+        [MIX_ENV: "dev"],
+        Enum.map(env, fn {key, value} -> {String.to_atom(key), value} end)
+      )
+
+    env = Enum.map(env, fn {key, value} -> {Atom.to_string(key), value} end)
+
+    case System.cmd("mix", args, cd: cwd, env: env, stderr_to_stdout: true) do
+      {_output, 0} -> :ok
+      {output, status} -> raise "mix #{Enum.join(args, " ")} failed with #{status}:\n#{output}"
+    end
   end
 
   defp create_source_repo!(host, unique) do

@@ -46,7 +46,7 @@ The same `ingress` declaration can also be consumed by the Caddy provider. HostK
 
 `ingress` is the preferred public API for application routing. The lower-level `proxy ..., provider: :gatehouse` resource remains available as an advanced escape hatch when you need to express Gatehouse-specific listeners, services, balancing, health checks, drain behavior, or TLS details that are not yet modeled by provider-neutral ingress.
 
-The full source-build deployment path is covered by an opt-in Incus integration test:
+The deploy integration defaults to a target-side source build. This path is intentionally heavier, but validates the complete Linux deployment flow:
 
 ```sh
 HOSTKIT_INTEGRATION=1 \
@@ -56,4 +56,4 @@ HOSTKIT_INCUS_INTEGRATION=1 \
 mix test test/integration/gatehouse_deploy_test.exs
 ```
 
-That test builds Gatehouse from source on a Linux target, writes the generated config, starts `gatehouse.service`, and verifies systemd reports it active.
+There is also an experimental `HOSTKIT_GATEHOUSE_DEPLOY_MODE=prebuilt` path that builds a local release and uploads it to the target. Use it only when the local build host is ABI-compatible with the target OS; otherwise the release ERTS may require a newer glibc than the target provides.
