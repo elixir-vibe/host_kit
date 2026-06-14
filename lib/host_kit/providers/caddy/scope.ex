@@ -1,4 +1,4 @@
-defmodule HostKit.Plugins.Caddy.Scope do
+defmodule HostKit.Providers.Caddy.Scope do
   @moduledoc false
 
   alias HostKit.Caddy.Directive.{Encode, FileServer, ReverseProxy, Root}

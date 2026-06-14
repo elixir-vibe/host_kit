@@ -15,9 +15,9 @@ defmodule HostKit.ApiTest do
              "Plan: 0 to create, 0 to update, 0 to delete, 0 read errors, 0 unchanged"
   end
 
-  test "provider namespace aliases Caddy provider" do
-    assert HostKit.Providers.Caddy.provider_name() == HostKit.Plugins.Caddy.provider_name()
-    assert HostKit.Providers.Caddy.dsl_modules() == HostKit.Plugins.Caddy.dsl_modules()
-    assert HostKit.Providers.Caddy.resource_types() == HostKit.Plugins.Caddy.resource_types()
+  test "provider namespace exposes Caddy provider" do
+    assert HostKit.Providers.Caddy.provider_name() == :caddy
+    assert HostKit.Providers.Caddy.dsl_modules() == [HostKit.Providers.Caddy.DSL]
+    assert HostKit.Providers.Caddy.resource_types() == [HostKit.Caddy.Site]
   end
 end

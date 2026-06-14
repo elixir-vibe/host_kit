@@ -1,7 +1,7 @@
-use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
+use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
 project :caddy_local_demo do
-  provider :caddy, HostKit.Plugins.Caddy do
+  provider :caddy, HostKit.Providers.Caddy do
     set :sites_dir, System.fetch_env!("HOST_KIT_CADDY_TEST_SITES_DIR")
   end
 

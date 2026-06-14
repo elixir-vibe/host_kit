@@ -1,4 +1,4 @@
-use HostKit.DSL, providers: [HostKit.Plugins.Caddy]
+use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
 project :caddy_static_demo do
   service :landing do

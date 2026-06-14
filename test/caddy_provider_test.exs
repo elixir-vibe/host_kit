@@ -8,7 +8,7 @@ defmodule HostKit.CaddyProviderTest do
   test "caddy provider contributes DSL and renderer" do
     project = HostKit.load!(fixture_path("caddy_project.hostkit"))
 
-    assert HostKit.Plugins.Caddy in project.providers
+    assert HostKit.Providers.Caddy in project.providers
 
     assert [
              %HostKit.Service{
