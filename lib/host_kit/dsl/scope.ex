@@ -338,6 +338,19 @@ defmodule HostKit.DSL.Scope do
     listener
   end
 
+  def put_endpoint(name, opts) do
+    endpoint = HostKit.Endpoint.declaration(name, opts)
+
+    update_current(:service, fn service ->
+      endpoints = service.meta |> Map.get(:endpoints, %{}) |> Map.put(name, endpoint)
+      %{service | meta: Map.put(service.meta, :endpoints, endpoints)}
+    end)
+
+    endpoint
+  end
+
+  def service_active?, do: Process.get(@service_key) != nil
+
   def listener(name) do
     service = Process.get(@service_key) || raise "no HostKit service in scope"
     service.meta |> Map.get(:listeners, %{}) |> Map.fetch!(name)

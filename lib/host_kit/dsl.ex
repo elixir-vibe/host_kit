@@ -573,9 +573,14 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro endpoint(service, name \\ :default, opts \\ []) do
+  defmacro endpoint(name_or_service, name_or_opts \\ :default, opts \\ []) do
     quote do
-      HostKit.Endpoint.new(unquote(service), unquote(name), unquote(opts))
+      if HostKit.DSL.Scope.service_active?() and is_list(unquote(name_or_opts)) and
+           unquote(opts) == [] do
+        HostKit.DSL.Scope.put_endpoint(unquote(name_or_service), unquote(name_or_opts))
+      else
+        HostKit.Endpoint.new(unquote(name_or_service), unquote(name_or_opts), unquote(opts))
+      end
     end
   end
 

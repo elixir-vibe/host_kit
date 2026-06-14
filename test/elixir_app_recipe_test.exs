@@ -18,7 +18,13 @@ defmodule HostKit.ElixirAppRecipeTest do
       end
     end
 
-    resources = HostKit.Project.resources(ElixirAppRecipeProject.project())
+    project = ElixirAppRecipeProject.project()
+    resources = HostKit.Project.resources(project)
+
+    assert [service] = project.services
+
+    assert %HostKit.Endpoint{port: 4000, protocol: :http, health: "/health"} =
+             service.meta.endpoints.http
 
     assert Enum.any?(resources, &match?(%HostKit.Resources.Package{name: :git}, &1))
     assert Enum.any?(resources, &match?(%HostKit.Resources.Package{name: :caddy}, &1))

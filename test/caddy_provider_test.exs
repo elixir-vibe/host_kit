@@ -44,6 +44,27 @@ defmodule HostKit.CaddyProviderTest do
            } in handlers
   end
 
+  test "caddy reverse_proxy accepts endpoint references" do
+    source = """
+    use HostKit.DSL, providers: [HostKit.Providers.Caddy]
+
+    project :demo do
+      service :hello_phoenix do
+        endpoint :http, port: 4000, protocol: :http
+
+        caddy_site :hello_phoenix, "app.example.com" do
+          reverse_proxy endpoint(:hello_phoenix, :http)
+        end
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    assert {:ok, plan} = HostKit.plan(project)
+    site = Enum.find(plan.resources, &match?(%Site{}, &1))
+    assert [%ReverseProxy{upstreams: ["127.0.0.1:4000"]}] = site.directives
+  end
+
   test "caddy provider applies site files" do
     tmp =
       Path.join(System.tmp_dir!(), "host-kit-caddy-apply-#{System.unique_integer([:positive])}")

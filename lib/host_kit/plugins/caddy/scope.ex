@@ -25,6 +25,10 @@ defmodule HostKit.Plugins.Caddy.Scope do
     update_site(&append_directive(&1, %FileServer{browse: Keyword.get(opts, :browse, false)}))
   end
 
+  def add_reverse_proxy(%HostKit.Endpoint{} = upstream) do
+    update_site(&append_directive(&1, %ReverseProxy{upstreams: [upstream]}))
+  end
+
   def add_reverse_proxy(upstream) when is_binary(upstream) do
     update_site(&append_directive(&1, %ReverseProxy{upstreams: [upstream]}))
   end

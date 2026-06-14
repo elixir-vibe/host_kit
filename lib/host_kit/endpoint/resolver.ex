@@ -1,0 +1,167 @@
+defmodule HostKit.Endpoint.Resolver do
+  @moduledoc "Resolves endpoint references against service endpoint/listener declarations."
+
+  alias HostKit.Caddy.Directive.ReverseProxy
+  alias HostKit.{Diagnostic, Diagnostics, Endpoint, Proxy, Resource, Service}
+
+  @spec resolve([struct()], [Service.t()]) :: {:ok, [struct()]} | {:error, Diagnostics.t()}
+  def resolve(resources, services) do
+    index = endpoint_index(services)
+
+    {resources, diagnostics} =
+      Enum.map_reduce(resources, [], fn resource, diagnostics ->
+        case resolve_resource(resource, index) do
+          {:ok, resource} -> {resource, diagnostics}
+          {:error, diagnostic} -> {resource, [diagnostic | diagnostics]}
+        end
+      end)
+
+    case Enum.reverse(diagnostics) do
+      [] -> {:ok, resources}
+      diagnostics -> {:error, Diagnostics.new(diagnostics)}
+    end
+  end
+
+  defp endpoint_index(services) do
+    Map.new(services, fn %Service{name: service_name} = service ->
+      {service_name, service_endpoints(service_name, service)}
+    end)
+  end
+
+  defp service_endpoints(service_name, %Service{meta: meta}) do
+    endpoints =
+      meta
+      |> Map.get(:endpoints, %{})
+      |> Map.new(fn {name, endpoint} -> {name, %{endpoint | service: service_name}} end)
+
+    listeners =
+      meta
+      |> Map.get(:listeners, %{})
+      |> Map.new(fn {name, listener} ->
+        {name, endpoint_from_listener(service_name, listener)}
+      end)
+
+    Map.merge(listeners, endpoints)
+  end
+
+  defp endpoint_from_listener(service_name, listener) do
+    %Endpoint{
+      service: service_name,
+      name: listener.name,
+      protocol: listener.protocol,
+      host: HostKit.Net.Addr.to_string(listener.on),
+      port: listener.port,
+      meta: listener.meta
+    }
+  end
+
+  defp resolve_resource(%HostKit.Caddy.Site{} = site, index) do
+    with {:ok, directives} <- resolve_directives(site.directives, index, Resource.id(site)) do
+      {:ok, %{site | directives: directives}}
+    end
+  end
+
+  defp resolve_resource(%Proxy{} = proxy, index) do
+    with {:ok, services} <- resolve_proxy_services(proxy.services, index, Resource.id(proxy)) do
+      {:ok, %{proxy | services: services}}
+    end
+  end
+
+  defp resolve_resource(resource, _index), do: {:ok, resource}
+
+  defp resolve_directives(directives, index, resource_id) do
+    map_while_ok(directives, fn
+      %ReverseProxy{upstreams: upstreams} = directive ->
+        with {:ok, upstreams} <- resolve_upstreams(upstreams, index, resource_id) do
+          {:ok, %{directive | upstreams: upstreams}}
+        end
+
+      directive ->
+        {:ok, directive}
+    end)
+  end
+
+  defp resolve_upstreams(upstreams, index, resource_id) do
+    map_while_ok(upstreams, fn
+      %Endpoint{} = endpoint ->
+        with {:ok, endpoint} <- resolve_endpoint(endpoint, index, resource_id) do
+          {:ok, Endpoint.upstream(endpoint)}
+        end
+
+      upstream ->
+        {:ok, upstream}
+    end)
+  end
+
+  defp resolve_proxy_services(services, index, resource_id) do
+    map_while_ok(services, fn service ->
+      with {:ok, targets} <- resolve_targets(service.targets, index, resource_id) do
+        {:ok, %{service | targets: targets}}
+      end
+    end)
+  end
+
+  defp resolve_targets(targets, index, resource_id) do
+    map_while_ok(targets, fn
+      %{to: %Endpoint{} = endpoint} = target ->
+        with {:ok, endpoint} <- resolve_endpoint(endpoint, index, resource_id) do
+          {:ok, %{target | to: endpoint}}
+        end
+
+      target ->
+        {:ok, target}
+    end)
+  end
+
+  defp resolve_endpoint(%Endpoint{} = endpoint, index, _resource_id) do
+    if Endpoint.resolved?(endpoint) do
+      {:ok, endpoint}
+    else
+      fetch_endpoint(endpoint, index)
+    end
+  end
+
+  defp fetch_endpoint(%Endpoint{service: service, name: name} = endpoint, index) do
+    case get_in(index, [service, name]) do
+      %Endpoint{} = resolved ->
+        {:ok, merge_endpoint(endpoint, resolved)}
+
+      nil ->
+        {:error, endpoint_diagnostic(endpoint)}
+    end
+  end
+
+  defp merge_endpoint(ref, resolved) do
+    %{
+      resolved
+      | service: ref.service,
+        name: ref.name,
+        meta: Map.merge(resolved.meta, ref.meta)
+    }
+  end
+
+  defp endpoint_diagnostic(%Endpoint{} = endpoint) do
+    %Diagnostic{
+      severity: :error,
+      code: :endpoint_unresolved,
+      message: "unknown endpoint #{inspect(endpoint.service)}.#{endpoint.name}",
+      resource_id: {:endpoint, endpoint.service, endpoint.name},
+      details: %{service: endpoint.service, endpoint: endpoint.name},
+      hint:
+        "declare endpoint #{inspect(endpoint.name)}, port: ... inside service #{inspect(endpoint.service)}"
+    }
+  end
+
+  defp map_while_ok(values, fun) do
+    Enum.reduce_while(values, {:ok, []}, fn value, {:ok, acc} ->
+      case fun.(value) do
+        {:ok, value} -> {:cont, {:ok, [value | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> then(fn
+      {:ok, values} -> {:ok, Enum.reverse(values)}
+      error -> error
+    end)
+  end
+end

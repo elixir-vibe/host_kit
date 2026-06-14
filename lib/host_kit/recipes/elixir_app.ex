@@ -86,6 +86,12 @@ defmodule HostKit.Recipes.ElixirApp do
         timeout: 300_000
       )
 
+      endpoint(:http,
+        port: app.phoenix.port,
+        protocol: :http,
+        health: app.health.path
+      )
+
       daemon app.paths.service_unit do
         description("#{app.name} Elixir release")
         environment_file(app.paths.env)
@@ -101,7 +107,7 @@ defmodule HostKit.Recipes.ElixirApp do
       end
 
       caddy_site app.service_name, app.caddy.host do
-        reverse_proxy("127.0.0.1:#{app.phoenix.port}")
+        reverse_proxy(endpoint(app.service_name, :http))
       end
     end
   end

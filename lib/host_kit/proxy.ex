@@ -51,7 +51,11 @@ defmodule HostKit.Proxy do
   end
 
   defp target_quoted(%{name: name, to: %HostKit.Endpoint{} = endpoint} = target) do
-    {:target, [], [name, endpoint_quoted(endpoint), target_opts(target)]}
+    if HostKit.Endpoint.resolved?(endpoint) do
+      {:target, [], [name, HostKit.Endpoint.url(endpoint), target_opts(target)]}
+    else
+      {:target, [], [name, endpoint_quoted(endpoint), target_opts(target)]}
+    end
   end
 
   defp target_quoted(%{name: name, url: url} = target) do

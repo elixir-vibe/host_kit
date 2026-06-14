@@ -65,6 +65,35 @@ defmodule HostKit.ProxyTest do
     assert [%{name: :main, safe_rpc: [socket: "/run/app.sock"], active: true}] = service.targets
   end
 
+  test "plan resolves endpoint targets from service declarations" do
+    project =
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :demo do
+        service :hello_phoenix do
+          endpoint :http, port: 4000, protocol: :http, health: "/health"
+        end
+
+        proxy :edge, provider: :gatehouse do
+          service :app do
+            host "app.example.com"
+            target :main, to: endpoint(:hello_phoenix, :http), active: true
+          end
+        end
+      end
+      """)
+      |> elem(0)
+
+    assert {:ok, plan} = HostKit.plan(project)
+    proxy = Enum.find(plan.resources, &match?(%HostKit.Proxy{}, &1))
+    assert [service] = proxy.services
+    assert [%{to: %HostKit.Endpoint{host: "127.0.0.1", port: 4000}}] = service.targets
+
+    assert HostKit.Proxy.render(proxy) =~
+             "target(:main, \"http://127.0.0.1:4000\", active: true)"
+  end
+
   test "builds endpoint targets from generic DSL" do
     project =
       Code.eval_string("""

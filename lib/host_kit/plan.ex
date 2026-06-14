@@ -28,6 +28,7 @@ defmodule HostKit.Plan do
     opts = maybe_put_package_manager(resources, opts)
 
     with {:ok, resources} <- resolve_resources(resources, opts),
+         {:ok, resources} <- HostKit.Endpoint.Resolver.resolve(resources, project.services),
          :ok <- HostKit.CommandAnalysis.validate(resources),
          :ok <- maybe_write_package_lock(resources, opts) do
       opts = Keyword.put(opts, :resources, resources)
