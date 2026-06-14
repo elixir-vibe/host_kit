@@ -5,7 +5,9 @@ defmodule HostKit.PlanFormatTest do
   alias HostKit.Change
   alias HostKit.Package.Resolution
   alias HostKit.Plan.Format
+  alias HostKit.Resources.Command
   alias HostKit.Resources.{Package, Source}
+  alias HostKit.Source.Ref, as: SourceRef
 
   test "formats a concise human-readable plan" do
     plan = %HostKit.Plan{
@@ -93,6 +95,26 @@ defmodule HostKit.PlanFormatTest do
                checkout: /opt/app/source
                path: examples/hello
              """)
+  end
+
+  test "formats command source references in inputs" do
+    plan = %HostKit.Plan{
+      changes: [
+        %Change{
+          action: :create,
+          resource_id: {:command, :build},
+          after: %Command{
+            name: :build,
+            exec: {"mix", ["compile"]},
+            inputs: [SourceRef.new(:app_source), "mix.exs"],
+            outputs: ["_build/prod/rel/app"]
+          },
+          reason: :missing
+        }
+      ]
+    }
+
+    assert Format.format(plan) =~ "inputs: #HostKit.Source.Ref<app_source>, mix.exs"
   end
 
   test "formats package resolution details" do

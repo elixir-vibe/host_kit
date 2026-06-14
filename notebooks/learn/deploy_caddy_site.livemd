@@ -155,6 +155,7 @@ project =
 
     service :hello_site do
       package :caddy, as: "caddy"
+      package :curl, as: "curl"
 
       directory site_root, owner: "root", group: "root", mode: 0o755
       directory caddy_config_dir, owner: "root", group: "root", mode: 0o755

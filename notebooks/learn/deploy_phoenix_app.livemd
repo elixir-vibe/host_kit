@@ -167,6 +167,8 @@ project =
     end
 
     service :phoenix_caddy do
+      package :curl, as: "curl"
+
       directory caddy_config_dir, owner: "root", group: "root", mode: 0o755
       directory caddy_sites_dir, owner: "root", group: "root", mode: 0o755
 
@@ -225,7 +227,7 @@ target_opts = Host.target_opts(host)
 Render the plan so you can review the exact changes before applying them.
 
 ```elixir
-plan |> Format.format() |> Markdown.new()
+plan |> inspect(pretty: true, limit: :infinity) |> Markdown.new()
 ```
 
 ## Inspect what the recipe generated
