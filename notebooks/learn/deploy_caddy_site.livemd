@@ -51,13 +51,17 @@ settings_form =
     submit: "Plan deployment"
   )
 
+Control.subscribe(settings_form, :demo_settings)
 settings_form
 ```
 
 Read the submitted form. From here on, everything is plain Elixir data that the HostKit declaration can reference.
 
 ```elixir
-settings = Control.await(settings_form)
+settings =
+  receive do
+    {:demo_settings, %{type: :submit, data: data}} -> data
+  end
 ```
 
 Turn the UI fields into explicit target settings. This keeps credentials and transport details visible without mixing them into the deployment declaration.

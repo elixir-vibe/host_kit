@@ -59,13 +59,17 @@ settings_form =
     submit: "Plan deployment"
   )
 
+Control.subscribe(settings_form, :demo_settings)
 settings_form
 ```
 
 Read the submitted form once. Every later cell works with ordinary Elixir data.
 
 ```elixir
-settings = Control.await(settings_form)
+settings =
+  receive do
+    {:demo_settings, %{type: :submit, data: data}} -> data
+  end
 ```
 
 Turn the form values into an explicit HostKit target. The SSH key path can still come from your shell or Livebook deployment environment.
