@@ -23,6 +23,7 @@ alias HostKit.Plan.{Artifact, Format}
 alias HostKit.Providers.Caddy
 alias HostKit.Providers.Elixir, as: ElixirProvider
 alias HostKit.Resources.Source
+alias HostKit.Runner.SSH.Connection
 ```
 
 This notebook deploys the example Phoenix app from the HostKit repository:
@@ -90,6 +91,30 @@ target = %{
     retry: [attempts: settings.ssh_retries]
   ]
 }
+```
+
+Check SSH connectivity before planning. This is a friendly smoke test: it reports the transport result, but it does not stop the notebook. The plan cell below will still show detailed resource read results.
+
+```elixir
+ssh_opts =
+  target.ssh
+  |> Keyword.merge(host: target.host, user: target.user, sudo: target.sudo)
+  |> Keyword.put_new(:connect_timeout, 5_000)
+
+ssh_check =
+  case Connection.open(ssh_opts) do
+    {:ok, conn} ->
+      Connection.close(conn)
+      {:ok, "Connected to #{target.user}@#{target.host}:#{settings.ssh_port}"}
+
+    {:error, reason} ->
+      {:error, "Could not connect to #{target.user}@#{target.host}:#{settings.ssh_port}: #{inspect(reason)}"}
+  end
+
+case ssh_check do
+  {:ok, message} -> Markdown.new("✅ **SSH check passed.** #{message}")
+  {:error, message} -> Markdown.new("⚠️ **SSH check failed.** #{message}")
+end
 ```
 
 Describe the Phoenix app settings separately from the host settings.
