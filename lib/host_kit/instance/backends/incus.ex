@@ -84,26 +84,50 @@ defmodule HostKit.Instance.Backends.Incus do
     ]
 
     case cmd(args, opts) do
-      {_output, 0} ->
-        :ok
-
-      {output, status} ->
-        maybe_replace_existing_device(instance, device, args, output, status, opts)
+      {_output, 0} -> :ok
+      {output, status} -> recover_device_add(instance, port, device, args, output, status, opts)
     end
   end
 
-  defp maybe_replace_existing_device(instance, device, add_args, output, _status, opts) do
-    if String.contains?(output, "already exists") do
-      with {_output, 0} <-
-             cmd(["config", "device", "remove", instance_name(instance), device], opts),
-           {_output, 0} <- cmd(add_args, opts) do
-        :ok
-      else
-        {replace_output, replace_status} ->
-          {:error, {:incus_device_replace_failed, replace_status, replace_output}}
-      end
+  defp recover_device_add(instance, port, device, add_args, output, status, opts) do
+    cond do
+      String.contains?(output, "already exists") ->
+        replace_device(instance, device, add_args, opts)
+
+      String.contains?(output, "address already in use") ->
+        replace_legacy_device(instance, port, add_args, output, status, opts)
+
+      true ->
+        {:error, {:incus_device_add_failed, status, output}}
+    end
+  end
+
+  defp replace_legacy_device(instance, port, add_args, output, status, opts) do
+    case legacy_device(port) do
+      nil ->
+        {:error, {:incus_device_add_failed, status, output}}
+
+      legacy ->
+        remove_and_add_device(instance, legacy, add_args, opts)
+    end
+  end
+
+  defp legacy_device(%{name: :ssh}), do: "sshproxy"
+  defp legacy_device(%{name: :caddy_demo, host: host}), do: "web#{host}"
+  defp legacy_device(%{name: :web, host: host}), do: "web#{host}"
+  defp legacy_device(_port), do: nil
+
+  defp replace_device(instance, device, add_args, opts),
+    do: remove_and_add_device(instance, device, add_args, opts)
+
+  defp remove_and_add_device(instance, device, add_args, opts) do
+    with {_output, 0} <-
+           cmd(["config", "device", "remove", instance_name(instance), device], opts),
+         {_output, 0} <- cmd(add_args, opts) do
+      :ok
     else
-      {:error, {:incus_device_add_failed, output}}
+      {replace_output, replace_status} ->
+        {:error, {:incus_device_replace_failed, replace_status, replace_output}}
     end
   end
 

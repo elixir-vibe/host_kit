@@ -9,6 +9,7 @@ project :livebook_demo do
 
     expose(:ssh, host: 2222, guest: 22)
     expose(:caddy_demo, host: 18_080, guest: 18_080)
+    expose(:phoenix_demo, host: 18_081, guest: 18_081)
 
     host :guest, at: "127.0.0.1" do
       ssh do

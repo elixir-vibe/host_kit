@@ -68,6 +68,7 @@ defmodule HostKit.LivebookDemoVM do
     Instance.new(name(), backend: :incus, image: image(), kind: kind(), lifecycle: :ephemeral)
     |> Instance.add_port(:ssh, host: ssh_port(), guest: 22)
     |> Instance.add_port(:caddy_demo, host: public_port(), guest: public_port())
+    |> Instance.add_port(:phoenix_demo, host: phoenix_public_port(), guest: phoenix_public_port())
     |> Instance.add_host(host)
   end
 
@@ -86,7 +87,8 @@ defmodule HostKit.LivebookDemoVM do
       SSH user:     root
       SSH password: #{password()}
       SSH port:     #{ssh_port()}
-      Public port:  #{public_port()}
+      Caddy port:   #{public_port()}
+      Phoenix port: #{phoenix_public_port()}
     """)
   end
 
@@ -104,7 +106,8 @@ defmodule HostKit.LivebookDemoVM do
       HOSTKIT_LIVEBOOK_DEMO_IMAGE        Incus image (default: images:ubuntu/24.04)
       HOSTKIT_LIVEBOOK_DEMO_TYPE         container or vm (default: container)
       HOSTKIT_LIVEBOOK_DEMO_SSH_PORT     host SSH port (default: 2222)
-      HOSTKIT_LIVEBOOK_DEMO_PUBLIC_PORT  public demo port (default: 18080)
+      HOSTKIT_LIVEBOOK_DEMO_PUBLIC_PORT  Caddy public demo port (default: 18080)
+      HOSTKIT_LIVEBOOK_PHOENIX_PORT      Phoenix public demo port (default: 18081)
       HOSTKIT_LIVEBOOK_DEMO_PASSWORD     root password (default: hostkit-demo)
       HOSTKIT_INCUS_SUDO                 run incus through sudo: true/false (default: false)
       INCUS                              incus executable (default: incus)
@@ -121,6 +124,7 @@ defmodule HostKit.LivebookDemoVM do
   defp password, do: env("HOSTKIT_LIVEBOOK_DEMO_PASSWORD", "hostkit-demo")
   defp ssh_port, do: env_integer("HOSTKIT_LIVEBOOK_DEMO_SSH_PORT", 2222)
   defp public_port, do: env_integer("HOSTKIT_LIVEBOOK_DEMO_PUBLIC_PORT", 18_080)
+  defp phoenix_public_port, do: env_integer("HOSTKIT_LIVEBOOK_PHOENIX_PORT", 18_081)
 
   defp kind do
     case env("HOSTKIT_LIVEBOOK_DEMO_TYPE", "container") do

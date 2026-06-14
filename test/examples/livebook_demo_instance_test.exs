@@ -9,6 +9,12 @@ defmodule HostKit.Examples.LivebookDemoInstanceTest do
     assert instance.name == :hostkit_livebook_demo
     assert instance.backend == :incus
     assert instance.lifecycle == :ephemeral
+
+    assert Enum.any?(
+             instance.ports,
+             &match?(%{name: :phoenix_demo, host: 18_081, guest: 18_081}, &1)
+           )
+
     assert [%HostKit.Host{name: :guest}] = instance.hosts
 
     assert {:ok, plan} = HostKit.plan(project)

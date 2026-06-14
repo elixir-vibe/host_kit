@@ -54,6 +54,40 @@ defmodule HostKit.Instance.IncusBackendTest do
     assert_received {"incus", ["exec", "demo", "--", "true"]}
   end
 
+  test "apply replaces legacy demo proxy devices when ports are already bound" do
+    parent = self()
+
+    {:ok, calls} = Agent.start_link(fn -> %{} end)
+
+    runner = fn _command, args ->
+      send(parent, args)
+
+      count =
+        Agent.get_and_update(calls, fn counts ->
+          {Map.get(counts, args, 0), Map.update(counts, args, 1, &(&1 + 1))}
+        end)
+
+      case {args, count} do
+        {["info", "demo"], _count} ->
+          {"present", 0}
+
+        {["config", "device", "add", "demo", "hostkit-ssh", "proxy", _listen, _connect], 0} ->
+          {"address already in use", 1}
+
+        {_args, _count} ->
+          {"", 0}
+      end
+    end
+
+    instance =
+      Instance.new(:demo, backend: :incus, image: "images:ubuntu/24.04")
+      |> Instance.add_port(:ssh, host: 2222, guest: 22)
+
+    assert :ok = Incus.apply(instance, incus_runner: runner)
+
+    assert_received ["config", "device", "remove", "demo", "sshproxy"]
+  end
+
   test "apply configures root password ssh when a nested host declares it" do
     parent = self()
 
