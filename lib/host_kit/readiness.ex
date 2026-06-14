@@ -12,18 +12,54 @@ defmodule HostKit.Readiness do
 
   @spec wait(Readiness.t(), keyword()) :: :ok | {:error, term()}
   def wait(%Readiness{} = readiness, opts) do
-    with :ok <- prepare(readiness, opts) do
-      deadline = System.monotonic_time(:millisecond) + readiness.timeout
-      wait_until(readiness, opts, deadline, [])
+    emit_apply(opts, :readiness_started, readiness)
+    emit_check_started(readiness, opts)
+
+    case prepare(readiness, opts) do
+      :ok ->
+        deadline = System.monotonic_time(:millisecond) + readiness.timeout
+
+        case wait_until(readiness, opts, deadline, []) do
+          :ok ->
+            emit_check_passed(readiness, opts)
+            emit_apply(opts, :readiness_passed, readiness)
+            :ok
+
+          {:error, reason} = error ->
+            emit_check_failed(readiness, opts, reason)
+            emit_apply(opts, :readiness_failed, readiness, reason: reason)
+            error
+        end
+
+      {:error, reason} = error ->
+        emit_apply(opts, :readiness_failed, readiness, reason: reason)
+        error
     end
   end
 
-  defp prepare(%Readiness{checks: checks}, opts) do
+  defp prepare(%Readiness{checks: checks} = readiness, opts) do
     units = Enum.filter(checks, &match?(%Systemd{restart: true}, &1))
 
     case units do
-      [] -> :ok
-      units -> Ops.cmd(opts, "sh", ["-c", restart_script(units)])
+      [] ->
+        :ok
+
+      units ->
+        Enum.each(units, &emit_service_restart(opts, readiness, &1, :service_restart_started))
+
+        case Ops.cmd(opts, "sh", ["-c", restart_script(units)]) do
+          :ok ->
+            Enum.each(
+              units,
+              &emit_service_restart(opts, readiness, &1, :service_restart_finished)
+            )
+
+            :ok
+
+          {:error, reason} = error ->
+            Enum.each(units, &emit_service_restart(opts, readiness, &1, :service_failed, reason))
+            error
+        end
     end
   end
 
@@ -34,7 +70,7 @@ defmodule HostKit.Readiness do
 
       {:error, errors} ->
         summary = summarize_errors(errors)
-        maybe_emit_waiting(readiness, summary, last_summary)
+        maybe_emit_waiting(readiness, summary, last_summary, opts)
 
         if System.monotonic_time(:millisecond) >= deadline do
           emit(:timeout, readiness, %{summary: summary, errors: errors})
@@ -123,9 +159,11 @@ defmodule HostKit.Readiness do
 
   defp effective_interval(%Readiness{interval: interval}, _opts), do: interval
 
-  defp maybe_emit_waiting(readiness, summary, previous) do
+  defp maybe_emit_waiting(readiness, summary, previous, opts) do
     if summary != previous do
       emit(:waiting, readiness, %{summary: summary})
+      emit_apply(opts, :readiness_waiting, readiness, details: %{summary: summary})
+      emit_http_waiting(readiness, opts)
     end
   end
 
@@ -135,6 +173,68 @@ defmodule HostKit.Readiness do
       %{system_time: System.system_time()},
       Map.merge(%{name: readiness.name}, metadata)
     )
+  end
+
+  defp emit_check_started(%Readiness{checks: checks} = readiness, opts) do
+    Enum.each(checks, fn
+      %Systemd{} ->
+        :ok
+
+      %HTTP{} = http ->
+        emit_apply(opts, :health_check_started, readiness, details: %{url: http.url})
+    end)
+  end
+
+  defp emit_check_passed(%Readiness{checks: checks} = readiness, opts) do
+    Enum.each(checks, fn
+      %Systemd{} = systemd ->
+        emit_service_restart(opts, readiness, systemd, :service_active)
+
+      %HTTP{} = http ->
+        emit_apply(opts, :health_check_passed, readiness, details: %{url: http.url})
+    end)
+  end
+
+  defp emit_check_failed(%Readiness{checks: checks} = readiness, opts, reason) do
+    Enum.each(checks, fn
+      %Systemd{} = systemd ->
+        emit_service_restart(opts, readiness, systemd, :service_failed, reason)
+
+      %HTTP{} = http ->
+        emit_apply(opts, :health_check_failed, readiness,
+          reason: reason,
+          details: %{url: http.url}
+        )
+    end)
+  end
+
+  defp emit_http_waiting(%Readiness{checks: checks} = readiness, opts) do
+    Enum.each(checks, fn
+      %HTTP{} = http ->
+        emit_apply(opts, :health_check_waiting, readiness, details: %{url: http.url})
+
+      _check ->
+        :ok
+    end)
+  end
+
+  defp emit_service_restart(opts, readiness, %Systemd{unit: unit}, type, reason \\ nil) do
+    emit_apply(opts, type, readiness, reason: reason, details: %{unit: unit})
+  end
+
+  defp emit_apply(opts, type, readiness, attrs \\ []) do
+    case Keyword.get(opts, :reporter) do
+      pid when is_pid(pid) ->
+        attrs =
+          attrs
+          |> Keyword.put_new(:resource_id, HostKit.Resources.Readiness.id(readiness))
+          |> Keyword.put_new(:details, %{})
+
+        send(pid, {HostKit.Apply, HostKit.Apply.Event.new(type, attrs)})
+
+      _other ->
+        :ok
+    end
   end
 
   defp summarize_errors(errors) do

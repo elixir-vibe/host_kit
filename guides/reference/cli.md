@@ -80,6 +80,8 @@ Common options:
 - `--package-lock PATH` — read deterministic package resolutions when planning inline.
 - `--local`, `--remote`, `--user`, `--port`, `--identity-file`, `--password`, `--password-env`, `--silently-accept-hosts`, `--sudo` — same target options as `plan`.
 - `--require PATH` — load project-local DSL/support code before config.
+- `--track` — write a minimal run record after apply.
+- `--runs-root PATH` — override the HostKit runs root for tracked applies.
 
 Examples:
 

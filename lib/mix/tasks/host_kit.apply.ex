@@ -39,7 +39,9 @@ defmodule Mix.Tasks.HostKit.Apply do
           repology_cache_ttl: :integer,
           repology_no_cache: :boolean,
           dry_run: :boolean,
-          confirm: :boolean
+          confirm: :boolean,
+          track: :boolean,
+          runs_root: :string
         ],
         aliases: [dry_run: :dry_run]
       )
@@ -48,10 +50,15 @@ defmodule Mix.Tasks.HostKit.Apply do
 
     Options.with_target_opts(opts, project, fn target_opts ->
       plan = load_plan(opts, project, positional, target_opts)
+      reporter = start_reporter()
 
-      case HostKit.apply(plan, apply_opts(opts, target_opts)) do
-        {:ok, results} -> print_results(results)
-        {:error, reason} -> Mix.raise("HostKit apply failed: #{inspect(reason)}")
+      try do
+        case HostKit.apply(plan, Keyword.put(apply_opts(opts, target_opts), :reporter, reporter)) do
+          {:ok, results} -> print_results(results)
+          {:error, reason} -> Mix.raise("HostKit apply failed: #{inspect(reason)}")
+        end
+      after
+        send(reporter, :stop)
       end
     end)
   end
@@ -152,6 +159,21 @@ defmodule Mix.Tasks.HostKit.Apply do
     end
   end
 
+  defp start_reporter do
+    spawn(fn -> reporter_loop() end)
+  end
+
+  defp reporter_loop do
+    receive do
+      {HostKit.Apply, %HostKit.Apply.Event{} = event} ->
+        IO.puts(HostKit.Apply.Event.format(event))
+        reporter_loop()
+
+      :stop ->
+        :ok
+    end
+  end
+
   defp print_results(results) do
     results
     |> Enum.map_join("\n", fn %{change: change, status: status} ->
@@ -171,8 +193,10 @@ defmodule Mix.Tasks.HostKit.Apply do
     Keyword.merge(target_opts,
       dry_run: Keyword.get(opts, :dry_run, false),
       confirm: Keyword.get(opts, :confirm, false),
-      sudo: Keyword.get(opts, :sudo, Keyword.get(target_opts, :sudo, false))
+      sudo: Keyword.get(opts, :sudo, Keyword.get(target_opts, :sudo, false)),
+      track: Keyword.get(opts, :track, false)
     )
+    |> put_present(:hostkit_runs_root, Keyword.get(opts, :runs_root))
   end
 
   defp put_present(opts, _key, nil), do: opts

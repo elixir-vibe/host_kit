@@ -1,5 +1,6 @@
 defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
   use ExUnit.Case, async: false
+  require HostKit.IntegrationCase
 
   @moduletag :integration
   @tag timeout: 300_000
@@ -44,12 +45,18 @@ defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
     target_opts = HostKit.Host.target_opts(hd(project.hosts))
 
     {:ok, plan} = HostKit.plan(project, target_opts)
+
+    runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
+
+    HostKit.IntegrationCase.on_exit_rollback(plan, target_opts,
+      only: [{:systemd_service, caddy_service_name}],
+      before_rollback: fn -> sudo_cmd(host, runner, ["systemctl", "stop", caddy_service_name]) end
+    )
+
     assert :ok = HostKit.Plan.Artifact.save(artifact_path, plan)
     assert File.exists?(artifact_path)
 
     assert {:ok, _results} = HostKit.apply(plan, Keyword.merge(target_opts, confirm: true))
-
-    runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
 
     assert {_, 0} =
              HostKit.Runner.cmd(runner, "test", ["-f", Path.join(site_root, "index.html")],

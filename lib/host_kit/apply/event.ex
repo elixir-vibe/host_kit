@@ -8,6 +8,18 @@ defmodule HostKit.Apply.Event do
           | :change_finished
           | :change_skipped
           | :change_failed
+          | :readiness_started
+          | :readiness_waiting
+          | :readiness_passed
+          | :readiness_failed
+          | :service_restart_started
+          | :service_restart_finished
+          | :service_active
+          | :service_failed
+          | :health_check_started
+          | :health_check_waiting
+          | :health_check_passed
+          | :health_check_failed
 
   @type t :: %__MODULE__{
           type: type(),
@@ -16,10 +28,22 @@ defmodule HostKit.Apply.Event do
           change: HostKit.Change.t() | nil,
           result: map() | nil,
           reason: term() | nil,
+          lifecycle: map() | nil,
+          details: map(),
           at: DateTime.t()
         }
 
-  defstruct [:type, :resource_id, :action, :change, :result, :reason, :at]
+  defstruct [
+    :type,
+    :resource_id,
+    :action,
+    :change,
+    :result,
+    :reason,
+    :lifecycle,
+    details: %{},
+    at: nil
+  ]
 
   @spec new(type(), keyword()) :: t()
   def new(type, attrs \\ []) do
@@ -32,6 +56,8 @@ defmodule HostKit.Apply.Event do
       change: change,
       result: Keyword.get(attrs, :result),
       reason: Keyword.get(attrs, :reason),
+      lifecycle: Keyword.get(attrs, :lifecycle),
+      details: Keyword.get(attrs, :details, %{}),
       at: DateTime.utc_now()
     }
   end
@@ -51,6 +77,42 @@ defmodule HostKit.Apply.Event do
 
   def format(%__MODULE__{type: :change_failed} = event),
     do: "✗ #{format_resource(event)} #{event.action}: #{format_reason(event.reason)}"
+
+  def format(%__MODULE__{type: :readiness_started} = event),
+    do: "▶ readiness #{format_resource(event)}"
+
+  def format(%__MODULE__{type: :readiness_waiting, details: details}),
+    do: "↻ waiting for readiness: #{Map.get(details, :summary, "not ready")}"
+
+  def format(%__MODULE__{type: :readiness_passed} = event),
+    do: "✓ readiness #{format_resource(event)}"
+
+  def format(%__MODULE__{type: :readiness_failed} = event),
+    do: "✗ readiness #{format_resource(event)}: #{format_reason(event.reason)}"
+
+  def format(%__MODULE__{type: :service_restart_started, details: details}),
+    do: "↻ restarting #{Map.get(details, :unit)}"
+
+  def format(%__MODULE__{type: :service_restart_finished, details: details}),
+    do: "✓ restarted #{Map.get(details, :unit)}"
+
+  def format(%__MODULE__{type: :service_active, details: details}),
+    do: "✓ service active #{Map.get(details, :unit)}"
+
+  def format(%__MODULE__{type: :service_failed, details: details} = event),
+    do: "✗ service #{Map.get(details, :unit)}: #{format_reason(event.reason)}"
+
+  def format(%__MODULE__{type: :health_check_started, details: details}),
+    do: "▶ health check #{Map.get(details, :url)}"
+
+  def format(%__MODULE__{type: :health_check_waiting, details: details}),
+    do: "↻ health check waiting #{Map.get(details, :url)}"
+
+  def format(%__MODULE__{type: :health_check_passed, details: details}),
+    do: "✓ health check passed #{Map.get(details, :url)}"
+
+  def format(%__MODULE__{type: :health_check_failed, details: details} = event),
+    do: "✗ health check #{Map.get(details, :url)}: #{format_reason(event.reason)}"
 
   defp resource_id(%HostKit.Change{resource_id: resource_id}), do: resource_id
   defp resource_id(_change), do: nil

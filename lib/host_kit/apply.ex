@@ -31,6 +31,7 @@ defmodule HostKit.Apply do
       |> maybe_put_package_manager(plan)
 
     with :ok <- confirm(opts) do
+      opts = Keyword.put(opts, :plan, plan)
       with_reusable_runner(opts, fn opts -> apply_changes(plan.changes, opts) end)
     end
   end
@@ -99,7 +100,8 @@ defmodule HostKit.Apply do
       {:ok, results, reload?} ->
         results = Enum.reverse(results)
 
-        with {:ok, finished} <- finish_apply(results, reload?, opts) do
+        with {:ok, finished} <- finish_apply(results, reload?, opts),
+             :ok <- HostKit.RunRecord.write(Keyword.fetch!(opts, :plan), finished, opts) do
           emit(opts, :apply_finished, result: %{results: finished})
           {:ok, finished}
         end
@@ -326,9 +328,25 @@ defmodule HostKit.Apply do
     do: emit(opts, :change_finished, change: change, result: result)
 
   defp emit(opts, type, attrs \\ []) do
+    attrs = maybe_put_lifecycle(attrs, opts)
+
     case Keyword.get(opts, :reporter) do
       pid when is_pid(pid) -> send(pid, {__MODULE__, HostKit.Apply.Event.new(type, attrs)})
       nil -> :ok
+    end
+  end
+
+  defp maybe_put_lifecycle(attrs, opts) do
+    case Keyword.get(attrs, :change) do
+      %Change{after: %Command{phase: phase, name: name}} when not is_nil(phase) ->
+        Keyword.put_new(attrs, :lifecycle, %{
+          phase: phase,
+          operation: name,
+          direction: Keyword.get(opts, :direction, :up)
+        })
+
+      _other ->
+        attrs
     end
   end
 

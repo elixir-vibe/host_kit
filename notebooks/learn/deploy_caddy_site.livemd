@@ -193,7 +193,17 @@ apply_result =
     {:skipped, :set_apply_to_true}
   end
 
-apply_result
+progress =
+  Stream.repeatedly(fn ->
+    receive do
+      {HostKit.Apply, event} -> HostKit.Apply.Event.format(event)
+    after
+      0 -> nil
+    end
+  end)
+  |> Enum.take_while(& &1)
+
+{apply_result, progress}
 ```
 
 ## Verify
