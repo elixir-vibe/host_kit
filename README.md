@@ -96,6 +96,49 @@ mix host_kit.apply --host app \
 
 `secret_env/1` stores an environment-variable reference. Plan artifacts include the variable name, not the resolved secret value.
 
+## Managed local demo instance
+
+`host` is a connection endpoint. `instance` is a lifecycle-managed compute boundary. Backends such as Incus create/start/destroy the instance, while nested `host` and `service` declarations describe how HostKit connects into it and what should run inside.
+
+```elixir
+use HostKit.DSL
+
+project :demo do
+  instance :demo_vm do
+    backend :incus, sudo: true
+    image "images:ubuntu/24.04"
+    kind :container
+    lifecycle :ephemeral
+
+    expose :ssh, host: 2222, guest: 22
+    expose :web, host: 18_080, guest: 80
+
+    host :guest, at: "127.0.0.1" do
+      ssh do
+        user "root"
+        password "hostkit-demo"
+        port 2222
+        accept_hosts true
+      end
+    end
+
+    service :web do
+      package :caddy
+    end
+  end
+end
+```
+
+Manage the declared instance through the backend-neutral instance CLI:
+
+```sh
+mix host_kit.instance ensure demo_vm infra/demo.exs
+mix host_kit.instance status demo_vm infra/demo.exs
+mix host_kit.instance destroy demo_vm infra/demo.exs
+```
+
+See [`examples/livebook_demo_instance.exs`](examples/livebook_demo_instance.exs) for the local Livebook demo target used by the notebook workflow.
+
 ## Interactive notebook
 
 Deploy real services from Livebook with Kino inputs for SSH target/auth, plan review, explicit apply, and HTTP verification:
