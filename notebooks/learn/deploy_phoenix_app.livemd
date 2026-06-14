@@ -15,7 +15,7 @@ The setup cell above installs this notebook's dependencies: `kino` for friendly 
 Use aliases so the rest of the notebook reads like application code.
 
 ```elixir
-alias Kino.{Input, Layout, Markdown}
+alias Kino.{Control, Frame, Input, Layout, Markdown}
 alias HostKit, as: HK
 alias HostKit.{Apply, Host, Ingress, Project}
 alias HostKit.Apply.Event, as: ApplyEvent
@@ -65,6 +65,44 @@ settings_inputs
 |> Layout.grid(columns: 2)
 ```
 
+Use this button whenever you want to check SSH connectivity with the current input values. It does not apply anything.
+
+```elixir
+ssh_check_button = Control.button("Check SSH connection")
+ssh_check_result = Frame.new()
+
+Kino.listen(ssh_check_button, fn _event ->
+  server = Input.read(settings_inputs.server)
+  user = Input.read(settings_inputs.user)
+  ssh_port = Input.read(settings_inputs.ssh_port)
+
+  ssh_opts = [
+    host: server,
+    user: user,
+    sudo: true,
+    port: ssh_port,
+    identity_file: Path.expand(Input.read(settings_inputs.identity_file)),
+    silently_accept_hosts: true,
+    retry: [attempts: Input.read(settings_inputs.ssh_retries)],
+    connect_timeout: 5_000
+  ]
+
+  markdown =
+    case Connection.open(ssh_opts) do
+      {:ok, conn} ->
+        Connection.close(conn)
+        Markdown.new("✅ **SSH check passed.** Connected to #{user}@#{server}:#{ssh_port}")
+
+      {:error, reason} ->
+        Markdown.new("⚠️ **SSH check failed.** Could not connect to #{user}@#{server}:#{ssh_port}: `#{inspect(reason)}`")
+    end
+
+  Frame.render(ssh_check_result, markdown)
+end)
+
+Layout.grid([ssh_check_button, ssh_check_result], columns: 1)
+```
+
 Read the current input values. Every later cell works with ordinary Elixir data.
 
 ```elixir
@@ -101,30 +139,6 @@ target = %{
     retry: [attempts: settings.ssh_retries]
   ]
 }
-```
-
-Check SSH connectivity before planning. This is a friendly smoke test: it reports the transport result, but it does not stop the notebook. The plan cell below will still show detailed resource read results.
-
-```elixir
-ssh_opts =
-  target.ssh
-  |> Keyword.merge(host: target.host, user: target.user, sudo: target.sudo)
-  |> Keyword.put_new(:connect_timeout, 5_000)
-
-ssh_check =
-  case Connection.open(ssh_opts) do
-    {:ok, conn} ->
-      Connection.close(conn)
-      {:ok, "Connected to #{target.user}@#{target.host}:#{settings.ssh_port}"}
-
-    {:error, reason} ->
-      {:error, "Could not connect to #{target.user}@#{target.host}:#{settings.ssh_port}: #{inspect(reason)}"}
-  end
-
-case ssh_check do
-  {:ok, message} -> Markdown.new("✅ **SSH check passed.** #{message}")
-  {:error, message} -> Markdown.new("⚠️ **SSH check failed.** #{message}")
-end
 ```
 
 Describe the Phoenix app settings separately from the host settings.
