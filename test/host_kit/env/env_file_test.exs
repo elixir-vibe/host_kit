@@ -61,7 +61,7 @@ defmodule HostKit.EnvFileTest do
              {:error, {:missing_secret_env, "HOST_KIT_MISSING_SECRET"}}
   end
 
-  test "env file plans compare metadata only" do
+  test "env file plans compare metadata and non-secret entries" do
     desired = %HostKit.Resources.EnvFile{
       path: "/etc/app/env",
       owner: "root",
@@ -92,5 +92,36 @@ defmodule HostKit.EnvFileTest do
 
     assert {:ok, plan} = HostKit.plan(project, reader: EnvFileReader)
     assert [%{action: :no_op, reason: :in_sync}] = plan.changes
+  end
+
+  test "env file plans update when public entries drift" do
+    desired = %HostKit.Resources.EnvFile{
+      path: "/etc/app/env",
+      entries: [
+        {:set, "PORT", "4001"},
+        {:secret, "SECRET_KEY_BASE", HostKit.Secret.env("HOST_KIT_TEST_SECRET")}
+      ],
+      owner: "root",
+      group: "app",
+      mode: 0o640
+    }
+
+    project = %HostKit.Project{services: [%HostKit.Service{name: :web, resources: [desired]}]}
+
+    defmodule EnvFileDriftReader do
+      def read(%HostKit.Resources.EnvFile{} = desired, _context) do
+        {:ok,
+         %HostKit.Resources.EnvFile{
+           desired
+           | owner: "root",
+             group: "app",
+             mode: 0o640,
+             meta: %{actual_public_entries: %{"PORT" => "4000"}}
+         }}
+      end
+    end
+
+    assert {:ok, plan} = HostKit.plan(project, reader: EnvFileDriftReader)
+    assert [%{action: :update, reason: :drift}] = plan.changes
   end
 end

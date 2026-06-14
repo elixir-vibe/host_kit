@@ -53,7 +53,8 @@ defmodule HostKit.Reader.Helpers do
            desired
            | owner: actual.owner,
              group: actual.group,
-             mode: actual.mode
+             mode: actual.mode,
+             meta: put_env_file_public_entries(desired, actual.content)
          }}
 
       {:error, reason} ->
@@ -85,6 +86,22 @@ defmodule HostKit.Reader.Helpers do
       {:metadata, {:error, :enoent}} -> {:ok, nil}
       {:metadata, {:error, reason}} -> {:error, reason}
       {:content, {:error, reason}} -> {:error, reason}
+    end
+  end
+
+  defp put_env_file_public_entries(desired, content) do
+    public_entries = HostKit.Env.public_entries(desired)
+
+    case HostKit.Env.public_entries_from_content(content, Map.keys(public_entries)) do
+      {:ok, actual_entries} ->
+        desired.meta
+        |> Map.put(:public_entries, public_entries)
+        |> Map.put(:actual_public_entries, actual_entries)
+
+      {:error, _reason} ->
+        desired.meta
+        |> Map.put(:public_entries, public_entries)
+        |> Map.put(:actual_public_entries, :invalid)
     end
   end
 

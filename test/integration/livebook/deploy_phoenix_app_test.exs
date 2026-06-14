@@ -1,6 +1,8 @@
 defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
   use ExUnit.Case, async: false
 
+  import HostKit.IntegrationCase
+
   @moduletag :integration
   @tag timeout: 900_000
   test "deploys the Livebook Phoenix app notebook DSL" do
@@ -122,6 +124,18 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
              _resource -> false
            end)
 
+    runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host) |> maybe_trace_commands()}
+
+    _down_plan =
+      on_exit_rollback(plan, target_opts,
+        except: [{:source, "hello-phoenix_source"}],
+        before_rollback: fn ->
+          sudo_cmd(host, runner, ["systemctl", "stop", app_service_name])
+          sudo_cmd(host, runner, ["systemctl", "stop", caddy_service_name])
+        end,
+        after_rollback: fn -> cleanup.("/tmp/#{deployment_name}") end
+      )
+
     reporter = start_apply_reporter()
 
     assert {:ok, _results} =
@@ -130,8 +144,6 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
              end)
 
     send(reporter, :stop)
-
-    runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host) |> maybe_trace_commands()}
 
     timed("verify app service", fn ->
       assert {_, 0} = sudo_cmd(host, runner, ["systemctl", "restart", app_service_name])

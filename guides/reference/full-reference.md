@@ -737,7 +737,7 @@ Resources store normalized integer modes, so plan/apply remains simple.
 
 ## Env files and secrets
 
-HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time and env-file drift compares metadata only by default.
+HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries; secret entry values are not read into plan artifacts for comparison.
 
 ```elixir
 env_file root_path(:config, "env"), owner: "root", group: service_user(), mode: 0o640 do

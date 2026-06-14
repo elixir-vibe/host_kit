@@ -3,6 +3,23 @@ defmodule HostKit.Env do
 
   alias HostKit.Resources.EnvFile
 
+  @spec public_entries(EnvFile.t()) :: %{String.t() => String.t()}
+  def public_entries(%EnvFile{entries: entries}) do
+    entries
+    |> Enum.flat_map(fn
+      {:set, key, value} -> [{key, to_string(value)}]
+      {:secret, _key, _secret} -> []
+    end)
+    |> Map.new()
+  end
+
+  @spec public_entries_from_content(String.t(), [String.t()]) :: {:ok, map()} | {:error, term()}
+  def public_entries_from_content(content, keys) do
+    with {:ok, entries} <- parse(content) do
+      {:ok, Map.take(entries, keys)}
+    end
+  end
+
   @spec render(EnvFile.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
   def render(%EnvFile{} = env_file, opts \\ []) do
     with {:ok, lines} <- render_entries(env_file.entries, opts) do
@@ -33,15 +50,18 @@ defmodule HostKit.Env do
   end
 
   defp validate_dotenv(content) do
+    case parse(content) do
+      {:ok, _env} -> {:ok, content}
+      {:error, reason} -> {:error, {:invalid_env_file, reason}}
+    end
+  end
+
+  defp parse(content) do
     path = Path.join(System.tmp_dir!(), "host-kit-env-#{System.unique_integer([:positive])}.env")
 
     try do
       File.write!(path, content)
-
-      case Dotenvy.source(path, side_effect: fn _env -> :ok end) do
-        {:ok, _env} -> {:ok, content}
-        {:error, reason} -> {:error, {:invalid_env_file, reason}}
-      end
+      Dotenvy.source(path, side_effect: fn _env -> :ok end)
     after
       File.rm(path)
     end

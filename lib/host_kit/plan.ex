@@ -404,8 +404,10 @@ defmodule HostKit.Plan do
   defp equivalent?(%HostKit.Resources.File{} = desired, actual),
     do: comparable(desired, actual, [:path, :content, :owner, :group, :mode])
 
-  defp equivalent?(%HostKit.Resources.EnvFile{} = desired, actual),
-    do: comparable(desired, actual, [:path, :owner, :group, :mode])
+  defp equivalent?(%HostKit.Resources.EnvFile{} = desired, actual) do
+    comparable(desired, actual, [:path, :owner, :group, :mode]) and
+      HostKit.Env.public_entries(desired) == Map.get(actual.meta, :actual_public_entries, %{})
+  end
 
   defp equivalent?(%Source{} = desired, %Source{} = actual) do
     comparable(desired, actual, [:type, :uri, :revision]) and
