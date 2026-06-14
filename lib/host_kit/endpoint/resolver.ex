@@ -67,6 +67,12 @@ defmodule HostKit.Endpoint.Resolver do
     end
   end
 
+  defp resolve_resource(%HostKit.Ingress{} = ingress, index) do
+    with {:ok, servers} <- resolve_ingress_servers(ingress.servers, index, Resource.id(ingress)) do
+      {:ok, %{ingress | servers: servers}}
+    end
+  end
+
   defp resolve_resource(resource, _index), do: {:ok, resource}
 
   defp resolve_directives(directives, index, resource_id) do
@@ -113,6 +119,26 @@ defmodule HostKit.Endpoint.Resolver do
     end)
   end
 
+  defp resolve_ingress_servers(servers, index, resource_id) do
+    map_while_ok(servers, fn server ->
+      with {:ok, routes} <- resolve_ingress_routes(server.routes, index, resource_id) do
+        {:ok, %{server | routes: routes}}
+      end
+    end)
+  end
+
+  defp resolve_ingress_routes(routes, index, resource_id) do
+    map_while_ok(routes, fn
+      %{proxy: %HostKit.Ingress.Proxy{to: %Endpoint{} = endpoint} = proxy} = route ->
+        with {:ok, endpoint} <- resolve_endpoint(endpoint, index, resource_id) do
+          {:ok, %{route | proxy: %{proxy | to: endpoint}}}
+        end
+
+      route ->
+        {:ok, route}
+    end)
+  end
+
   defp resolve_endpoint(%Endpoint{} = endpoint, index, _resource_id) do
     if Endpoint.resolved?(endpoint) do
       {:ok, endpoint}
@@ -141,11 +167,16 @@ defmodule HostKit.Endpoint.Resolver do
   end
 
   defp endpoint_diagnostic(%Endpoint{} = endpoint) do
+    source = Map.get(endpoint.meta, :source)
+
     %Diagnostic{
       severity: :error,
       code: :endpoint_unresolved,
-      message: "unknown endpoint #{inspect(endpoint.service)}.#{endpoint.name}",
+      message: "unknown endpoint #{inspect(endpoint.service)}.#{inspect(endpoint.name)}",
       resource_id: {:endpoint, endpoint.service, endpoint.name},
+      file: source && source.file,
+      line: source && source.line,
+      column: source && source.column,
       details: %{service: endpoint.service, endpoint: endpoint.name},
       hint:
         "declare endpoint #{inspect(endpoint.name)}, port: ... inside service #{inspect(endpoint.service)}"

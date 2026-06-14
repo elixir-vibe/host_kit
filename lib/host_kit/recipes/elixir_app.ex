@@ -97,17 +97,22 @@ defmodule HostKit.Recipes.ElixirApp do
         environment_file(app.paths.env)
         working_directory(app.paths.app_dir)
         exec_start([app.paths.release_bin, "start"])
+        service(kill_mode: :mixed, timeout_stop_sec: 10)
         restart(:on_failure)
         wanted_by(:multi_user)
       end
 
       ready app.commands.ready.name, timeout: app.health.timeout do
-        systemd(app.paths.service_unit, restart: true)
+        systemd(app.paths.service_unit, restart: true, kill: true)
         http(app.health.url, body: app.health.expect_body)
       end
 
-      caddy_site app.service_name, app.caddy.host do
-        reverse_proxy(endpoint(app.service_name, :http))
+      ingress app.service_name do
+        server app.caddy.listen do
+          route host: app.caddy.host do
+            proxy(to: endpoint(app.service_name, :http))
+          end
+        end
       end
     end
   end
@@ -139,7 +144,8 @@ defmodule HostKit.Recipes.ElixirApp do
       },
       health: health(phoenix),
       caddy: %{
-        host: Keyword.get(caddy, :host, phoenix_host)
+        host: Keyword.get(caddy, :host, phoenix_host),
+        listen: Keyword.get(caddy, :listen, ":443")
       }
     }
 

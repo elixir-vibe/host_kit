@@ -29,6 +29,7 @@ defmodule HostKit.Plan do
 
     with {:ok, resources} <- resolve_resources(resources, opts),
          {:ok, resources} <- HostKit.Endpoint.Resolver.resolve(resources, project.services),
+         {:ok, resources} <- expand_ingress(resources, project),
          :ok <- HostKit.CommandAnalysis.validate(resources),
          :ok <- maybe_write_package_lock(resources, opts) do
       opts = Keyword.put(opts, :resources, resources)
@@ -83,6 +84,19 @@ defmodule HostKit.Plan do
       {:error, reason} -> {:halt, {:error, reason}}
     end
   end
+
+  defp expand_ingress(resources, project) do
+    if HostKit.Providers.Caddy in project.providers do
+      {:ok, Enum.flat_map(resources, &expand_ingress_resource/1)}
+    else
+      {:ok, resources}
+    end
+  end
+
+  defp expand_ingress_resource(%HostKit.Ingress{} = ingress),
+    do: HostKit.Ingress.Caddy.to_sites(ingress)
+
+  defp expand_ingress_resource(resource), do: [resource]
 
   defp timed_resource(phase, resource, fun) do
     HostKit.Telemetry.span([:plan, :resource], resource_metadata(phase, resource), fun)
@@ -229,7 +243,10 @@ defmodule HostKit.Plan do
 
   defp equivalent?(%HostKit.Caddy.Site{} = desired, actual) do
     normalize_caddy(Map.get(actual.meta, :content)) ==
-      desired |> HostKit.Plugins.Caddy.render_site() |> IO.iodata_to_binary() |> normalize_caddy()
+      desired
+      |> HostKit.Providers.Caddy.render_site()
+      |> IO.iodata_to_binary()
+      |> normalize_caddy()
   end
 
   defp equivalent?(%HostKit.Resources.Directory{} = desired, actual),

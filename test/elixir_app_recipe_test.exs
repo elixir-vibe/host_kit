@@ -94,6 +94,14 @@ defmodule HostKit.ElixirAppRecipeTest do
                false
            end)
 
-    assert Enum.any?(resources, &match?(%HostKit.Caddy.Site{host: "hello.example.com"}, &1))
+    assert Enum.any?(resources, &match?(%HostKit.Ingress{name: :hello}, &1))
+
+    assert {:ok, plan} =
+             HostKit.plan(project,
+               package_repo: "ubuntu_24_04",
+               package_lock: "test/fixtures/package_locks/beam_apt.package.lock"
+             )
+
+    assert Enum.any?(plan.resources, &match?(%HostKit.Caddy.Site{host: "hello.example.com"}, &1))
   end
 end

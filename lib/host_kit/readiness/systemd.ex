@@ -4,17 +4,19 @@ defmodule HostKit.Readiness.Systemd do
   @type t :: %__MODULE__{
           unit: String.t(),
           state: :active,
-          restart: boolean()
+          restart: boolean(),
+          kill: boolean()
         }
 
-  defstruct [:unit, state: :active, restart: false]
+  defstruct [:unit, state: :active, restart: false, kill: false]
 
   @spec new(String.t(), keyword()) :: t()
   def new(unit, opts \\ []) do
     %__MODULE__{
       unit: unit,
       state: Keyword.get(opts, :state, :active),
-      restart: Keyword.get(opts, :restart, false)
+      restart: Keyword.get(opts, :restart, false),
+      kill: Keyword.get(opts, :kill, false)
     }
   end
 end

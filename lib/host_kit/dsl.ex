@@ -115,6 +115,42 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro ingress(name, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Ingress.Scope.start_ingress(unquote(name), unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.add_resource(HostKit.DSL.Ingress.Scope.finish_ingress())
+    end
+  end
+
+  defmacro server(listen \\ ":443", opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Ingress.Scope.start_server(unquote(listen), unquote(opts))
+      unquote(block)
+      HostKit.DSL.Ingress.Scope.finish_server()
+    end
+  end
+
+  defmacro tls(mode, opts \\ []) do
+    quote do
+      HostKit.DSL.Ingress.Scope.put_tls(unquote(mode), unquote(opts))
+    end
+  end
+
+  defmacro route(opts, do: block) do
+    quote do
+      HostKit.DSL.Ingress.Scope.start_route(unquote(opts))
+      unquote(block)
+      HostKit.DSL.Ingress.Scope.finish_route()
+    end
+  end
+
+  defmacro proxy(opts) do
+    quote do
+      HostKit.DSL.Ingress.Scope.put_proxy(unquote(opts))
+    end
+  end
+
   defmacro systemd(unit, opts \\ []) do
     quote do
       HostKit.DSL.Readiness.Scope.add_check(
@@ -437,8 +473,9 @@ defmodule HostKit.DSL do
       HostKit.DSL.Systemd.Scope.active?() ->
         HostKit.DSL.Systemd.Scope.put_telemetry(config)
 
-      Code.ensure_loaded?(HostKit.Plugins.Caddy.Scope) and HostKit.Plugins.Caddy.Scope.active?() ->
-        HostKit.Plugins.Caddy.Scope.put_telemetry(config)
+      Code.ensure_loaded?(HostKit.Providers.Caddy.Scope) and
+          HostKit.Providers.Caddy.Scope.active?() ->
+        HostKit.Providers.Caddy.Scope.put_telemetry(config)
 
       true ->
         HostKit.DSL.Scope.update_last_resource(&put_in(&1.meta[:telemetry], config))
@@ -452,8 +489,9 @@ defmodule HostKit.DSL do
       HostKit.DSL.Systemd.Scope.active?() ->
         HostKit.DSL.Systemd.Scope.put_logs(config)
 
-      Code.ensure_loaded?(HostKit.Plugins.Caddy.Scope) and HostKit.Plugins.Caddy.Scope.active?() ->
-        HostKit.Plugins.Caddy.Scope.put_logs(config)
+      Code.ensure_loaded?(HostKit.Providers.Caddy.Scope) and
+          HostKit.Providers.Caddy.Scope.active?() ->
+        HostKit.Providers.Caddy.Scope.put_logs(config)
 
       true ->
         HostKit.DSL.Scope.update_last_resource(&put_in(&1.meta[:logs], config))
@@ -528,8 +566,9 @@ defmodule HostKit.DSL do
         HostKit.DSL.Systemd.Scope.active?() ->
           HostKit.DSL.Systemd.Scope.put_monitor(unquote(type), unquote(opts))
 
-        Code.ensure_loaded?(HostKit.Plugins.Caddy.Scope) and HostKit.Plugins.Caddy.Scope.active?() ->
-          HostKit.Plugins.Caddy.Scope.put_monitor(unquote(type), unquote(opts))
+        Code.ensure_loaded?(HostKit.Providers.Caddy.Scope) and
+            HostKit.Providers.Caddy.Scope.active?() ->
+          HostKit.Providers.Caddy.Scope.put_monitor(unquote(type), unquote(opts))
 
         true ->
           HostKit.DSL.Scope.update_last_resource(fn resource ->
@@ -574,12 +613,18 @@ defmodule HostKit.DSL do
   end
 
   defmacro endpoint(name_or_service, name_or_opts \\ :default, opts \\ []) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
       if HostKit.DSL.Scope.service_active?() and is_list(unquote(name_or_opts)) and
            unquote(opts) == [] do
-        HostKit.DSL.Scope.put_endpoint(unquote(name_or_service), unquote(name_or_opts))
+        declaration_opts =
+          HostKit.DSL.put_source_meta(unquote(name_or_opts), unquote(Macro.escape(source)))
+
+        HostKit.DSL.Scope.put_endpoint(unquote(name_or_service), declaration_opts)
       else
-        HostKit.Endpoint.new(unquote(name_or_service), unquote(name_or_opts), unquote(opts))
+        ref_opts = HostKit.DSL.put_source_meta(unquote(opts), unquote(Macro.escape(source)))
+        HostKit.Endpoint.new(unquote(name_or_service), unquote(name_or_opts), ref_opts)
       end
     end
   end
@@ -598,6 +643,10 @@ defmodule HostKit.DSL do
 
       HostKit.DSL.Scope.add_resource(HostKit.Resources.Source.new(unquote(name), opts))
     end
+  end
+
+  def put_source_meta(opts, source) do
+    Keyword.update(opts, :meta, %{source: source}, &Map.put(&1, :source, source))
   end
 
   defmacro package(name, opts \\ []) do

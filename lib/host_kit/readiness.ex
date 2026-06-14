@@ -19,28 +19,29 @@ defmodule HostKit.Readiness do
   end
 
   defp prepare(%Readiness{checks: checks}, opts) do
-    restart_units =
-      checks
-      |> Enum.filter(&match?(%Systemd{restart: true}, &1))
-      |> Enum.map(& &1.unit)
+    units = Enum.filter(checks, &match?(%Systemd{restart: true}, &1))
 
-    case restart_units do
+    case units do
       [] -> :ok
       units -> Ops.cmd(opts, "sh", ["-c", restart_script(units)])
     end
   end
 
-  defp wait_until(readiness, opts, deadline, _last_errors) do
+  defp wait_until(readiness, opts, deadline, last_summary) do
     case check_all(readiness, opts) do
       :ok ->
         :ok
 
       {:error, errors} ->
+        summary = summarize_errors(errors)
+        maybe_emit_waiting(readiness, summary, last_summary)
+
         if System.monotonic_time(:millisecond) >= deadline do
+          emit(:timeout, readiness, %{summary: summary, errors: errors})
           {:error, {:readiness_timeout, readiness.name, errors}}
         else
           Process.sleep(effective_interval(readiness, opts))
-          wait_until(readiness, opts, deadline, errors)
+          wait_until(readiness, opts, deadline, summary)
         end
     end
   end
@@ -55,9 +56,10 @@ defmodule HostKit.Readiness do
   end
 
   defp restart_script(units) do
-    Enum.map_join(units, "\n", fn unit ->
+    Enum.map_join(units, "\n", fn %Systemd{unit: unit, kill: kill} ->
       escaped = HostKit.Shell.escape(unit)
-      "systemctl reset-failed #{escaped} || true\nsystemctl restart #{escaped}"
+      kill_script = if kill, do: "systemctl kill --kill-who=all #{escaped} || true\n", else: ""
+      "#{kill_script}systemctl reset-failed #{escaped} || true\nsystemctl restart #{escaped}"
     end)
   end
 
@@ -120,6 +122,28 @@ defmodule HostKit.Readiness do
   end
 
   defp effective_interval(%Readiness{interval: interval}, _opts), do: interval
+
+  defp maybe_emit_waiting(readiness, summary, previous) do
+    if summary != previous do
+      emit(:waiting, readiness, %{summary: summary})
+    end
+  end
+
+  defp emit(type, readiness, metadata) do
+    HostKit.Telemetry.execute(
+      [:readiness, type],
+      %{system_time: System.system_time()},
+      Map.merge(%{name: readiness.name}, metadata)
+    )
+  end
+
+  defp summarize_errors(errors) do
+    errors
+    |> Enum.map_join(", ", fn {_check, {:error, reason}} ->
+      HostKit.Error.format(reason, max: 240)
+    end)
+    |> String.replace("\n", " ")
+  end
 
   defp remote_runner?(HostKit.Runner.SSH), do: true
   defp remote_runner?({HostKit.Runner.SSH, _opts}), do: true
