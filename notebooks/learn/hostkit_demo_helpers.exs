@@ -41,9 +41,32 @@ defmodule HostKit.LivebookDemo do
         Markdown.new("✅ **SSH works** — #{settings.user}@#{settings.server}:#{settings.ssh_port}")
 
       {:error, reason} ->
-        Markdown.new("⚠️ **SSH failed** — `#{inspect(reason)}`")
+        Markdown.new("⚠️ **SSH failed** — #{ssh_error(reason)}")
     end
   end
+
+  defp ssh_error(reason) when is_list(reason) do
+    reason
+    |> List.to_string()
+    |> ssh_error()
+  rescue
+    _error -> inspect(reason)
+  end
+
+  defp ssh_error(reason) when is_binary(reason) do
+    cond do
+      String.contains?(reason, "Unable to connect using the available authentication methods") ->
+        "authentication failed. Check the SSH user, password, or uploaded key."
+
+      String.contains?(reason, "Connection refused") ->
+        "connection refused. Check the server address and SSH port."
+
+      true ->
+        reason
+    end
+  end
+
+  defp ssh_error(reason), do: inspect(reason)
 
   defp maybe_put(opts, _key, ""), do: opts
   defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)

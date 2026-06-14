@@ -18,7 +18,7 @@ Code.require_file("notebooks/learn/hostkit_demo_helpers.exs", File.cwd!())
 
 ## Target
 
-Use a password, upload a key, or enter a key path.
+Use the local demo VM defaults, or replace them with your own server.
 
 <details>
 <summary>SSH key upload</summary>
@@ -37,10 +37,10 @@ form =
     [
       server: Kino.Input.text("Server", default: "127.0.0.1"),
       user: Kino.Input.text("SSH user", default: "root"),
-      password: Kino.Input.password("SSH password", default: ""),
+      password: Kino.Input.password("SSH password", default: "hostkit-demo"),
       key_file: Kino.Input.file("Upload SSH key"),
       identity_file: Kino.Input.text("SSH key path on server (optional)", default: ""),
-      ssh_port: Kino.Input.number("SSH port", default: 22),
+      ssh_port: Kino.Input.number("SSH port", default: 2222),
       public_hostname: Kino.Input.text("Public hostname", default: "phoenix.example.com"),
       public_port: Kino.Input.number("Public port", default: 18_081),
       app_port: Kino.Input.number("Phoenix port", default: 14_000),
