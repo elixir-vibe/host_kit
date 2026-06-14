@@ -404,7 +404,7 @@ defmodule HostKit.DSL do
   defmacro agent(opts \\ []) do
     quote do
       service Keyword.get(unquote(opts), :service, :agent) do
-        system_user(service_user())
+        account(service_user(), system: true)
 
         directory(root_path(:data),
           owner: service_user(),
@@ -586,14 +586,21 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro system_user(name, opts \\ []) do
+  defmacro account(name) do
     quote do
-      HostKit.DSL.Scope.add_resource(%HostKit.Resources.User{
-        name: unquote(name),
-        system: true,
+      HostKit.Account.ref(unquote(name))
+    end
+  end
+
+  defmacro account(name, opts) do
+    quote do
+      HostKit.DSL.Scope.add_resource(%HostKit.Resources.Account{
+        name: HostKit.Account.name!(unquote(name)),
+        system: Keyword.get(unquote(opts), :system, false),
         home: Keyword.get(unquote(opts), :home),
         shell: Keyword.get(unquote(opts), :shell, "/usr/sbin/nologin"),
-        groups: Keyword.get(unquote(opts), :groups, [])
+        groups: Keyword.get(unquote(opts), :groups, []),
+        meta: Keyword.get(unquote(opts), :meta, %{})
       })
     end
   end

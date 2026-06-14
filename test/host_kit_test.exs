@@ -8,7 +8,7 @@ defmodule HostKitTest do
     assert project.name == :toys
     assert [%HostKit.Service{name: :exograph, resources: resources}] = project.services
 
-    assert %HostKit.Resources.User{name: "toys-exograph", system: true} = Enum.at(resources, 0)
+    assert %HostKit.Resources.Account{name: "toys-exograph", system: true} = Enum.at(resources, 0)
     assert %HostKit.Resources.Directory{path: "/srv/toys/exograph"} = Enum.at(resources, 1)
     assert %HostKit.Systemd.Service{name: "toys-exograph.service"} = Enum.at(resources, 2)
   end
@@ -17,7 +17,7 @@ defmodule HostKitTest do
     project = HostKit.load!(fixture_path("project.hostkit"))
 
     assert {:ok, plan} = HostKit.plan(project)
-    assert plan.summary == %{directory: 1, systemd_service: 1, user: 1}
+    assert plan.summary == %{account: 1, directory: 1, systemd_service: 1}
   end
 
   test "systemd resources render through core renderer" do

@@ -22,7 +22,7 @@ defmodule HostKit.WorkspaceAgentTest do
     assert service.meta.path_name == "alice/blog/agent"
 
     assert [user, directory, unit] = service.resources
-    assert %HostKit.Resources.User{name: "hk-alice-blog-agent", system: true} = user
+    assert %HostKit.Resources.Account{name: "hk-alice-blog-agent", system: true} = user
 
     assert %HostKit.Resources.Directory{
              path: "/var/lib/hostkit/workspaces/alice/blog/agent",

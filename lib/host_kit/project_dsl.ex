@@ -18,7 +18,7 @@ defmodule HostKit.ProjectDSL do
           path :state_dir, root(:state), service_name()
 
           macro :standard_user do
-            system_user service_user(), home: state_path("home")
+            account service_user(), system: true, home: state_path("home")
           end
         end
       end

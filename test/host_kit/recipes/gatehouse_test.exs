@@ -7,6 +7,8 @@ defmodule HostKit.GatehouseRecipeTest do
       use HostKit.DSL, providers: [HostKit.Providers.Gatehouse]
 
       project :edge do
+        account :gatehouse, system: true, home: "/var/lib/gatehouse"
+
         proxy :edge, provider: :gatehouse, path: "/etc/gatehouse/config.exs" do
           service :app do
             host "app.example.com"
@@ -18,7 +20,7 @@ defmodule HostKit.GatehouseRecipeTest do
           release_path: "/opt/gatehouse",
           config_path: "/etc/gatehouse/config.exs",
           state_path: "/var/lib/gatehouse/state.etf",
-          user: "gatehouse",
+          run_as: account(:gatehouse),
           cookie: "secret"
       end
       """)
@@ -30,7 +32,7 @@ defmodule HostKit.GatehouseRecipeTest do
 
     assert Enum.any?(
              resources,
-             &match?(%HostKit.Resources.User{name: "gatehouse", system: true}, &1)
+             &match?(%HostKit.Resources.Account{name: "gatehouse", system: true}, &1)
            )
 
     assert Enum.any?(resources, &match?(%HostKit.Resources.Directory{path: "/etc/gatehouse"}, &1))

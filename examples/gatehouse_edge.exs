@@ -1,6 +1,8 @@
 use HostKit.DSL, providers: [HostKit.Providers.Gatehouse]
 
 project :gatehouse_edge do
+  account(:gatehouse, system: true, home: "/var/lib/gatehouse")
+
   service :hello_phoenix do
     endpoint(:http, port: 4000, protocol: :http, health: "/health")
   end
@@ -16,6 +18,6 @@ project :gatehouse_edge do
     release_path: "/opt/gatehouse",
     config_path: "/etc/gatehouse/config.exs",
     state_path: "/var/lib/gatehouse/state.etf",
-    user: "gatehouse"
+    run_as: account(:gatehouse)
   )
 end

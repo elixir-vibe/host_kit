@@ -380,8 +380,11 @@ defmodule HostKit.DSL.Scope do
   end
 
   def add_resource(resource) do
-    service = Process.get(@service_key) || raise "resources must be declared inside service/2"
-    Process.put(@service_key, Service.add_resource(service, resource))
+    case Process.get(@service_key) do
+      nil -> update_project(&Project.add_resource(&1, resource))
+      service -> Process.put(@service_key, Service.add_resource(service, resource))
+    end
+
     :ok
   end
 

@@ -267,7 +267,7 @@ defmodule HostKit.Plan do
       not Map.get(actual.meta, :dirty, false)
   end
 
-  defp equivalent?(%HostKit.Resources.User{} = desired, actual),
+  defp equivalent?(%HostKit.Resources.Account{} = desired, actual),
     do: comparable(desired, actual, [:name, :home, :shell, :groups])
 
   defp equivalent?(desired, actual), do: desired == actual

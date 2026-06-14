@@ -5,6 +5,7 @@ defmodule HostKit.Remote do
   alias HostKit.{Firewall, Proxy, Reader.Helpers, Runner, Systemd}
 
   alias HostKit.Resources.{
+    Account,
     Command,
     Directory,
     EnvFile,
@@ -13,14 +14,13 @@ defmodule HostKit.Remote do
     Package,
     Readiness,
     Shell,
-    Source,
-    User
+    Source
   }
 
   @spec read(struct(), map()) :: {:ok, struct() | nil} | {:error, term()}
-  def read(%User{name: name} = desired, context) do
+  def read(%Account{name: name} = desired, context) do
     case cmd(context, "getent", ["passwd", name]) do
-      {line, 0} -> {:ok, Helpers.user_from_passwd(line, desired)}
+      {line, 0} -> {:ok, Helpers.account_from_passwd(line, desired)}
       {_output, 2} -> {:ok, nil}
       {output, status} -> {:error, {:getent_failed, status, output}}
     end

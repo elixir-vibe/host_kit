@@ -9,6 +9,7 @@ defmodule HostKit.Project do
           hosts: [HostKit.Host.t()],
           tenants: [Tenant.t()],
           services: [Service.t()],
+          resources: [struct()],
           providers: [module()],
           provider_configs: %{optional(atom()) => ProviderConfig.t()},
           proxies: [Proxy.t()],
@@ -20,6 +21,7 @@ defmodule HostKit.Project do
             hosts: [],
             tenants: [],
             services: [],
+            resources: [],
             providers: [],
             provider_configs: %{},
             proxies: [],
@@ -92,14 +94,18 @@ defmodule HostKit.Project do
   def add_service(%__MODULE__{} = project, service),
     do: %{project | services: project.services ++ [service]}
 
+  @spec add_resource(t(), struct()) :: t()
+  def add_resource(%__MODULE__{} = project, resource),
+    do: %{project | resources: project.resources ++ [resource]}
+
   @spec add_proxy(t(), Proxy.t()) :: t()
   def add_proxy(%__MODULE__{} = project, %Proxy{} = proxy),
     do: %{project | proxies: project.proxies ++ [proxy]}
 
   @spec resources(t()) :: [struct()]
   def resources(%__MODULE__{} = project) do
-    project.services
-    |> Enum.flat_map(&expand_resources(&1.resources))
+    project.resources
+    |> Kernel.++(project.services |> Enum.flat_map(&expand_resources(&1.resources)))
     |> Kernel.++(project.proxies)
     |> Kernel.++(Firewall.policies(project))
     |> Kernel.++(workspace_egress(project))

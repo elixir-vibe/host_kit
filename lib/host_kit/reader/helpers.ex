@@ -6,7 +6,7 @@ defmodule HostKit.Reader.Helpers do
   end
 
   alias HostKit.Caddy
-  alias HostKit.Resources.{Directory, File, User}
+  alias HostKit.Resources.{Account, Directory, File}
   alias HostKit.Systemd
 
   def read_directory(%Directory{path: path} = desired, stat_fun) do
@@ -113,11 +113,11 @@ defmodule HostKit.Reader.Helpers do
   def mark_render(%Systemd.Timer{} = actual),
     do: Map.update!(actual, :meta, &Map.put(&1, :desired_render, Systemd.Timer.render(actual)))
 
-  def user_from_passwd(line, %User{} = desired) do
+  def account_from_passwd(line, %Account{} = desired) do
     [_name, _password, _uid, _gid, _gecos, home, shell] =
       line |> String.trim() |> String.split(":", parts: 7)
 
-    %User{desired | home: home, shell: shell}
+    %Account{desired | home: home, shell: shell}
   end
 
   defp normalize_type(type) when type in ["directory", "Directory"], do: :directory

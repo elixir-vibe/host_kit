@@ -24,8 +24,8 @@ defmodule HostKit.Resources.File do
     %__MODULE__{
       path: path,
       content: Keyword.get(opts, :content),
-      owner: Keyword.get(opts, :owner),
-      group: Keyword.get(opts, :group),
+      owner: normalize_account_name(Keyword.get(opts, :owner)),
+      group: normalize_account_name(Keyword.get(opts, :group)),
       mode: opts |> Keyword.get(:mode) |> HostKit.Mode.normalize!(),
       depends_on: Keyword.get(opts, :depends_on, []),
       meta: Keyword.get(opts, :meta, %{})
@@ -33,4 +33,7 @@ defmodule HostKit.Resources.File do
   end
 
   def id(%__MODULE__{path: path}), do: {:file, path}
+
+  defp normalize_account_name(nil), do: nil
+  defp normalize_account_name(name), do: HostKit.Account.name!(name)
 end

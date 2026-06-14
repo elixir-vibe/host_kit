@@ -10,7 +10,7 @@ defmodule HostKit.GenericConventionsTest do
       prefixes user: "toys-", unit: "toys-"
 
       service :forgejo do
-        system_user service_user(), home: root_path(:data)
+        account service_user(), system: true, home: root_path(:data)
 
         storage :repositories,
           under: :data,
@@ -38,7 +38,7 @@ defmodule HostKit.GenericConventionsTest do
 
     assert Enum.any?(
              service.resources,
-             &match?(%HostKit.Resources.User{name: "toys-forgejo"}, &1)
+             &match?(%HostKit.Resources.Account{name: "toys-forgejo"}, &1)
            )
 
     assert Enum.any?(

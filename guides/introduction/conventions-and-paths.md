@@ -19,7 +19,7 @@ project :toys do
     # Optional: override the path/identity slug used by root_path/2 and service_user/0.
     path_name "git"
 
-    system_user service_user(), home: root_path(:state, "home")
+    account service_user(), system: true, home: root_path(:state, "home")
 
     directory root_path(:data), owner: service_user(), group: service_user(), mode: 0o750
     directory root_path(:config), owner: "root", group: service_user(), mode: 0o750

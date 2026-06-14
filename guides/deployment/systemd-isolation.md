@@ -10,7 +10,7 @@ project :prod do
   prefixes user: "app-", unit: "app-"
 
   service :api do
-    system_user service_user(), home: root_path(:state, "home")
+    account service_user(), system: true, home: root_path(:state, "home")
 
     directory root_path(:data), owner: service_user(), group: service_user(), mode: 0o750
     directory root_path(:state), owner: service_user(), group: service_user(), mode: 0o750

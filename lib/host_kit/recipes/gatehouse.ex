@@ -7,10 +7,6 @@ defmodule HostKit.Recipes.Gatehouse do
     gatehouse = __MODULE__.assigns(name, opts)
 
     service gatehouse.service_name do
-      if gatehouse.create_user do
-        system_user(gatehouse.owner, home: gatehouse.paths.state_dir)
-      end
-
       directory(gatehouse.paths.config_dir, owner: "root", group: "root", mode: 0o755)
 
       directory(gatehouse.paths.state_dir,
@@ -66,9 +62,9 @@ defmodule HostKit.Recipes.Gatehouse do
     %{
       name: path_name,
       service_name: Keyword.get(opts, :service, :gatehouse),
-      owner: Keyword.get(opts, :user, "gatehouse"),
-      group: Keyword.get(opts, :group, Keyword.get(opts, :user, "gatehouse")),
-      create_user: Keyword.get(opts, :create_user, true),
+      owner: HostKit.Account.name!(Keyword.get(opts, :run_as, "gatehouse")),
+      group:
+        HostKit.Account.name!(Keyword.get(opts, :group, Keyword.get(opts, :run_as, "gatehouse"))),
       cookie: Keyword.get(opts, :cookie),
       ready_name: "gatehouse_#{path_name}_ready",
       paths: %{

@@ -22,7 +22,7 @@ defmodule HostKit.ToysInfra do
     path(:config_dir, root(:config), path_name())
 
     macro :standard_user do
-      system_user(service_user(), home: state_path("home"))
+      account(service_user(), system: true, home: state_path("home"))
     end
 
     macro :standard_dirs do

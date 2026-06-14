@@ -32,7 +32,7 @@ project :toys do
   end
 
   service :exograph do
-    system_user "toys-exograph", home: "/var/lib/toys/exograph/home"
+    account "toys-exograph", system: true, home: "/var/lib/toys/exograph/home"
     directory "/srv/toys/exograph", owner: "toys-exograph", group: "toys-exograph", mode: 0o755
 
     daemon "toys-exograph.service" do
@@ -207,7 +207,7 @@ defmodule ToysInfra do
     path :config_dir, root(:config), service_name()
 
     macro :standard_user do
-      system_user service_user(), home: state_path("home")
+      account service_user(), system: true, home: state_path("home")
     end
   end
 end

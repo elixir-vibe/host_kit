@@ -118,13 +118,13 @@ defmodule HostKit.DSL.Systemd do
 
   defmacro service_user(value) do
     quote do
-      HostKit.DSL.Systemd.Scope.put_service(:user, unquote(value))
+      HostKit.DSL.Systemd.Scope.put_service(:user, HostKit.Account.name!(unquote(value)))
     end
   end
 
   defmacro service_group(value) do
     quote do
-      HostKit.DSL.Systemd.Scope.put_service(:group, unquote(value))
+      HostKit.DSL.Systemd.Scope.put_service(:group, HostKit.Account.name!(unquote(value)))
     end
   end
 

@@ -1,7 +1,7 @@
 defmodule HostKit.RemoteTest do
   use ExUnit.Case, async: true
 
-  alias HostKit.Resources.{Directory, File, User}
+  alias HostKit.Resources.{Account, Directory, File}
   alias HostKit.Systemd
 
   defmodule FakeRunner do
@@ -45,8 +45,8 @@ defmodule HostKit.RemoteTest do
   test "reads users through a runner" do
     context = context()
 
-    assert {:ok, %User{home: "/var/lib/app", shell: "/usr/sbin/nologin"}} =
-             HostKit.Remote.read(%User{name: "app"}, context)
+    assert {:ok, %Account{home: "/var/lib/app", shell: "/usr/sbin/nologin"}} =
+             HostKit.Remote.read(%Account{name: "app"}, context)
   end
 
   test "reads directory metadata through a runner" do

@@ -9,7 +9,7 @@ defmodule HostKit.ProjectDSLTest do
 
     assert Enum.any?(
              service.resources,
-             &match?(%HostKit.Resources.User{name: "toys-exograph"}, &1)
+             &match?(%HostKit.Resources.Account{name: "toys-exograph"}, &1)
            )
 
     assert Enum.any?(

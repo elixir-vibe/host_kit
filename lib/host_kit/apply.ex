@@ -6,6 +6,7 @@ defmodule HostKit.Apply do
   alias HostKit.Runner.SSH.Connection
 
   alias Resources.{
+    Account,
     Command,
     Directory,
     EnvFile,
@@ -14,8 +15,7 @@ defmodule HostKit.Apply do
     Package,
     Readiness,
     Shell,
-    Source,
-    User
+    Source
   }
 
   alias Runner.Ops
@@ -197,12 +197,12 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: :read} = change, _opts), do: {:ok, skipped(change)}
   defp apply_change(%Change{action: :delete}, _opts), do: {:error, :delete_not_supported}
 
-  defp apply_change(%Change{action: :create, after: %User{} = user} = change, opts) do
-    apply_or_dry_run(change, opts, fn -> apply_user(user, opts) end)
+  defp apply_change(%Change{action: :create, after: %Account{} = account} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> apply_account(account, opts) end)
   end
 
-  defp apply_change(%Change{action: :update, after: %User{}}, _opts),
-    do: {:error, :user_update_not_supported}
+  defp apply_change(%Change{action: :update, after: %Account{}}, _opts),
+    do: {:error, :account_update_not_supported}
 
   defp apply_change(%Change{action: action, after: %Directory{} = directory} = change, opts)
        when action in [:create, :update] do
@@ -331,11 +331,11 @@ defmodule HostKit.Apply do
     end
   end
 
-  defp apply_user(%User{name: name} = user, opts) do
-    args = if user.system, do: ["--system"], else: []
-    args = if user.home, do: args ++ ["--home", user.home], else: args
-    args = if user.shell, do: args ++ ["--shell", user.shell], else: args
-    args = args ++ Enum.flat_map(user.groups, &["--groups", &1])
+  defp apply_account(%Account{name: name} = account, opts) do
+    args = if account.system, do: ["--system"], else: []
+    args = if account.home, do: args ++ ["--home", account.home], else: args
+    args = if account.shell, do: args ++ ["--shell", account.shell], else: args
+    args = args ++ Enum.flat_map(account.groups, &["--groups", &1])
 
     Ops.cmd(opts, "useradd", args ++ [name])
   end

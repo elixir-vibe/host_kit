@@ -5,6 +5,7 @@ defmodule HostKit.Local do
   alias HostKit.Reader.Helpers
 
   alias HostKit.Resources.{
+    Account,
     Command,
     Directory,
     EnvFile,
@@ -13,16 +14,15 @@ defmodule HostKit.Local do
     Package,
     Readiness,
     Shell,
-    Source,
-    User
+    Source
   }
 
   alias HostKit.Systemd
 
   @spec read(struct()) :: {:ok, struct() | nil} | {:error, term()}
-  def read(%User{name: name} = desired) do
+  def read(%Account{name: name} = desired) do
     case System.cmd("getent", ["passwd", name], stderr_to_stdout: true) do
-      {line, 0} -> {:ok, Helpers.user_from_passwd(line, desired)}
+      {line, 0} -> {:ok, Helpers.account_from_passwd(line, desired)}
       {_output, 2} -> {:ok, nil}
       {output, status} -> {:error, {:getent_failed, status, output}}
     end

@@ -8,7 +8,7 @@ project :toys do
   end
 
   service :exograph do
-    system_user("toys-exograph", home: "/var/lib/toys/exograph/home")
+    account("toys-exograph", system: true, home: "/var/lib/toys/exograph/home")
     directory("/srv/toys/exograph", owner: "toys-exograph", group: "toys-exograph", mode: 0o755)
 
     systemd_service "toys-exograph.service" do

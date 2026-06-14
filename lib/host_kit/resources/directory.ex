@@ -21,8 +21,8 @@ defmodule HostKit.Resources.Directory do
   def new(path, opts \\ []) do
     %__MODULE__{
       path: path,
-      owner: Keyword.get(opts, :owner),
-      group: Keyword.get(opts, :group),
+      owner: normalize_account_name(Keyword.get(opts, :owner)),
+      group: normalize_account_name(Keyword.get(opts, :group)),
       mode: opts |> Keyword.get(:mode) |> HostKit.Mode.normalize!(),
       depends_on: Keyword.get(opts, :depends_on, []),
       meta: Keyword.get(opts, :meta, %{})
@@ -30,4 +30,7 @@ defmodule HostKit.Resources.Directory do
   end
 
   def id(%__MODULE__{path: path}), do: {:directory, path}
+
+  defp normalize_account_name(nil), do: nil
+  defp normalize_account_name(name), do: HostKit.Account.name!(name)
 end

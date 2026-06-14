@@ -44,7 +44,7 @@ project :prod do
   end
 
   service :api do
-    system_user "api", home: "/var/lib/api"
+    account "api", system: true, home: "/var/lib/api"
     directory "/var/lib/api", owner: "api", group: "api", mode: 0o750
 
     env_file "/etc/api/api.env", owner: "root", group: "api" do

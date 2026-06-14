@@ -4,7 +4,7 @@ defmodule HostKit.ApplyTest do
   alias HostKit.Apply
   alias HostKit.Change
   alias HostKit.Plan
-  alias HostKit.Resources.{Directory, File, User}
+  alias HostKit.Resources.{Account, Directory, File}
   alias HostKit.Systemd
 
   test "requires confirmation outside dry-run" do
@@ -104,8 +104,8 @@ defmodule HostKit.ApplyTest do
     Elixir.File.rm_rf!(root)
   end
 
-  test "creates users through useradd" do
-    user = %User{
+  test "creates accounts through useradd" do
+    account = %Account{
       name: "toys-demo",
       system: true,
       home: "/var/lib/toys/demo",
@@ -114,7 +114,7 @@ defmodule HostKit.ApplyTest do
     }
 
     plan = %Plan{
-      changes: [%Change{action: :create, resource_id: {:user, user.name}, after: user}]
+      changes: [%Change{action: :create, resource_id: {:account, account.name}, after: account}]
     }
 
     parent = self()
@@ -151,14 +151,14 @@ defmodule HostKit.ApplyTest do
                      ], [stderr_to_stdout: true]}
   end
 
-  test "refuses user updates" do
-    user = %User{name: "toys-demo"}
+  test "refuses account updates" do
+    account = %Account{name: "toys-demo"}
 
     plan = %Plan{
-      changes: [%Change{action: :update, resource_id: {:user, user.name}, after: user}]
+      changes: [%Change{action: :update, resource_id: {:account, account.name}, after: account}]
     }
 
-    assert {:error, {{:user, "toys-demo"}, :user_update_not_supported}} =
+    assert {:error, {{:account, "toys-demo"}, :account_update_not_supported}} =
              Apply.run(plan, confirm: true)
   end
 

@@ -6,6 +6,8 @@ Gatehouse is the BEAM-native edge proxy/runtime for HostKit-managed hosts. HostK
 use HostKit.DSL, providers: [HostKit.Providers.Gatehouse]
 
 project :edge do
+  account :gatehouse, system: true, home: "/var/lib/gatehouse"
+
   service :hello_phoenix do
     endpoint :http, port: 4000, protocol: :http, health: "/health"
   end
@@ -21,16 +23,15 @@ project :edge do
     release_path: "/opt/gatehouse",
     config_path: "/etc/gatehouse/config.exs",
     state_path: "/var/lib/gatehouse/state.etf",
-    user: "gatehouse"
+    run_as: account(:gatehouse)
 end
 ```
 
 The `proxy` block remains the source of Gatehouse routing config. The `gatehouse` recipe manages runtime scaffolding around that config:
 
-- system user
 - config/state/env directories
 - `/etc/gatehouse/env`
 - `gatehouse.service`
 - readiness check for systemd active state
 
-For now the recipe assumes the Gatehouse release already exists at `release_path`. Building and deploying the Gatehouse release itself is intentionally separate so routing config can stabilize first.
+Declare the runtime account explicitly with `account`; the recipe consumes it with `run_as: account(:gatehouse)`. For now the recipe assumes the Gatehouse release already exists at `release_path`. Building and deploying the Gatehouse release itself is intentionally separate so routing config can stabilize first.

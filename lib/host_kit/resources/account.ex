@@ -1,5 +1,5 @@
-defmodule HostKit.Resources.User do
-  @moduledoc "Desired Linux user."
+defmodule HostKit.Resources.Account do
+  @moduledoc "Desired Linux account."
 
   @type t :: %__MODULE__{
           name: String.t(),
@@ -19,5 +19,5 @@ defmodule HostKit.Resources.User do
             depends_on: [],
             meta: %{}
 
-  def id(%__MODULE__{name: name}), do: {:user, name}
+  def id(%__MODULE__{name: name}), do: {:account, name}
 end
