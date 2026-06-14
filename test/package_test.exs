@@ -78,6 +78,35 @@ defmodule HostKit.PackageTest do
              "DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -- 'curl'"
   end
 
+  test "apply batches consecutive package installs" do
+    packages = [HostKit.Resources.Package.new(:curl), HostKit.Resources.Package.new(:git)]
+
+    plan = %HostKit.Plan{
+      project: %HostKit.Project{name: :demo},
+      changes:
+        Enum.map(packages, fn package ->
+          %HostKit.Change{
+            action: :create,
+            resource_id: HostKit.Resources.Package.id(package),
+            after: package
+          }
+        end)
+    }
+
+    assert {:ok, results} =
+             HostKit.apply(plan,
+               confirm: true,
+               package_manager: :apt,
+               runner: {Runner, test_pid: self()}
+             )
+
+    assert [_curl_result, _git_result] = results
+    commands = receive_commands([])
+    assert "DEBIAN_FRONTEND=noninteractive apt-get install -y -- 'curl' 'git'" in commands
+    refute "DEBIAN_FRONTEND=noninteractive apt-get install -y -- 'curl'" in commands
+    refute "DEBIAN_FRONTEND=noninteractive apt-get install -y -- 'git'" in commands
+  end
+
   test "apply detects package manager once for package changes" do
     packages = [HostKit.Resources.Package.new(:curl), HostKit.Resources.Package.new(:git)]
 
@@ -98,6 +127,15 @@ defmodule HostKit.PackageTest do
 
     assert_received {:cmd, "sh", ["-c", "command -v apt-get >/dev/null 2>&1"]}
     refute_received {:cmd, "sh", ["-c", "command -v dnf >/dev/null 2>&1"]}
+  end
+
+  defp receive_commands(commands) do
+    receive do
+      {:cmd, "sh", ["-c", command]} -> receive_commands([command | commands])
+      {:cmd, _command, _args} -> receive_commands(commands)
+    after
+      0 -> Enum.reverse(commands)
+    end
   end
 
   test "package resources read installed state from package manager" do

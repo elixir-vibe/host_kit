@@ -18,8 +18,13 @@ defmodule HostKit.Package.CLI do
 
   @impl true
   def install(%PackageResource{} = package, opts) do
+    install_many([package], opts)
+  end
+
+  @impl true
+  def install_many(packages, opts) do
     with {:ok, manager} <- manager(opts) do
-      install_package(manager, package, opts)
+      install_packages(manager, packages, opts)
     end
   end
 
@@ -61,37 +66,52 @@ defmodule HostKit.Package.CLI do
     end
   end
 
-  defp install_package(:apt, package, opts) do
-    update = if package.update, do: "apt-get update && ", else: ""
+  defp install_packages(_manager, [], _opts), do: :ok
+
+  defp install_packages(:apt, packages, opts) do
+    update = if Enum.any?(packages, & &1.update), do: "apt-get update && ", else: ""
 
     sh_ok(
       opts,
-      "DEBIAN_FRONTEND=noninteractive #{update}apt-get install -y -- #{package_spec(:apt, package)}"
+      "DEBIAN_FRONTEND=noninteractive #{update}apt-get install -y -- #{package_specs(:apt, packages)}"
     )
   end
 
-  defp install_package(:dnf, package, opts) do
-    refresh = if package.update, do: " --refresh", else: ""
-    sh_ok(opts, "dnf install -y#{refresh} -- #{package_spec(:dnf, package)}")
+  defp install_packages(:dnf, packages, opts) do
+    refresh = if Enum.any?(packages, & &1.update), do: " --refresh", else: ""
+    sh_ok(opts, "dnf install -y#{refresh} -- #{package_specs(:dnf, packages)}")
   end
 
-  defp install_package(:pacman, package, opts) do
-    if package.version do
-      {:error, {:version_pin_not_supported, :pacman, package.system_name}}
-    else
-      refresh = if package.update, do: "pacman -Sy && ", else: ""
+  defp install_packages(:pacman, packages, opts) do
+    case pacman_package_summary(packages) do
+      %{versioned: nil, update?: update?} ->
+        refresh = if update?, do: "pacman -Sy && ", else: ""
+        names = Enum.map_join(packages, " ", &HostKit.Shell.escape(&1.system_name))
+        sh_ok(opts, "#{refresh}pacman -S --noconfirm --needed -- #{names}")
 
-      sh_ok(
-        opts,
-        "#{refresh}pacman -S --noconfirm --needed -- #{HostKit.Shell.escape(package.system_name)}"
-      )
+      %{versioned: package} ->
+        {:error, {:version_pin_not_supported, :pacman, package.system_name}}
     end
   end
 
-  defp install_package(:apk, package, opts) do
-    update = if package.update, do: " --update-cache", else: ""
-    sh_ok(opts, "apk add#{update} #{package_spec(:apk, package)}")
+  defp install_packages(:apk, packages, opts) do
+    update = if Enum.any?(packages, & &1.update), do: " --update-cache", else: ""
+    sh_ok(opts, "apk add#{update} #{package_specs(:apk, packages)}")
   end
+
+  defp pacman_package_summary(packages) do
+    Enum.reduce(packages, %{versioned: nil, update?: false}, fn package, summary ->
+      summary
+      |> Map.update!(:update?, &(&1 or package.update))
+      |> maybe_put_versioned_package(package)
+    end)
+  end
+
+  defp maybe_put_versioned_package(%{versioned: nil} = summary, %{version: version} = package)
+       when not is_nil(version),
+       do: %{summary | versioned: package}
+
+  defp maybe_put_versioned_package(summary, _package), do: summary
 
   defp manager(opts), do: Manager.resolve(opts)
 
@@ -135,6 +155,12 @@ defmodule HostKit.Package.CLI do
 
   defp package_spec(:apk, %{system_name: system_name, version: version}),
     do: HostKit.Shell.escape("#{system_name}=#{version}")
+
+  defp package_specs(manager, packages) do
+    packages
+    |> Enum.uniq_by(&{&1.system_name, &1.version})
+    |> Enum.map_join(" ", &package_spec(manager, &1))
+  end
 
   defp sh_ok(opts, command) do
     case sh(opts, command) do

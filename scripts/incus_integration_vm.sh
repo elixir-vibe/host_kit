@@ -134,7 +134,12 @@ install_ssh() {
   fi
 
   echo "[hostkit:incus] start ssh" >&2
-  incus_cmd exec "$INSTANCE_NAME" -- sh -c 'timeout 30s systemctl enable --now ssh >/dev/null 2>&1 || service ssh start'
+  incus_cmd exec "$INSTANCE_NAME" -- sh -c 'timeout 30s service ssh start >/dev/null 2>&1 || timeout 30s systemctl start ssh >/dev/null 2>&1 || true'
+
+  if ! incus_cmd exec "$INSTANCE_NAME" -- systemctl is-active --quiet ssh >/dev/null 2>&1; then
+    echo "ssh did not become active" >&2
+    exit 1
+  fi
 }
 
 instance_ip() {

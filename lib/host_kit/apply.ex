@@ -93,7 +93,8 @@ defmodule HostKit.Apply do
     emit(opts, :apply_started)
 
     changes
-    |> Enum.reduce_while({:ok, [], false}, &apply_change_step(&1, &2, opts))
+    |> chunk_package_changes()
+    |> Enum.reduce_while({:ok, [], false}, &apply_change_chunk(&1, &2, opts))
     |> then(fn
       {:ok, results, reload?} ->
         results = Enum.reverse(results)
@@ -108,6 +109,54 @@ defmodule HostKit.Apply do
     end)
   end
 
+  defp chunk_package_changes(changes), do: chunk_package_changes(changes, []) |> Enum.reverse()
+
+  defp chunk_package_changes([], chunks), do: chunks
+
+  defp chunk_package_changes(
+         [%Change{action: action, after: %Package{}} | _rest] = changes,
+         chunks
+       )
+       when action in [:create, :update] do
+    {package_changes, rest} = Enum.split_while(changes, &batchable_package_change?/1)
+    chunk_package_changes(rest, [{:package_batch, package_changes} | chunks])
+  end
+
+  defp chunk_package_changes([change | rest], chunks) do
+    chunk_package_changes(rest, [{:change, change} | chunks])
+  end
+
+  defp batchable_package_change?(%Change{action: action, after: %Package{}})
+       when action in [:create, :update],
+       do: true
+
+  defp batchable_package_change?(_change), do: false
+
+  defp apply_change_chunk({:change, change}, state, opts),
+    do: apply_change_step(change, state, opts)
+
+  defp apply_change_chunk({:package_batch, [change]}, state, opts),
+    do: apply_change_step(change, state, opts)
+
+  defp apply_change_chunk({:package_batch, changes}, {:ok, results, reload?}, opts) do
+    Enum.each(changes, &report_change_start(&1, opts))
+
+    case timed_package_batch(changes, fn -> apply_package_batch(changes, opts) end) do
+      :ok ->
+        batch_results = Enum.map(changes, &%{change: &1, status: :applied})
+
+        Enum.zip(changes, batch_results)
+        |> Enum.each(fn {change, result} -> report_change_result(change, result, opts) end)
+
+        {:cont, {:ok, Enum.reverse(batch_results, results), reload?}}
+
+      {:error, reason} ->
+        failed = hd(changes)
+        emit(opts, :change_failed, change: failed, reason: reason)
+        {:halt, {:error, {failed.resource_id, reason}}}
+    end
+  end
+
   defp apply_change_step(change, {:ok, results, reload?}, opts) do
     report_change_start(change, opts)
 
@@ -120,6 +169,20 @@ defmodule HostKit.Apply do
         emit(opts, :change_failed, change: change, reason: reason)
         {:halt, {:error, {change.resource_id, reason}}}
     end
+  end
+
+  defp apply_package_batch(changes, opts) do
+    changes
+    |> Enum.map(& &1.after)
+    |> HostKit.Package.install_many(opts)
+  end
+
+  defp timed_package_batch(changes, fun) do
+    HostKit.Telemetry.span(
+      [:apply, :package_batch],
+      %{resource_ids: Enum.map(changes, & &1.resource_id), count: length(changes)},
+      fun
+    )
   end
 
   defp timed_change(%Change{} = change, fun) do
