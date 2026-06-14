@@ -1,4 +1,4 @@
-<!-- livebook:{"app_settings":{"access_type":"public","output_type":"rich","show_source":false,"slug":"hostkit-phoenix-demo"}} -->
+<!-- livebook:{"app_settings":{"access_type":"public","output_type":"rich","slug":"hostkit-phoenix-demo"}} -->
 
 # Deploy a Phoenix app with HostKit
 
@@ -21,6 +21,12 @@ Mix.install([
 
 ```elixir
 Code.require_file("notebooks/learn/hostkit_demo_helpers.exs", File.cwd!())
+Logger.configure(level: :notice)
+
+alias HostKit, as: HK
+alias HostKit.LivebookDemo, as: Demo
+alias HostKit.Providers.Caddy
+alias HostKit.Providers.Elixir, as: ElixirProvider
 ```
 
 ## Target
@@ -35,48 +41,26 @@ Uploaded keys are copied to a temporary `0600` file in the Livebook runtime and 
 </details>
 
 ```elixir
-status = Kino.Frame.new() |> Kino.render()
-Kino.Frame.render(status, Kino.Markdown.new("Enter SSH details and click **Check SSH connection**."))
-notebook = self()
-
 form =
-  Kino.Control.form(
-    [
-      server: Kino.Input.text("Server", default: "127.0.0.1"),
-      user: Kino.Input.text("SSH user", default: "root"),
-      password: Kino.Input.password("SSH password", default: "hostkit-demo"),
-      key_file: Kino.Input.file("Upload SSH key"),
-      identity_file: Kino.Input.text("SSH key path on server (optional)", default: ""),
-      ssh_port: Kino.Input.number("SSH port", default: 2222),
-      public_hostname: Kino.Input.text("Public hostname", default: "phoenix.example.com"),
-      public_port: Kino.Input.number("Public port", default: 18_081),
-      app_port: Kino.Input.number("Phoenix port", default: 14_000),
-      apply?: Kino.Input.checkbox("Apply now", default: false),
-      verify?: Kino.Input.checkbox("Verify", default: false)
-    ],
-    submit: "Check SSH connection"
+  Demo.phoenix_target_form(
+    server: "127.0.0.1",
+    user: "root",
+    password: "hostkit-demo",
+    ssh_port: 2222,
+    public_hostname: "phoenix.example.com",
+    public_port: 18_081,
+    app_port: 14_000
   )
-
-Kino.listen(form, fn %{type: :submit, data: settings} ->
-  settings = HostKit.LivebookDemo.with_uploaded_key(settings)
-  send(notebook, {:demo_settings, settings})
-  Kino.Frame.render(status, HostKit.LivebookDemo.check_ssh(settings))
-end)
-
-form
 ```
 
 ```elixir
-settings =
-  receive do
-    {:demo_settings, settings} -> settings
-  end
+settings = Demo.await_target(form)
 
 target = %{
   host: settings.server,
   user: settings.user,
   sudo: true,
-  ssh: HostKit.LivebookDemo.ssh_opts(settings)
+  ssh: Demo.ssh_opts(settings)
 }
 ```
 
@@ -91,9 +75,6 @@ app = %{
   erlang_version: Map.get(settings, :erlang_version, "29.0.2"),
   elixir_version: Map.get(settings, :elixir_version, "1.20.1")
 }
-
-apply? = settings.apply?
-verify? = settings.verify?
 ```
 
 ## Declare
@@ -160,10 +141,6 @@ import #{caddy_sites_dir}/*.caddy
 The app recipe expands to source checkout, BEAM runtime, systemd, readiness, and Caddy ingress.
 
 ```elixir
-alias HostKit, as: HK
-alias HostKit.Providers.Caddy
-alias HostKit.Providers.Elixir, as: ElixirProvider
-
 use HK,
   providers: [Caddy, ElixirProvider]
 
@@ -239,43 +216,38 @@ host = hd(project.hosts)
 
 target_opts =
   host
-  |> HostKit.Host.target_opts()  |> Keyword.put(:package_repo, package_repo)
+  |> HostKit.Host.target_opts()
+  |> Keyword.put(:package_repo, package_repo)
   |> Keyword.put(:package_lock, package_lock_path)
 
-{:ok, plan} = HostKit.plan(project, target_opts)
+{:ok, plan} = HK.plan(project, target_opts)
 ```
 
 ```elixir
-plan |> inspect(pretty: true, limit: 50) |> Kino.Markdown.new()
+Demo.plan_summary(plan)
 ```
 
-## Apply
+```elixir
+Demo.plan_table(plan)
+```
 
-Only runs when `Apply now` is checked.
+## Deploy
+
+This is the line that changes the target.
 
 ```elixir
 reporter = self()
-
-apply_result =
-  if apply? do
-    HostKit.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
-  else
-    {:skipped, :set_apply_to_true}
-  end
+apply_result = HK.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
+Kino.nothing()
 ```
 
 ```elixir
-progress =
-  Stream.repeatedly(fn ->
-    receive do
-      {HostKit.Apply, event} -> HostKit.Apply.Event.format(event)
-    after
-      0 -> nil
-    end
-  end)
-  |> Enum.take_while(& &1)
+progress = Demo.collect_apply_progress()
+Demo.apply_summary(apply_result, progress)
+```
 
-{apply_result, progress}
+```elixir
+Demo.apply_table(apply_result)
 ```
 
 ## Verify
@@ -283,10 +255,10 @@ progress =
 Readiness checks in the declaration already restart and wait for systemd services during apply. Verification can stay focused on the app URL.
 
 ```elixir
-if verify? do
-  response = Req.get!(public_url)
-  {response.status, response.body, public_url}
-else
-  {:skipped, public_url}
-end
+response = Req.get!(public_url)
+
+[
+  Demo.verify_summary(response, public_url),
+  Kino.HTML.new(response.body)
+]
 ```

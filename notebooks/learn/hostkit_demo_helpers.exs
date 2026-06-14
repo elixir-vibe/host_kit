@@ -77,6 +77,49 @@ defmodule HostKit.LivebookDemo do
     Kino.Layout.grid([form, status], columns: 1)
   end
 
+  def phoenix_target_form(defaults \\ []) do
+    defaults = Map.new(defaults)
+    caller = self()
+
+    form =
+      Kino.Control.form(
+        [
+          server: Kino.Input.text("Server", default: Map.get(defaults, :server, "127.0.0.1")),
+          user: Kino.Input.text("SSH user", default: Map.get(defaults, :user, "root")),
+          password:
+            Kino.Input.password("SSH password", default: Map.get(defaults, :password, "")),
+          key_file: Kino.Input.file("Upload SSH key"),
+          identity_file:
+            Kino.Input.text("SSH key path on server",
+              default: Map.get(defaults, :identity_file, "")
+            ),
+          ssh_port: Kino.Input.number("SSH port", default: Map.get(defaults, :ssh_port, 22)),
+          public_hostname:
+            Kino.Input.text("Public hostname", default: Map.get(defaults, :public_hostname, "")),
+          public_port:
+            Kino.Input.number("Public port", default: Map.get(defaults, :public_port, 18_081)),
+          app_port:
+            Kino.Input.number("Phoenix port", default: Map.get(defaults, :app_port, 14_000))
+        ],
+        submit: "Check SSH connection"
+      )
+
+    status = Kino.Frame.new()
+
+    Kino.Frame.render(
+      status,
+      Markdown.new("Enter SSH details and click **Check SSH connection**.")
+    )
+
+    Kino.listen(form, fn %{type: :submit, data: settings} ->
+      settings = with_uploaded_key(settings)
+      send(caller, {:demo_settings, settings})
+      Kino.Frame.render(status, check_ssh(settings))
+    end)
+
+    Kino.Layout.grid([form, status], columns: 1)
+  end
+
   def await_target(_form) do
     receive do
       {:demo_settings, settings} -> settings
