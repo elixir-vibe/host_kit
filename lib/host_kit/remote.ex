@@ -125,22 +125,17 @@ defmodule HostKit.Remote do
     end
   end
 
-  defp read_file(path, context) do
-    case cmd(context, "sh", ["-c", read_command(path, context)]) do
-      {content, 0} -> decode_content(content)
-      {output, _status} -> {:error, stat_error(output)}
+  defp read_file(path, %{opts: opts}) do
+    case HostKit.Runner.Files.read_file(path, opts) do
+      {:ok, content} ->
+        {:ok, content}
+
+      {:error, {:command_failed, _command, _args, _status, output}} ->
+        {:error, stat_error(output)}
+
+      {:error, reason} ->
+        {:error, reason}
     end
-  end
-
-  defp read_command(path, context) do
-    prefix = if sudo?(context), do: "sudo ", else: ""
-    "#{prefix}base64 #{HostKit.Shell.escape(path)}"
-  end
-
-  defp decode_content(content) do
-    content
-    |> String.replace(~r/\s+/, "")
-    |> Base.decode64()
   end
 
   defp stat_metadata(path, context) do

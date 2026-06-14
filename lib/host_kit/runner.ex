@@ -11,20 +11,7 @@ defmodule HostKit.Runner do
   @callback write_file(Path.t(), iodata(), opts()) :: :ok | {:error, term()}
 
   @spec read_file(Path.t(), opts()) :: {:ok, binary()} | {:error, term()}
-  def read_file(path, opts) do
-    case Keyword.get(opts, :runner, HostKit.Runner.Local) do
-      HostKit.Runner.Local ->
-        File.read(path)
-
-      runner ->
-        case cmd(runner, "sh", ["-c", "cat #{HostKit.Shell.escape(path)}"],
-               stderr_to_stdout: true
-             ) do
-          {content, 0} -> {:ok, content}
-          {output, status} -> {:error, {:command_failed, "cat", status, output}}
-        end
-    end
-  end
+  def read_file(path, opts \\ []), do: HostKit.Runner.Files.read_file(path, opts)
 
   @spec cmd(module() | {module(), keyword()}, command(), args(), opts()) :: result()
   def cmd({runner, runner_opts}, command, args, opts) when is_atom(runner) do
