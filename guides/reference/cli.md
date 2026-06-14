@@ -52,7 +52,8 @@ Common options:
 
 - `--plan PATH` — read an up plan artifact.
 - `--last` — read the latest tracked run and use its referenced up plan artifact.
-- `--runs-root PATH` — override the HostKit runs root for `--last`.
+- `--runs-root PATH` — override the HostKit runs root for `--last` / `--run`.
+- `--run RUN_ID` — build a down plan from a specific tracked run.
 - `--out PATH` — write the generated down plan artifact.
 - `--only type:name` — include only selected resources.
 - `--except type:name` — exclude selected resources.
@@ -63,6 +64,7 @@ Examples:
 ```sh
 mix host_kit.down host_kit.plan.json --out host_kit.down.plan.json
 mix host_kit.down --last --runs-root /var/lib/hostkit/runs --out host_kit.down.plan.json
+mix host_kit.down --run 20260614-101148-demo-up --runs-root /var/lib/hostkit/runs --out host_kit.down.plan.json
 mix host_kit.apply --plan host_kit.down.plan.json --confirm
 ```
 
@@ -111,6 +113,8 @@ Common options:
 - `--runs-root PATH` — override the HostKit runs root.
 - `--format text|json|inspect` — output format.
 - `--verbose` — include artifact and backup paths in text output.
+- `--latest` — show only the latest run.
+- `--id RUN_ID` — show one run by id.
 
 Examples:
 
@@ -118,6 +122,7 @@ Examples:
 mix host_kit.apply --host prod --track --plan up.plan.json --confirm infra/config.exs
 mix host_kit.runs --host prod infra/config.exs
 mix host_kit.runs --host prod --verbose infra/config.exs
+mix host_kit.runs --host prod --latest --verbose infra/config.exs
 ```
 
 ## Target selection

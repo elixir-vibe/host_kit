@@ -97,6 +97,9 @@ defmodule HostKit.Plan do
   defp down_change(%Change{action: :update, before: nil} = change),
     do: {:skip, irreversible(change, :missing_previous_state)}
 
+  defp down_change(%Change{action: :update, before: %Source{}} = change),
+    do: {:skip, irreversible(change, :source_update_not_reversible)}
+
   defp down_change(%Change{action: :update, before: before} = change) do
     {:ok,
      %Change{

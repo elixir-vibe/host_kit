@@ -29,14 +29,16 @@ defmodule Mix.Tasks.HostKit.Runs do
           require: :keep,
           runs_root: :string,
           format: :string,
-          verbose: :boolean
+          verbose: :boolean,
+          latest: :boolean,
+          id: :string
         ]
       )
 
     project = load_project(opts, positional)
 
     Options.with_target_opts(opts, project, fn target_opts ->
-      case HostKit.RunRecord.list(run_opts(opts, target_opts)) do
+      case load_records(opts, run_opts(opts, target_opts)) do
         {:ok, records} -> IO.puts(format_records(records, opts))
         {:error, reason} -> Mix.raise("could not list HostKit runs: #{inspect(reason)}")
       end
@@ -60,6 +62,19 @@ defmodule Mix.Tasks.HostKit.Runs do
     case Keyword.pop(opts, :target) do
       {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
       {nil, opts} -> opts
+    end
+  end
+
+  defp load_records(opts, run_opts) do
+    cond do
+      id = Keyword.get(opts, :id) ->
+        with {:ok, record} <- HostKit.RunRecord.load(id, run_opts), do: {:ok, [record]}
+
+      Keyword.get(opts, :latest, false) ->
+        with {:ok, record} <- HostKit.RunRecord.latest(run_opts), do: {:ok, [record]}
+
+      true ->
+        HostKit.RunRecord.list(run_opts)
     end
   end
 

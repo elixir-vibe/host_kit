@@ -25,6 +25,7 @@ defmodule Mix.Tasks.HostKit.Down do
           only: :keep,
           except: :keep,
           last: :boolean,
+          run: :string,
           local: :boolean,
           host: :string,
           remote: :string,
@@ -59,15 +60,21 @@ defmodule Mix.Tasks.HostKit.Down do
   end
 
   defp load_up_plan!(opts, positional, target_opts) do
-    if Keyword.get(opts, :last, false) do
-      {path, record} = latest_plan_artifact!(opts, target_opts)
-      path |> load_plan_artifact!(target_opts) |> HostKit.RunRecord.apply_backups(record)
-    else
-      path =
-        Keyword.get(opts, :plan) || List.first(positional) ||
-          Mix.raise("expected a plan artifact")
+    cond do
+      Keyword.get(opts, :last, false) ->
+        {path, record} = tracked_plan_artifact!(:latest, opts, target_opts)
+        path |> load_plan_artifact!(target_opts) |> HostKit.RunRecord.apply_backups(record)
 
-      load_plan_artifact!(path, target_opts)
+      run_id = Keyword.get(opts, :run) ->
+        {path, record} = tracked_plan_artifact!(run_id, opts, target_opts)
+        path |> load_plan_artifact!(target_opts) |> HostKit.RunRecord.apply_backups(record)
+
+      true ->
+        path =
+          Keyword.get(opts, :plan) || List.first(positional) ||
+            Mix.raise("expected a plan artifact")
+
+        load_plan_artifact!(path, target_opts)
     end
   end
 
@@ -78,25 +85,26 @@ defmodule Mix.Tasks.HostKit.Down do
     end
   end
 
-  defp latest_plan_artifact!(opts, target_opts) do
+  defp tracked_plan_artifact!(selector, opts, target_opts) do
     run_opts =
       target_opts
       |> expand_target_opts()
       |> put_present(:hostkit_runs_root, Keyword.get(opts, :runs_root))
 
-    case HostKit.RunRecord.latest(run_opts) do
+    case load_run_record(selector, run_opts) do
       {:ok, %{artifacts: %{"up_plan" => path}} = record} when is_binary(path) ->
         {path, record}
 
       {:ok, record} ->
-        Mix.raise(
-          "latest HostKit run #{inspect(record.id)} does not reference an up plan artifact"
-        )
+        Mix.raise("HostKit run #{inspect(record.id)} does not reference an up plan artifact")
 
       {:error, reason} ->
-        Mix.raise("could not load latest HostKit run: #{inspect(reason)}")
+        Mix.raise("could not load HostKit run: #{inspect(reason)}")
     end
   end
+
+  defp load_run_record(:latest, run_opts), do: HostKit.RunRecord.latest(run_opts)
+  defp load_run_record(id, run_opts), do: HostKit.RunRecord.load(id, run_opts)
 
   defp down_opts(opts) do
     []

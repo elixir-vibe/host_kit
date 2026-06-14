@@ -167,6 +167,40 @@ defmodule HostKit.Plan.DownTest do
              down_plan.diagnostics.warnings
   end
 
+  test "down plan treats source updates as irreversible by default" do
+    before = %HostKit.Resources.Source{name: "app", type: :git, uri: "/old", revision: "old"}
+
+    after_source = %HostKit.Resources.Source{
+      name: "app",
+      type: :git,
+      uri: "/new",
+      revision: "new"
+    }
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :rollback_test},
+      changes: [
+        %Change{
+          action: :update,
+          resource_id: {:source, "app"},
+          before: before,
+          after: after_source
+        }
+      ]
+    }
+
+    assert {:ok, down_plan} = HostKit.down(plan)
+    assert down_plan.changes == []
+
+    assert [
+             %HostKit.Diagnostic{
+               code: :irreversible_change,
+               resource_id: {:source, "app"},
+               details: %{reason: :source_update_not_reversible}
+             }
+           ] = down_plan.diagnostics.warnings
+  end
+
   test "down plan can be filtered to part of the original plan" do
     first = %HostKit.Resources.File{path: "/tmp/first", content: "old"}
     second = %HostKit.Resources.File{path: "/tmp/second", content: "old"}

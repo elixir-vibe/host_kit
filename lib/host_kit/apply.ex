@@ -365,7 +365,7 @@ defmodule HostKit.Apply do
   end
 
   defp apply_directory(%Directory{path: path} = directory, opts) do
-    with :ok <- mkdir_p(path, opts),
+    with :ok <- HostKit.Runner.Files.mkdir_p(path, opts),
          :ok <- Ops.chown(path, directory.owner, directory.group, opts) do
       Ops.chmod(path, directory.mode, opts)
     end
@@ -376,8 +376,8 @@ defmodule HostKit.Apply do
 
   defp apply_file(%File{path: path, content: content} = file, opts) do
     with {:ok, content} <- file_content(content, opts),
-         :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, content, opts),
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
+         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
          :ok <- Ops.chown(path, file.owner, file.group, opts) do
       Ops.chmod(path, file.mode, opts)
     end
@@ -403,8 +403,8 @@ defmodule HostKit.Apply do
 
   defp apply_env_file(%EnvFile{path: path} = env_file, opts) do
     with {:ok, content} <- env_file_content(env_file, opts),
-         :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, content, opts),
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
+         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
          :ok <- Ops.chown(path, env_file.owner, env_file.group, opts) do
       Ops.chmod(path, env_file.mode, opts)
     end
@@ -529,8 +529,8 @@ defmodule HostKit.Apply do
       Keyword.get(opts, :egress_dir, "/etc/nftables.d") |> Path.join("hostkit-egress-#{user}.nft")
 
     with {:ok, content} <- rendered_content(egress, Firewall.Nftables.render_egress(egress), opts),
-         :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, content, opts),
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
+         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
          :ok <- Ops.chown(path, "root", "root", opts),
          :ok <- Ops.chmod(path, 0o644, opts) do
       validate_firewall(path, opts)
@@ -539,8 +539,8 @@ defmodule HostKit.Apply do
 
   defp apply_proxy(%Proxy{path: path} = proxy, opts) do
     with {:ok, content} <- rendered_content(proxy, Proxy.render(proxy), opts),
-         :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, content, opts),
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
+         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
          :ok <- Ops.chown(path, proxy.meta[:owner], proxy.meta[:group], opts) do
       Ops.chmod(path, Map.get(proxy.meta, :mode, 0o644), opts)
     end
@@ -550,8 +550,8 @@ defmodule HostKit.Apply do
 
   defp apply_firewall(%Firewall{path: path} = firewall, opts) do
     with {:ok, content} <- rendered_content(firewall, Firewall.render(firewall), opts),
-         :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, content, opts),
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
+         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
          :ok <- Ops.chown(path, "root", "root", opts),
          :ok <- Ops.chmod(path, 0o644, opts),
          :ok <- validate_firewall(path, opts) do
@@ -580,8 +580,8 @@ defmodule HostKit.Apply do
     owner = Keyword.get(opts, :systemd_unit_owner, "root")
     group = Keyword.get(opts, :systemd_unit_group, "root")
 
-    with :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, IO.iodata_to_binary(content), opts),
+    with :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
+         :ok <- HostKit.Runner.Files.write_file(path, IO.iodata_to_binary(content), opts),
          :ok <- Ops.chown(path, owner, group, opts) do
       Ops.chmod(path, 0o644, opts)
     end
@@ -634,14 +634,6 @@ defmodule HostKit.Apply do
 
   defp systemd_change?(_result), do: false
 
-  defp mkdir_p(path, opts) do
-    opts |> runner() |> Runner.mkdir_p(path, opts)
-  end
-
-  defp write_file(path, content, opts) do
-    opts |> runner() |> Runner.write_file(path, content, opts)
-  end
-
   defp apply_provider_change(%Change{} = change, opts) do
     case Keyword.fetch(opts, :project) do
       {:ok, project} ->
@@ -653,8 +645,6 @@ defmodule HostKit.Apply do
         {:error, {:unsupported_resource, change.resource_id}}
     end
   end
-
-  defp runner(opts), do: Keyword.get(opts, :runner, HostKit.Runner.Local)
 
   defp skipped(change), do: %{change: change, status: :skipped}
 end

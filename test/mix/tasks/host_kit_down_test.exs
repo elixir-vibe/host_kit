@@ -88,9 +88,11 @@ defmodule Mix.Tasks.HostKit.DownTest do
                up_plan_artifact: up_path
              )
 
+    assert {:ok, record} = HostKit.RunRecord.latest(hostkit_runs_root: runs_root)
+
     output =
       capture_io(fn ->
-        Down.run(["--last", "--runs-root", runs_root, "--out", down_path])
+        Down.run(["--run", record.id, "--runs-root", runs_root, "--out", down_path])
       end)
 
     assert output =~ "1 to update"

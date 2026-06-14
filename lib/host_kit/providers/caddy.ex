@@ -31,9 +31,11 @@ defmodule HostKit.Providers.Caddy do
 
     opts = Map.get(context, :opts, [])
 
+    file_opts = Keyword.put(opts, :runner, Ops.runner(opts))
+
     with {:ok, content} <- rendered_content(site, render_site(site), opts),
-         :ok <- HostKit.Runner.mkdir_p(Ops.runner(opts), Path.dirname(path), opts),
-         :ok <- HostKit.Runner.write_file(Ops.runner(opts), path, content, opts),
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), file_opts),
+         :ok <- HostKit.Runner.Files.write_file(path, content, file_opts),
          :ok <- Ops.chown(path, Map.get(config, :owner), Map.get(config, :group), opts) do
       Ops.chmod(path, Map.get(config, :mode, 0o644), opts)
     end

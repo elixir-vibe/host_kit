@@ -171,20 +171,7 @@ defmodule HostKit.RunRecord do
     end
   end
 
-  defp read_text(path, opts) do
-    case runner(opts) do
-      HostKit.Runner.Local ->
-        File.read(path)
-
-      runner ->
-        case Runner.cmd(runner, "sh", ["-c", "cat #{HostKit.Shell.escape(path)}"],
-               stderr_to_stdout: true
-             ) do
-          {output, 0} -> {:ok, output}
-          {output, status} -> {:error, {:command_failed, "cat", status, output}}
-        end
-    end
-  end
+  defp read_text(path, opts), do: HostKit.Runner.Files.read_file(path, opts)
 
   defp run_path(id_or_file, opts) do
     if String.ends_with?(id_or_file, ".json") and String.contains?(id_or_file, "/") do
@@ -233,8 +220,8 @@ defmodule HostKit.RunRecord do
     target = Path.join(root, Path.basename(source))
 
     with {:ok, content} <- File.read(source),
-         :ok <- Runner.mkdir_p(runner(opts), root, opts),
-         :ok <- Runner.write_file(runner(opts), target, content, opts) do
+         :ok <- HostKit.Runner.Files.mkdir_p(root, opts),
+         :ok <- HostKit.Runner.Files.write_file(target, content, opts) do
       {:ok, Map.put(artifacts, key, target)}
     end
   end
@@ -279,8 +266,8 @@ defmodule HostKit.RunRecord do
   defp backup_content(_result), do: :skip
 
   defp write_backup(path, content, opts) do
-    with :ok <- Runner.mkdir_p(runner(opts), Path.dirname(path), opts) do
-      Runner.write_file(runner(opts), path, content, opts)
+    with :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts) do
+      HostKit.Runner.Files.write_file(path, content, opts)
     end
   end
 

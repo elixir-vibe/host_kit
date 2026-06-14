@@ -79,10 +79,18 @@ defmodule Mix.Tasks.HostKit.RunsTest do
                up_plan_artifact: up_path
              )
 
+    assert {:ok, record} = HostKit.RunRecord.latest(hostkit_runs_root: runs_root)
+
     output = capture_io(fn -> Runs.run(["--runs-root", runs_root, "--verbose"]) end)
     assert output =~ "artifacts=1"
     assert output =~ "backups=1"
     assert output =~ "artifacts.up_plan="
     assert output =~ "backups."
+
+    latest_output = capture_io(fn -> Runs.run(["--runs-root", runs_root, "--latest"]) end)
+    assert latest_output =~ record.id
+
+    id_output = capture_io(fn -> Runs.run(["--runs-root", runs_root, "--id", record.id]) end)
+    assert id_output =~ record.id
   end
 end
