@@ -11,6 +11,8 @@ defmodule HostKit.DSL.Readiness.Scope do
     Process.delete(@key) || raise "no HostKit readiness in scope"
   end
 
+  def active?, do: Process.get(@key) != nil
+
   def add_check(check) do
     readiness = Process.get(@key) || raise "readiness check used outside ready/2 block"
     Process.put(@key, %{readiness | checks: readiness.checks ++ [check]})

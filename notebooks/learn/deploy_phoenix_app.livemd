@@ -8,94 +8,64 @@ Mix.install([
 ])
 ```
 
-## What this notebook does
+This notebook deploys the example Phoenix app from the HostKit repository:
 
-This notebook deploys a real Phoenix release from Git:
+1. declare the app source/runtime,
+2. build a release on the target,
+3. run it with systemd,
+4. publish it through semantic ingress rendered by Caddy,
+5. optionally apply and verify.
 
-- declares a semantic `source`,
-- resolves and pins the Git revision in the HostKit plan,
-- stamps build commands with source provenance,
-- installs BEAM runtimes through mise,
-- runs the release with systemd,
-- declares semantic ingress for the app,
-- renders that ingress through the Caddy provider,
-- verifies the live HTTP endpoint.
+The deployment declaration lives directly in the notebook. The integration test extracts the marked DSL cell below.
 
-The HostKit DSL lives directly in this notebook. Integration tests extract the marked DSL cell below.
+## Demo settings
 
-## Configure deployment
+Edit these values and re-run the notebook.
 
 ```elixir
-form = Kino.Control.form(
-  [
-    target_host: Kino.Input.text("SSH host", default: System.get_env("HOSTKIT_TARGET_HOST", "127.0.0.1")),
-    target_user: Kino.Input.text("SSH user", default: System.get_env("HOSTKIT_TARGET_USER", "root")),
-    target_port: Kino.Input.number("SSH port", default: 22),
-    target_sudo: Kino.Input.checkbox("Use sudo", default: true),
-    identity_file: Kino.Input.text("Identity file", default: Path.expand("~/.ssh/id_ed25519")),
-    password_env: Kino.Input.text("Password env var (optional)", default: ""),
-    silently_accept_hosts: Kino.Input.checkbox("Silently accept host keys", default: false),
-    public_hostname: Kino.Input.text("Public hostname", default: "phoenix.example.com"),
-    source_ref: Kino.Input.text("Git ref", default: "master"),
-    app_port: Kino.Input.number("Phoenix app port", default: 14000),
-    http_port: Kino.Input.number("Public HTTP test port", default: 18081),
-    apply: Kino.Input.checkbox("Apply changes", default: false),
-    verify: Kino.Input.checkbox("Verify with curl", default: false),
-    request_from_livebook: Kino.Input.checkbox("Request generated public URL from Livebook with Req", default: false)
-  ],
-  submit: "Build plan"
-)
+target = %{
+  host: System.get_env("HOSTKIT_TARGET_HOST", "127.0.0.1"),
+  user: System.get_env("HOSTKIT_TARGET_USER", "root"),
+  sudo: true,
+  ssh: [
+    port: 22,
+    identity_file: Path.expand("~/.ssh/id_ed25519"),
+    silently_accept_hosts: true
+  ]
+}
 
-Kino.render(form)
+app = %{
+  public_hostname: "phoenix.example.com",
+  app_port: 14_000,
+  public_port: 18_081,
+  source_ref: "master"
+}
+
+apply? = false
+verify? = false
 ```
 
 ```elixir
-inputs = Kino.Control.await(form)
-```
+target_host = target.host
+target_user = target.user
+target_sudo = target.sudo
+ssh_opts = target.ssh
 
-## Build SSH options
-
-```elixir
-ssh_opts =
-  []
-  |> Keyword.put(:port, inputs.target_port)
-  |> Keyword.put(:silently_accept_hosts, inputs.silently_accept_hosts)
-  |> then(fn opts ->
-    if inputs.identity_file == "" do
-      opts
-    else
-      Keyword.put(opts, :identity_file, inputs.identity_file)
-    end
-  end)
-  |> then(fn opts ->
-    if inputs.password_env == "" do
-      opts
-    else
-      Keyword.put(opts, :password, HostKit.Secret.env(inputs.password_env))
-    end
-  end)
-```
-
-## Build the HostKit project
-
-```elixir
-target_host = inputs.target_host
-target_user = inputs.target_user
-target_sudo = inputs.target_sudo
-public_hostname = inputs.public_hostname
+public_hostname = app.public_hostname
 source_repo = System.get_env("HOSTKIT_PHOENIX_SOURCE_GIT", "https://github.com/elixir-vibe/host_kit.git")
-source_ref = inputs.source_ref
+source_ref = app.source_ref
 erlang_version = System.get_env("HOSTKIT_PHOENIX_ERLANG", "29.0.2")
 elixir_version = System.get_env("HOSTKIT_PHOENIX_ELIXIR", "1.20.1")
-app_port = inputs.app_port
-http_port = inputs.http_port
+app_name = :hello_phoenix
+app_port = app.app_port
+http_port = app.public_port
 ingress_address = ":#{http_port}"
 public_url = "http://#{target_host}:#{http_port}"
 artifact_path = "/tmp/hostkit-phoenix-demo.plan.json"
 secret_key_base = Base.encode64(:crypto.strong_rand_bytes(64))
-app_name = :hello_phoenix
+
 deployment_name = "hostkit-phoenix-demo-#{http_port}"
-app_service_name = "#{app_name |> to_string() |> String.replace("_", "-")}.service"
+app_service_name = "hello-phoenix.service"
 caddy_config_path = "/etc/#{deployment_name}/Caddyfile"
 caddy_config_dir = Path.dirname(caddy_config_path)
 caddy_sites_dir = "/etc/#{deployment_name}/sites"
@@ -109,6 +79,10 @@ caddyfile = """
 import #{caddy_sites_dir}/*.caddy
 """
 ```
+
+## Deployment declaration
+
+This is the important part: the app recipe expands to ordinary resources—source checkout, mise runtime, build commands, systemd, readiness, endpoint metadata, and ingress.
 
 ```elixir
 # hostkit:deploy-phoenix-app-dsl
@@ -169,24 +143,21 @@ project =
 project
 ```
 
-## Inspect semantic resources
-
-The recipe expands to ordinary, inspectable HostKit resources, including a Git source and ingress declaration.
-
-```elixir
-HostKit.Project.resources(project)
-|> Enum.filter(&(match?(%HostKit.Resources.Source{}, &1) or match?(%HostKit.Ingress{}, &1)))
-```
-
 ## Plan
 
 ```elixir
 host = hd(project.hosts)
 target_opts = HostKit.Host.target_opts(host)
-
 {:ok, plan} = HostKit.plan(project, target_opts)
 
 plan |> HostKit.Plan.Format.format() |> Kino.Markdown.new()
+```
+
+## Inspect what the recipe generated
+
+```elixir
+HostKit.Project.resources(project)
+|> Enum.filter(&(match?(%HostKit.Resources.Source{}, &1) or match?(%HostKit.Ingress{}, &1)))
 ```
 
 ## Source provenance
@@ -197,7 +168,7 @@ plan.resources
 |> Enum.map(fn source -> {source.name, HostKit.Resources.Source.identity(source)} end)
 ```
 
-## Write the plan artifact
+## Save an artifact
 
 ```elixir
 :ok = HostKit.Plan.Artifact.save(artifact_path, plan)
@@ -206,53 +177,17 @@ artifact_path
 
 ## Apply
 
+Applying is explicit. Set `apply? = true` in the settings cell.
+
 ```elixir
-start_apply_log = fn ->
-  frame = Kino.Frame.new() |> Kino.render()
-
-  spawn(fn ->
-    loop = fn loop ->
-      receive do
-        {HostKit.Apply, event} ->
-          Kino.Frame.append(frame, HostKit.Apply.Event.format(event))
-          loop.(loop)
-
-        :stop ->
-          :ok
-      end
-    end
-
-    loop.(loop)
-  end)
-end
+reporter = self()
 
 apply_result =
-  if inputs.apply do
-    reporter = start_apply_log.()
-
-    try do
-      HostKit.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
-    after
-      send(reporter, :stop)
-    end
+  if apply? do
+    HostKit.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
   else
-    {:skipped, :apply_not_checked}
+    {:skipped, :set_apply_to_true}
   end
-
-if inputs.apply do
-  runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
-  maybe_sudo = fn args ->
-    if target_sudo do
-      HostKit.Runner.cmd(runner, "sudo", args, stderr_to_stdout: true)
-    else
-      [cmd | rest] = args
-      HostKit.Runner.cmd(runner, cmd, rest, stderr_to_stdout: true)
-    end
-  end
-
-  maybe_sudo.(["systemctl", "restart", app_service_name])
-  maybe_sudo.(["systemctl", "restart", caddy_service_name])
-end
 
 apply_result
 ```
@@ -260,26 +195,26 @@ apply_result
 ## Verify
 
 ```elixir
-verify_url = "http://127.0.0.1:#{http_port}"
-
-if inputs.verify do
+if verify? do
   runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
-  HostKit.Runner.cmd(runner, "curl", ["-fsS", verify_url], stderr_to_stdout: true)
+
+  restart_app =
+    if host.sudo do
+      HostKit.Runner.cmd(runner, "sudo", ["systemctl", "restart", app_service_name], stderr_to_stdout: true)
+    else
+      HostKit.Runner.cmd(runner, "systemctl", ["restart", app_service_name], stderr_to_stdout: true)
+    end
+
+  restart_caddy =
+    if host.sudo do
+      HostKit.Runner.cmd(runner, "sudo", ["systemctl", "restart", caddy_service_name], stderr_to_stdout: true)
+    else
+      HostKit.Runner.cmd(runner, "systemctl", ["restart", caddy_service_name], stderr_to_stdout: true)
+    end
+
+  response = HostKit.Runner.cmd(runner, "curl", ["-fsS", "http://127.0.0.1:#{http_port}"], stderr_to_stdout: true)
+  {restart_app, restart_caddy, response, public_url}
 else
-  {:skipped, :verify_not_checked}
-end
-```
-
-## Public URL
-
-```elixir
-Kino.Markdown.new("Open [#{public_url}](#{public_url})")
-```
-
-```elixir
-if inputs.request_from_livebook do
-  Req.get(public_url)
-else
-  {:skipped, :request_from_livebook_not_checked}
+  {:skipped, public_url}
 end
 ```

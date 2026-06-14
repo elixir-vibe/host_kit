@@ -5,19 +5,25 @@ defmodule HostKit.ProxyTest do
     proxy = %HostKit.Proxy{
       name: :edge,
       provider: :gatehouse,
+      state: "/var/lib/gatehouse/state.etf",
+      listeners: [%{scheme: :http, opts: [port: 18_080]}],
       services: [
         %{
           name: :app,
           hosts: ["app.example.com"],
           targets: [
             %{name: :main, safe_rpc: [socket: "/run/app.sock"], active: true}
-          ]
+          ],
+          balance: %{policy: :round_robin, opts: []},
+          health: %{path: "/health", opts: [timeout: 5_000]},
+          drain: 30_000,
+          tls: :auto
         }
       ]
     }
 
     expected =
-      "import Gatehouse.Config\nservice(:app) do\n  host(\"app.example.com\")\n  target(:main, safe_rpc: [socket: \"/run/app.sock\"], active: true)\nend"
+      "import Gatehouse.Config\nstate(\"/var/lib/gatehouse/state.etf\")\nhttp(port: 18080)\nservice(:app) do\n  host(\"app.example.com\")\n  target(:main, safe_rpc: [socket: \"/run/app.sock\"], active: true)\n  balance(:round_robin, [])\n  health(\"/health\", timeout: 5000)\n  drain(30000)\n  tls(:auto)\nend"
 
     assert HostKit.Proxy.render(proxy) == expected
   end
@@ -48,9 +54,16 @@ defmodule HostKit.ProxyTest do
 
       project :demo do
         proxy :edge, provider: :gatehouse do
+          state "/var/lib/gatehouse/state.etf"
+          http port: 18_080
+
           service :app do
             host "app.example.com"
             target :main, safe_rpc: [socket: "/run/app.sock"], active: true
+            balance :round_robin
+            health "/health", timeout: 5_000
+            drain 30_000
+            tls :auto
           end
         end
       end
@@ -59,10 +72,16 @@ defmodule HostKit.ProxyTest do
 
     assert [%HostKit.Proxy{name: :edge, provider: :gatehouse} = proxy] = project.proxies
     assert [proxy] == HostKit.Project.resources(project)
+    assert proxy.state == "/var/lib/gatehouse/state.etf"
+    assert proxy.listeners == [%{scheme: :http, opts: [port: 18_080]}]
     assert [service] = proxy.services
     assert service.name == :app
     assert service.hosts == ["app.example.com"]
     assert [%{name: :main, safe_rpc: [socket: "/run/app.sock"], active: true}] = service.targets
+    assert service.balance == %{policy: :round_robin, opts: []}
+    assert service.health == %{path: "/health", opts: [timeout: 5_000]}
+    assert service.drain == 30_000
+    assert service.tls == :auto
   end
 
   test "plan resolves endpoint targets from service declarations" do

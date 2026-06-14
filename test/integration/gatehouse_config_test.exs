@@ -8,6 +8,8 @@ defmodule HostKit.Integration.GatehouseConfigTest do
       proxy = %HostKit.Proxy{
         name: :edge,
         provider: :gatehouse,
+        state: "/var/lib/gatehouse/state.etf",
+        listeners: [%{scheme: :http, opts: [port: 18_080]}],
         services: [
           %{
             name: :app,
@@ -39,6 +41,9 @@ defmodule HostKit.Integration.GatehouseConfigTest do
           end
 
           proxy :edge, provider: :gatehouse do
+            state "/var/lib/gatehouse/state.etf"
+            http port: 18_080
+
             service :app do
               host "app.example.com"
               target :main, to: endpoint(:hello_phoenix, :http), active: true

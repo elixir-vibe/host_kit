@@ -8,122 +8,64 @@ Mix.install([
 ])
 ```
 
-## What this notebook does
+This notebook is a small, readable HostKit demo:
 
-This notebook deploys a small static site through HostKit's real DSL:
+1. declare a target and a static site,
+2. inspect the plan,
+3. optionally apply it,
+4. verify the site.
 
-- chooses an SSH target,
-- installs Caddy,
-- declares files/directories, a Caddyfile, a systemd Caddy service, and a Caddy site,
-- builds and displays a HostKit plan,
-- writes an inspectable plan artifact,
-- optionally applies the plan,
-- starts the Caddy service,
-- optionally provisions HTTPS through Caddy/Let's Encrypt for a real hostname,
-- optionally verifies the site with a real HTTP(S) request from the target,
-- optionally makes a `Req` request from this Livebook runtime and shows a clickable link.
+The deployment declaration lives directly in the notebook. The integration test extracts the marked DSL cell below.
 
-The HostKit deployment declaration lives directly in this notebook. The integration test extracts and evaluates the marked DSL cell below, so this notebook is the source of truth.
+## Demo settings
 
-## Configure deployment
+Edit these values and re-run the notebook.
 
 ```elixir
-form = Kino.Control.form(
-  [
-    target_host: Kino.Input.text("SSH host", default: System.get_env("HOSTKIT_TARGET_HOST", "127.0.0.1")),
-    target_user: Kino.Input.text("SSH user", default: System.get_env("HOSTKIT_TARGET_USER", "root")),
-    target_port: Kino.Input.number("SSH port", default: 22),
-    target_sudo: Kino.Input.checkbox("Use sudo", default: true),
-    identity_file: Kino.Input.text("Identity file", default: Path.expand("~/.ssh/id_ed25519")),
-    password_env: Kino.Input.text("Password env var (optional)", default: ""),
-    silently_accept_hosts: Kino.Input.checkbox("Silently accept host keys", default: false),
-    enable_https: Kino.Input.checkbox("Use HTTPS with Let's Encrypt", default: false),
-    public_hostname: Kino.Input.text("Public hostname for HTTPS", default: "hello.example.com"),
-    http_port: Kino.Input.number("HTTP test port when HTTPS is disabled", default: 18080),
-    message: Kino.Input.text("Message", default: "Deployed by HostKit"),
-    apply: Kino.Input.checkbox("Apply changes", default: false),
-    verify: Kino.Input.checkbox("Verify with curl", default: false),
-    request_from_livebook: Kino.Input.checkbox("Request generated public URL from Livebook with Req", default: false)
-  ],
-  submit: "Build plan"
-)
+target = %{
+  host: System.get_env("HOSTKIT_TARGET_HOST", "127.0.0.1"),
+  user: System.get_env("HOSTKIT_TARGET_USER", "root"),
+  sudo: true,
+  ssh: [
+    port: 22,
+    identity_file: Path.expand("~/.ssh/id_ed25519"),
+    silently_accept_hosts: true
+  ]
+}
 
-Kino.render(form)
+site = %{
+  address: ":18080",
+  message: "Deployed by HostKit"
+}
+
+apply? = false
+verify? = false
 ```
 
 ```elixir
-inputs = Kino.Control.await(form)
-```
+deployment_name = "hostkit-caddy-demo"
 
-## Build SSH options
+target_host = target.host
+target_user = target.user
+target_sudo = target.sudo
+ssh_opts = target.ssh
 
-```elixir
-ssh_opts =
-  []
-  |> Keyword.put(:port, inputs.target_port)
-  |> Keyword.put(:silently_accept_hosts, inputs.silently_accept_hosts)
-  |> then(fn opts ->
-    if inputs.identity_file == "" do
-      opts
-    else
-      Keyword.put(opts, :identity_file, inputs.identity_file)
-    end
-  end)
-  |> then(fn opts ->
-    if inputs.password_env == "" do
-      opts
-    else
-      Keyword.put(opts, :password, HostKit.Secret.env(inputs.password_env))
-    end
-  end)
-```
-
-## Build the HostKit project
-
-```elixir
-target_host = inputs.target_host
-target_user = inputs.target_user
-target_sudo = inputs.target_sudo
-site_address = if inputs.enable_https, do: inputs.public_hostname, else: ":#{inputs.http_port}"
-verify_url = if inputs.enable_https, do: "https://#{inputs.public_hostname}", else: "http://127.0.0.1:#{inputs.http_port}"
-public_url = if inputs.enable_https, do: "https://#{inputs.public_hostname}", else: "http://#{inputs.target_host}:#{inputs.http_port}"
-
-hostname_labels =
-  inputs.public_hostname
-  |> String.trim()
-  |> String.trim_trailing(".")
-  |> String.split(".", trim: true)
-
-inferred_acme_domain =
-  case hostname_labels do
-    labels when length(labels) >= 2 -> labels |> Enum.take(-2) |> Enum.join(".")
-    _labels -> "example.com"
-  end
-
-acme_email = "admin@#{inferred_acme_domain}"
-
-deployment_name =
-  if inputs.enable_https do
-    "hostkit-#{inputs.public_hostname}"
-  else
-    "hostkit-#{inputs.target_host}-#{inputs.http_port}"
-  end
-  |> String.downcase()
-  |> String.replace(~r/[^a-z0-9_.-]+/, "-")
-  |> String.trim("-.")
-
+site_address = site.address
+message = site.message
+acme_email = "admin@example.com"
 site_root = "/srv/#{deployment_name}"
 caddy_config_path = "/etc/#{deployment_name}/Caddyfile"
 caddy_config_dir = Path.dirname(caddy_config_path)
 caddy_sites_dir = "/etc/#{deployment_name}/sites"
 caddy_service_name = "#{deployment_name}.service"
 artifact_path = "/tmp/#{deployment_name}.plan.json"
-message = inputs.message
+verify_url = "http://127.0.0.1#{site_address}"
+public_url = "http://#{target_host}#{site_address}"
 ```
 
-This is the actual deployment declaration. It is normal HostKit DSL and is the cell used by the integration test.
+## Deployment declaration
 
-For HTTPS mode, make sure DNS for `public_hostname` points at the target and inbound ports 80/443 are open. Caddy will request and renew Let's Encrypt certificates automatically. The ACME email is inferred as `admin@<domain>` from the hostname.
+This is the important part: ordinary HostKit DSL, not a generated script.
 
 ```elixir
 # hostkit:deploy-caddy-site-dsl
@@ -138,11 +80,10 @@ html = """
 </html>
 """
 
-global_options = "admin off\n  email #{acme_email}"
-
 caddyfile = """
 {
-  #{global_options}
+  admin off
+  email #{acme_email}
 }
 
 import #{caddy_sites_dir}/*.caddy
@@ -183,7 +124,7 @@ project =
         mode: 0o644
 
       daemon caddy_service_name do
-        description "HostKit tutorial Caddy site"
+        description "HostKit demo Caddy site"
         exec_start ["/usr/bin/caddy", "run", "--config", caddy_config_path]
         restart :on_failure
         wanted_by :multi_user
@@ -199,129 +140,62 @@ project =
 project
 ```
 
-## Inspect resources
-
-```elixir
-HostKit.Project.resources(project)
-```
-
 ## Plan
 
 ```elixir
 host = hd(project.hosts)
 target_opts = HostKit.Host.target_opts(host)
-
 {:ok, plan} = HostKit.plan(project, target_opts)
 
 plan |> HostKit.Plan.Format.format() |> Kino.Markdown.new()
 ```
 
-## Write the plan artifact
+## Inspect generated resources
+
+```elixir
+HostKit.Project.resources(project)
+```
+
+## Save an artifact
 
 ```elixir
 :ok = HostKit.Plan.Artifact.save(artifact_path, plan)
-
 artifact_path
-|> File.read!()
-|> Jason.decode!()
 ```
 
-If you used `password_env`, the artifact contains the environment variable name, not the secret value.
+## Apply
 
-## Apply and start Caddy (explicit opt-in)
+Applying is explicit. Set `apply? = true` in the settings cell.
 
 ```elixir
-start_apply_log = fn ->
-  frame = Kino.Frame.new() |> Kino.render()
+reporter = self()
 
-  spawn(fn ->
-    loop = fn loop ->
-      receive do
-        {HostKit.Apply, event} ->
-          Kino.Frame.append(frame, HostKit.Apply.Event.format(event))
-          loop.(loop)
-
-        :stop ->
-          :ok
-      end
-    end
-
-    loop.(loop)
-  end)
-end
-
-restart_caddy = fn ->
-  runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
-
-  if host.sudo do
-    HostKit.Runner.cmd(runner, "sudo", ["systemctl", "restart", caddy_service_name], stderr_to_stdout: true)
+apply_result =
+  if apply? do
+    HostKit.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
   else
-    HostKit.Runner.cmd(runner, "systemctl", ["restart", caddy_service_name], stderr_to_stdout: true)
+    {:skipped, :set_apply_to_true}
   end
-end
 
-if inputs.apply do
-  reporter = start_apply_log.()
-
-  try do
-    with {:ok, results} <- HostKit.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter)),
-         {_output, 0} <- restart_caddy.() do
-      {:ok, results}
-    end
-  after
-    send(reporter, :stop)
-  end
-else
-  {:skipped, "Check Apply changes above to modify the target"}
-end
+apply_result
 ```
 
-## Verify with a real HTTP request from the target (optional)
+## Verify
 
 ```elixir
-if inputs.verify do
+if verify? do
   runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
 
-  service_status =
+  restart =
     if host.sudo do
-      HostKit.Runner.cmd(runner, "sudo", ["systemctl", "is-active", inputs.caddy_service_name], stderr_to_stdout: true)
+      HostKit.Runner.cmd(runner, "sudo", ["systemctl", "restart", caddy_service_name], stderr_to_stdout: true)
     else
-      HostKit.Runner.cmd(runner, "systemctl", ["is-active", inputs.caddy_service_name], stderr_to_stdout: true)
+      HostKit.Runner.cmd(runner, "systemctl", ["restart", caddy_service_name], stderr_to_stdout: true)
     end
 
-  %{
-    service: service_status,
-    http: HostKit.Runner.cmd(runner, "curl", ["-fsS", verify_url], stderr_to_stdout: true)
-  }
+  response = HostKit.Runner.cmd(runner, "curl", ["-fsS", verify_url], stderr_to_stdout: true)
+  {restart, response, public_url}
 else
-  {:skipped, "Check Verify with curl above to request the deployed site"}
-end
-```
-
-## Open the deployed site
-
-HostKit can generate the URL you should open from the values above:
-
-```elixir
-Kino.Markdown.new("""
-### Deployed site URL
-
-[Open #{public_url}](#{public_url})
-
-#{if inputs.enable_https do
-  "HTTPS mode expects DNS for `#{inputs.public_hostname}` to point at `#{inputs.target_host}` and ports 80/443 to be reachable."
-else
-  "HTTP test mode uses `#{inputs.target_host}:#{inputs.http_port}`. If your target is an Incus/private VM, this link may only work from networks that can reach that address; the SSH `curl` verification above is authoritative."
-end}
-""")
-```
-
-You can also make a real request from this Livebook runtime with `Req`:
-
-```elixir
-if inputs.request_from_livebook do
-  Req.get(public_url)
-else
-  {:skipped, "Enable the Req checkbox to request #{public_url} from this Livebook runtime"}
+  {:skipped, public_url}
 end
 ```

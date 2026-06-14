@@ -5,16 +5,37 @@ defmodule HostKit.Proxy do
           name: atom(),
           provider: atom(),
           path: String.t(),
+          state: String.t() | nil,
+          listeners: [map()],
+          acme: keyword() | nil,
           services: [map()],
           meta: map()
         }
 
-  defstruct [:name, :provider, path: "/etc/gatehouse/config.exs", services: [], meta: %{}]
+  defstruct [
+    :name,
+    :provider,
+    path: "/etc/gatehouse/config.exs",
+    state: nil,
+    listeners: [],
+    acme: nil,
+    services: [],
+    meta: %{}
+  ]
 
   def id(%__MODULE__{name: name}), do: {:proxy, name}
 
   def service(name, opts \\ []) do
-    %{name: name, hosts: [], targets: [], meta: Keyword.get(opts, :meta, %{})}
+    %{
+      name: name,
+      hosts: [],
+      targets: [],
+      balance: nil,
+      health: nil,
+      drain: nil,
+      tls: nil,
+      meta: Keyword.get(opts, :meta, %{})
+    }
   end
 
   def render(%__MODULE__{} = proxy) do
@@ -26,7 +47,14 @@ defmodule HostKit.Proxy do
   end
 
   def to_quoted(%__MODULE__{provider: :gatehouse} = proxy) do
-    block([import_gatehouse_config() | Enum.map(proxy.services, &gatehouse_service_quoted/1)])
+    expressions =
+      [import_gatehouse_config()]
+      |> maybe_append(proxy.state && {:state, [], [proxy.state]})
+      |> maybe_append(proxy.acme && {:acme, [], [proxy.acme]})
+      |> Kernel.++(Enum.map(proxy.listeners, &listener_quoted/1))
+      |> Kernel.++(Enum.map(proxy.services, &gatehouse_service_quoted/1))
+
+    block(expressions)
   end
 
   def to_quoted(%__MODULE__{provider: provider}) do
@@ -37,12 +65,29 @@ defmodule HostKit.Proxy do
     {:import, [], [{:__aliases__, [], [:Gatehouse, :Config]}]}
   end
 
+  defp listener_quoted(%{scheme: scheme, opts: opts}) when scheme in [:http, :https] do
+    {scheme, [], [opts]}
+  end
+
   defp gatehouse_service_quoted(service) do
     expressions =
-      Enum.map(service.hosts, &host_quoted/1) ++ Enum.map(service.targets, &target_quoted/1)
+      Enum.map(service.hosts, &host_quoted/1) ++
+        Enum.map(service.targets, &target_quoted/1) ++
+        optional_service_directives(service)
 
     {:service, [], [service.name, [do: block(expressions)]]}
   end
+
+  defp optional_service_directives(service) do
+    []
+    |> maybe_append(service[:balance] && {:balance, [], balance_args(service.balance)})
+    |> maybe_append(service[:health] && {:health, [], health_args(service.health)})
+    |> maybe_append(service[:drain] && {:drain, [], [service.drain]})
+    |> maybe_append(not is_nil(service[:tls]) && {:tls, [], [service.tls]})
+  end
+
+  defp balance_args(%{policy: policy, opts: opts}), do: [policy, opts]
+  defp health_args(%{path: path, opts: opts}), do: [path, opts]
 
   defp host_quoted(host), do: {:host, [], [host]}
 
@@ -82,6 +127,10 @@ defmodule HostKit.Proxy do
       {_key, _value} -> false
     end)
   end
+
+  defp maybe_append(list, nil), do: list
+  defp maybe_append(list, false), do: list
+  defp maybe_append(list, expression), do: list ++ [expression]
 
   defp block([expression]), do: expression
   defp block(expressions), do: {:__block__, [], expressions}

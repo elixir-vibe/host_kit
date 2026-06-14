@@ -9,6 +9,7 @@ defmodule HostKit.Recipes.Gatehouse do
     service release.service_name do
       packages([:git, :curl, :ca_certificates])
       package(:build_essential, as: "build-essential")
+      package(:cmake, as: "cmake")
 
       mise name: release.runtime.name, packages: release.runtime.mise_packages do
         tool(:erlang, release.runtime.erlang)

@@ -132,6 +132,36 @@ defmodule HostKit.DSL.Scope do
   end
 
   def proxy_active?, do: Process.get(@proxy_key) != nil
+  def proxy_service_active?, do: Process.get(@proxy_service_key) != nil
+
+  def put_proxy_state(path) do
+    update_proxy(&%{&1 | state: path})
+  end
+
+  def put_proxy_listener(scheme, opts) when scheme in [:http, :https] do
+    listener = %{scheme: scheme, opts: opts}
+    update_proxy(&%{&1 | listeners: &1.listeners ++ [listener]})
+  end
+
+  def put_proxy_acme(opts) do
+    update_proxy(&%{&1 | acme: opts})
+  end
+
+  def put_proxy_balance(policy, opts) do
+    update_proxy_service(&%{&1 | balance: %{policy: policy, opts: opts}})
+  end
+
+  def put_proxy_health(path, opts) do
+    update_proxy_service(&%{&1 | health: %{path: path, opts: opts}})
+  end
+
+  def put_proxy_drain(timeout) do
+    update_proxy_service(&%{&1 | drain: timeout})
+  end
+
+  def put_proxy_tls(tls) do
+    update_proxy_service(&%{&1 | tls: tls})
+  end
 
   def start_proxy_service(name, opts) do
     Process.put(@proxy_service_key, HostKit.Proxy.service(name, opts))
@@ -357,6 +387,12 @@ defmodule HostKit.DSL.Scope do
   end
 
   def listener_upstream(name), do: name |> listener() |> HostKit.Listener.upstream()
+
+  defp update_proxy(fun) do
+    proxy = Process.get(@proxy_key) || raise "proxy directive used outside proxy block"
+    Process.put(@proxy_key, fun.(proxy))
+    :ok
+  end
 
   defp update_proxy_service(fun) do
     service =

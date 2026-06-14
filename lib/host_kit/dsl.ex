@@ -133,7 +133,11 @@ defmodule HostKit.DSL do
 
   defmacro tls(mode, opts \\ []) do
     quote do
-      HostKit.DSL.Ingress.Scope.put_tls(unquote(mode), unquote(opts))
+      if HostKit.DSL.Scope.proxy_service_active?() do
+        HostKit.DSL.Scope.put_proxy_tls(unquote(mode))
+      else
+        HostKit.DSL.Ingress.Scope.put_tls(unquote(mode), unquote(opts))
+      end
     end
   end
 
@@ -159,11 +163,73 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro http(url, opts \\ []) do
+  defmacro http(url_or_opts \\ []) do
     quote do
-      HostKit.DSL.Readiness.Scope.add_check(
-        HostKit.Readiness.HTTP.new(unquote(url), unquote(opts))
-      )
+      cond do
+        HostKit.DSL.Readiness.Scope.active?() ->
+          HostKit.DSL.Readiness.Scope.add_check(
+            HostKit.Readiness.HTTP.new(unquote(url_or_opts), [])
+          )
+
+        HostKit.DSL.Scope.proxy_active?() ->
+          HostKit.DSL.Scope.put_proxy_listener(:http, unquote(url_or_opts))
+
+        true ->
+          raise ArgumentError, "http/1 is only supported inside ready/2 or proxy/3"
+      end
+    end
+  end
+
+  defmacro http(url, opts) do
+    quote do
+      cond do
+        HostKit.DSL.Readiness.Scope.active?() ->
+          HostKit.DSL.Readiness.Scope.add_check(
+            HostKit.Readiness.HTTP.new(unquote(url), unquote(opts))
+          )
+
+        HostKit.DSL.Scope.proxy_active?() ->
+          raise ArgumentError, "proxy http listener expects keyword options, got two arguments"
+
+        true ->
+          raise ArgumentError, "http/2 is only supported inside ready/2"
+      end
+    end
+  end
+
+  defmacro https(opts \\ []) do
+    quote do
+      HostKit.DSL.Scope.put_proxy_listener(:https, unquote(opts))
+    end
+  end
+
+  defmacro state(path) do
+    quote do
+      HostKit.DSL.Scope.put_proxy_state(unquote(path))
+    end
+  end
+
+  defmacro acme(opts) do
+    quote do
+      HostKit.DSL.Scope.put_proxy_acme(unquote(opts))
+    end
+  end
+
+  defmacro balance(policy, opts \\ []) do
+    quote do
+      HostKit.DSL.Scope.put_proxy_balance(unquote(policy), unquote(opts))
+    end
+  end
+
+  defmacro health(path, opts \\ []) do
+    quote do
+      HostKit.DSL.Scope.put_proxy_health(unquote(path), unquote(opts))
+    end
+  end
+
+  defmacro drain(timeout) do
+    quote do
+      HostKit.DSL.Scope.put_proxy_drain(unquote(timeout))
     end
   end
 
