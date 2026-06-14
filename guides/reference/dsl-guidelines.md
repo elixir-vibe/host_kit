@@ -268,7 +268,7 @@ Legend:
 | --- | --- | --- |
 | `host` | Canonical | Declare a named deployment host; use `host :app, at: "example.com" do ... end`. |
 | `ssh` | Canonical | Configure host SSH transport as a block. |
-| `user` | Canonical | SSH user inside `ssh`; host user in old host syntax. |
+| `user` | Canonical | SSH user inside `ssh`. |
 | `identity_file` | Canonical | SSH key path inside `ssh`. |
 | `password` | Reference | SSH password/secret inside `ssh`. |
 | `port` | Reference | SSH port inside `ssh`. |
