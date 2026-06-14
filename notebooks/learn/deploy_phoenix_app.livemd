@@ -17,7 +17,8 @@ This notebook deploys a real Phoenix release from Git:
 - stamps build commands with source provenance,
 - installs BEAM runtimes through mise,
 - runs the release with systemd,
-- publishes it through Caddy,
+- declares semantic ingress for the app,
+- renders that ingress through the Caddy provider,
 - verifies the live HTTP endpoint.
 
 The HostKit DSL lives directly in this notebook. Integration tests extract the marked DSL cell below.
@@ -88,7 +89,7 @@ erlang_version = System.get_env("HOSTKIT_PHOENIX_ERLANG", "29.0.2")
 elixir_version = System.get_env("HOSTKIT_PHOENIX_ELIXIR", "1.20.1")
 app_port = inputs.app_port
 http_port = inputs.http_port
-site_address = ":#{http_port}"
+ingress_address = ":#{http_port}"
 public_url = "http://#{target_host}:#{http_port}"
 artifact_path = "/tmp/hostkit-phoenix-demo.plan.json"
 secret_key_base = Base.encode64(:crypto.strong_rand_bytes(64))
@@ -161,18 +162,20 @@ project =
         secret_key_base: secret_key_base
       ],
       caddy: [
-        host: site_address
+        host: ingress_address
       ]
   end
 
 project
 ```
 
-## Inspect source-aware resources
+## Inspect semantic resources
+
+The recipe expands to ordinary, inspectable HostKit resources, including a Git source and ingress declaration.
 
 ```elixir
 HostKit.Project.resources(project)
-|> Enum.filter(&match?(%HostKit.Resources.Source{}, &1))
+|> Enum.filter(&(match?(%HostKit.Resources.Source{}, &1) or match?(%HostKit.Ingress{}, &1)))
 ```
 
 ## Plan

@@ -21,4 +21,31 @@ defmodule HostKit.EndpointTest do
       HostKit.Endpoint.new({:bad, :service}, :http)
     end
   end
+
+  test "unresolved endpoint diagnostics include suggestions" do
+    project =
+      Code.eval_string("""
+      use HostKit.DSL, providers: [HostKit.Providers.Caddy]
+
+      project :demo do
+        service :app do
+          endpoint :web, port: 4000
+        end
+
+        service :edge do
+          caddy_site :edge, ":8080" do
+            reverse_proxy endpoint(:app, :http)
+          end
+        end
+      end
+      """)
+      |> elem(0)
+
+    assert {:error, diagnostics} = HostKit.plan(project)
+    assert [diagnostic] = diagnostics.errors
+    assert diagnostic.code == :endpoint_unresolved
+    assert diagnostic.message == "unknown endpoint :app.:http"
+    assert diagnostic.hint == "did you mean :app.:web?"
+    assert diagnostic.line
+  end
 end

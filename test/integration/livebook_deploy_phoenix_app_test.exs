@@ -117,6 +117,11 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
              &match?(%HostKit.Resources.Source{revision: revision} when is_binary(revision), &1)
            )
 
+    assert Enum.any?(plan.resources, fn
+             %HostKit.Caddy.Site{host: host} -> host == ":#{http_port}"
+             _resource -> false
+           end)
+
     reporter = start_apply_reporter()
 
     assert {:ok, _results} =
@@ -171,7 +176,7 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
       app_port: opts.app_port,
       http_port: opts.http_port,
       app_service_name: "hello-phoenix.service",
-      site_address: ":#{opts.http_port}",
+      ingress_address: ":#{opts.http_port}",
       caddy_config_path: opts.caddy_config_path,
       caddy_config_dir: opts.caddy_config_dir,
       caddy_sites_dir: opts.caddy_sites_dir,

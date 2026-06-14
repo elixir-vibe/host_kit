@@ -153,7 +153,7 @@ defmodule HostKit.Endpoint.Resolver do
         {:ok, merge_endpoint(endpoint, resolved)}
 
       nil ->
-        {:error, endpoint_diagnostic(endpoint)}
+        {:error, endpoint_diagnostic(endpoint, index)}
     end
   end
 
@@ -166,21 +166,73 @@ defmodule HostKit.Endpoint.Resolver do
     }
   end
 
-  defp endpoint_diagnostic(%Endpoint{} = endpoint) do
+  defp endpoint_diagnostic(%Endpoint{} = endpoint, index) do
     source = Map.get(endpoint.meta, :source)
+    suggestion = endpoint_suggestion(endpoint, index)
 
     %Diagnostic{
       severity: :error,
       code: :endpoint_unresolved,
-      message: "unknown endpoint #{inspect(endpoint.service)}.#{inspect(endpoint.name)}",
+      message: "unknown endpoint #{endpoint_label(endpoint)}",
       resource_id: {:endpoint, endpoint.service, endpoint.name},
       file: source && source.file,
       line: source && source.line,
       column: source && source.column,
-      details: %{service: endpoint.service, endpoint: endpoint.name},
-      hint:
-        "declare endpoint #{inspect(endpoint.name)}, port: ... inside service #{inspect(endpoint.service)}"
+      details: %{service: endpoint.service, endpoint: endpoint.name, suggestion: suggestion},
+      hint: endpoint_hint(endpoint, suggestion)
     }
+  end
+
+  defp endpoint_hint(endpoint, nil) do
+    "declare endpoint #{inspect(endpoint.name)}, port: ... inside service #{inspect(endpoint.service)}"
+  end
+
+  defp endpoint_hint(_endpoint, suggestion) do
+    "did you mean #{endpoint_label(suggestion)}?"
+  end
+
+  defp endpoint_suggestion(%Endpoint{service: service, name: name}, index) do
+    cond do
+      endpoints = Map.get(index, service) ->
+        endpoints
+        |> Map.keys()
+        |> closest_to(name, 0.0)
+        |> case do
+          nil -> nil
+          endpoint_name -> %Endpoint{service: service, name: endpoint_name}
+        end
+
+      service_name = closest_to(Map.keys(index), service, 0.7) ->
+        index
+        |> Map.fetch!(service_name)
+        |> Map.keys()
+        |> closest_to(name, 0.0)
+        |> case do
+          nil -> %Endpoint{service: service_name, name: :default}
+          endpoint_name -> %Endpoint{service: service_name, name: endpoint_name}
+        end
+
+      true ->
+        nil
+    end
+  end
+
+  defp closest_to([], _needle, _minimum_score), do: nil
+
+  defp closest_to(values, needle, minimum_score) do
+    needle = to_string(needle)
+
+    values
+    |> Enum.map(fn value -> {String.jaro_distance(to_string(value), needle), value} end)
+    |> Enum.max_by(fn {score, _value} -> score end, fn -> {0.0, nil} end)
+    |> case do
+      {score, value} when score >= minimum_score -> value
+      _other -> nil
+    end
+  end
+
+  defp endpoint_label(%Endpoint{service: service, name: name}) do
+    "#{inspect(service)}.#{inspect(name)}"
   end
 
   defp map_while_ok(values, fun) do
