@@ -4,6 +4,11 @@ Elixir-native host management: declare a Linux host, bootstrap packages and runt
 
 HostKit is for operating real machines without assuming the target already has Elixir, Mix, Docker, or your application runtime installed.
 
+> [!NOTE]
+> HostKit is currently published as a beta. The core planning/apply workflow is
+> usable and documented, but DSL, provider, and recipe APIs may still change
+> before a stable release.
+
 ## Why HostKit
 
 Infrastructure code should be boring Elixir, not an opaque pile of shell scripts.
