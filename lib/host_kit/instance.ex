@@ -12,6 +12,7 @@ defmodule HostKit.Instance do
   @type t :: %__MODULE__{
           name: atom(),
           backend: atom() | nil,
+          backend_config: map(),
           image: String.t() | nil,
           kind: atom() | nil,
           lifecycle: atom(),
@@ -24,6 +25,7 @@ defmodule HostKit.Instance do
 
   defstruct name: nil,
             backend: nil,
+            backend_config: %{},
             image: nil,
             kind: nil,
             lifecycle: :persistent,
@@ -38,6 +40,7 @@ defmodule HostKit.Instance do
     %__MODULE__{
       name: name,
       backend: Keyword.get(opts, :backend),
+      backend_config: Map.new(Keyword.get(opts, :backend_config, [])),
       image: Keyword.get(opts, :image),
       kind: Keyword.get(opts, :kind),
       lifecycle: Keyword.get(opts, :lifecycle, :persistent),
@@ -49,6 +52,10 @@ defmodule HostKit.Instance do
 
   def put_backend(%__MODULE__{} = instance, backend) when is_atom(backend),
     do: %{instance | backend: backend}
+
+  def put_backend_config(%__MODULE__{} = instance, config) do
+    %{instance | backend_config: Map.merge(instance.backend_config, Map.new(config))}
+  end
 
   def put_image(%__MODULE__{} = instance, image) when is_binary(image),
     do: %{instance | image: image}

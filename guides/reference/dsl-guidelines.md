@@ -308,7 +308,8 @@ Legend:
 | --- | --- | --- |
 | `host` | Canonical | Declare a named connection endpoint; top-level hosts are existing targets, nested hosts are endpoints into an instance. |
 | `instance` | Canonical | Declare a lifecycle-managed compute instance with backend, image, exposed ports, nested hosts, and nested HostKit contents. |
-| `backend` | Canonical | Select the implementation backend for an instance, ingress, proxy, or other backend-driven declaration. |
+| `backend` | Canonical | Select the implementation backend for an instance, ingress, proxy, or other backend-driven declaration. Accepts backend-neutral option syntax such as `backend :incus, sudo: true`. |
+| `option` | Reference | Set a backend option inside `backend ... do`; options stay attached to the selected backend instead of leaking into generic plan/apply flags. |
 | `image` | Canonical | Set the instance image. |
 | `kind` | Canonical | Set the instance kind, such as `:container` or `:vm`. |
 | `lifecycle` | Reference | Set instance lifecycle policy, such as `:persistent` or `:ephemeral`. |

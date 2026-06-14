@@ -237,6 +237,7 @@ Events are the primary user-facing progress API. They cover:
 - apply lifecycle,
 - change lifecycle,
 - command lifecycle metadata,
+- instance lifecycle progress,
 - service restart/readiness progress,
 - HTTP health checks,
 - SSH transport retry progress for connection establishment.
@@ -248,6 +249,16 @@ Lifecycle command events include:
   phase: :before_start,
   operation: :migrate,
   direction: :up
+}
+```
+
+Instance events include backend lifecycle details for launch, port exposure, readiness wait, and SSH bootstrap:
+
+```elixir
+%HostKit.Apply.Event{
+  type: :instance_expose_started,
+  resource_id: {:instance, :demo_vm},
+  details: %{backend: :incus, name: :ssh, host: 2222, guest: 22}
 }
 ```
 

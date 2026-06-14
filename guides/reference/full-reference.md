@@ -235,6 +235,25 @@ The instance owns compute lifecycle metadata (`backend`, `image`, `kind`, `lifec
 
 Backend implementations are intentionally separate from the generic DSL. Incus is implemented as a backend for `instance`, not as a user-facing `incus_machine` DSL. The Incus backend maps `expose` declarations to Incus proxy devices.
 
+Backend configuration stays on the `backend` declaration instead of leaking backend-specific flags into generic plan/apply commands:
+
+```elixir
+instance :demo_vm do
+  backend :incus, sudo: true, project: "hostkit"
+end
+```
+
+For multi-line configuration, use backend options:
+
+```elixir
+instance :demo_vm do
+  backend :incus do
+    option :sudo, true
+    option :project, "hostkit"
+  end
+end
+```
+
 ## Host bootstrap packages and mise-managed runtimes
 
 HostKit can install OS packages through the target package manager. The DSL is distribution-neutral by default and can be pinned to a manager when needed.

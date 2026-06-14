@@ -82,6 +82,7 @@ defmodule HostKit.MixProject do
         "guides/operations/observability-and-monitors.md",
         "guides/operations/timers-and-jobs.md",
         "guides/reference/cli.md",
+        "guides/reference/dsl-guidelines.md",
         "guides/reference/full-reference.md",
         "guides/reference/internal-architecture.md",
         "notebooks/learn/deploy_caddy_site.livemd",

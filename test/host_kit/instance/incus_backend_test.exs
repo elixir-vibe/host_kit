@@ -13,6 +13,53 @@ defmodule HostKit.Instance.IncusBackendTest do
     assert reason =~ ":enoent"
   end
 
+  test "apply emits instance lifecycle events" do
+    parent = self()
+
+    runner = fn _command, args ->
+      case args do
+        ["info", "demo"] -> {"not found", 1}
+        _args -> {"", 0}
+      end
+    end
+
+    instance =
+      Instance.new(:demo, backend: :incus, image: "images:ubuntu/24.04", kind: :container)
+      |> Instance.add_port(:ssh, host: 2222, guest: 22)
+
+    assert :ok = Incus.apply(instance, incus_runner: runner, reporter: parent)
+
+    assert_received {HostKit.Apply, %HostKit.Apply.Event{type: :instance_launch_started}}
+    assert_received {HostKit.Apply, %HostKit.Apply.Event{type: :instance_launch_finished}}
+    assert_received {HostKit.Apply, %HostKit.Apply.Event{type: :instance_expose_started}}
+    assert_received {HostKit.Apply, %HostKit.Apply.Event{type: :instance_expose_finished}}
+    assert_received {HostKit.Apply, %HostKit.Apply.Event{type: :instance_ready_waiting}}
+    assert_received {HostKit.Apply, %HostKit.Apply.Event{type: :instance_ready_passed}}
+  end
+
+  test "apply uses declarative backend config" do
+    parent = self()
+
+    runner = fn command, args ->
+      send(parent, {command, args})
+
+      case args do
+        ["--project", "hostkit", "info", "demo"] -> {"not found", 1}
+        _args -> {"", 0}
+      end
+    end
+
+    instance =
+      Instance.new(:demo,
+        backend: :incus,
+        backend_config: [command: "incus-custom", project: "hostkit", sudo: false],
+        image: "images:ubuntu/24.04"
+      )
+
+    assert :ok = Incus.apply(instance, incus_runner: runner)
+    assert_received {"incus-custom", ["--project", "hostkit", "info", "demo"]}
+  end
+
   test "apply launches exposes ports and starts the instance" do
     parent = self()
 

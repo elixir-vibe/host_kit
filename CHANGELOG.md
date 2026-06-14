@@ -5,6 +5,8 @@
 - Added generic `instance` DSL for lifecycle-managed compute boundaries with backend selection, nested host endpoints, nested services/resources, and target-scoped content planning.
 - Added Incus instance backend support for launch/start/delete, proxy port exposure, readiness checks, and demo SSH bootstrap.
 - Added backend-neutral `mix host_kit.instance status|ensure|destroy INSTANCE [config.exs]` for declared instance lifecycle.
+- Added declarative backend options on `backend`, including block form with `option`, without leaking backend-specific flags into generic `plan`/`apply`.
+- Added instance lifecycle apply events for launch, port exposure, readiness, and SSH bootstrap progress.
 - Reworked Livebook demo VM helper to use HostKit instance lifecycle and expose both Caddy and Phoenix demo ports.
 - Polished Phoenix Livebook to match the explicit Target / Declare / Plan / Deploy / Verify flow with Kino summaries and no hidden apply/verify checkboxes.
 - Added SSH connection retry policy via `ssh retry: ...` with apply progress events for retry start/success/exhaustion.

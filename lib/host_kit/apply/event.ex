@@ -20,6 +20,14 @@ defmodule HostKit.Apply.Event do
           | :health_check_waiting
           | :health_check_passed
           | :health_check_failed
+          | :instance_launch_started
+          | :instance_launch_finished
+          | :instance_expose_started
+          | :instance_expose_finished
+          | :instance_ready_waiting
+          | :instance_ready_passed
+          | :instance_ssh_bootstrap_started
+          | :instance_ssh_bootstrap_finished
           | :transport_retry_started
           | :transport_retry_succeeded
           | :transport_retry_exhausted
@@ -117,6 +125,30 @@ defmodule HostKit.Apply.Event do
 
   def format(%__MODULE__{type: :health_check_failed, details: details} = event),
     do: "✗ health check #{Map.get(details, :url)}: #{format_reason(event.reason)}"
+
+  def format(%__MODULE__{type: :instance_launch_started} = event),
+    do: "▶ instance launch #{format_resource(event)}"
+
+  def format(%__MODULE__{type: :instance_launch_finished} = event),
+    do: "✓ instance launched #{format_resource(event)}"
+
+  def format(%__MODULE__{type: :instance_expose_started, details: details} = event),
+    do: "▶ instance expose #{format_resource(event)} #{Map.get(details, :name)}"
+
+  def format(%__MODULE__{type: :instance_expose_finished, details: details} = event),
+    do: "✓ instance exposed #{format_resource(event)} #{Map.get(details, :name)}"
+
+  def format(%__MODULE__{type: :instance_ready_waiting} = event),
+    do: "↻ instance waiting #{format_resource(event)}"
+
+  def format(%__MODULE__{type: :instance_ready_passed} = event),
+    do: "✓ instance ready #{format_resource(event)}"
+
+  def format(%__MODULE__{type: :instance_ssh_bootstrap_started} = event),
+    do: "▶ instance ssh bootstrap #{format_resource(event)}"
+
+  def format(%__MODULE__{type: :instance_ssh_bootstrap_finished} = event),
+    do: "✓ instance ssh bootstrap #{format_resource(event)}"
 
   def format(%__MODULE__{type: :transport_retry_started, details: details}) do
     suffix = "after #{Map.fetch!(details, :delay_ms)}ms"

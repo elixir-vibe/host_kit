@@ -7,6 +7,8 @@ defmodule HostKit.Instance.Backends.Incus do
 
   @impl true
   def read(%Instance{} = instance, opts) do
+    opts = backend_opts(instance, opts)
+
     case cmd(["info", instance_name(instance)], opts) do
       {_output, 0} ->
         {:ok, %{instance | meta: Map.put(instance.meta, :present, true)}}
@@ -21,6 +23,8 @@ defmodule HostKit.Instance.Backends.Incus do
 
   @impl true
   def apply(%Instance{} = instance, opts) do
+    opts = backend_opts(instance, opts)
+
     with :ok <- ensure_present(instance, opts),
          :ok <- ensure_exposed(instance, opts),
          :ok <- ensure_running(instance, opts),
@@ -31,6 +35,8 @@ defmodule HostKit.Instance.Backends.Incus do
 
   @impl true
   def delete(%Instance{} = instance, opts) do
+    opts = backend_opts(instance, opts)
+
     case cmd(["delete", instance_name(instance), "--force"], opts) do
       {_output, 0} -> :ok
       {output, status} -> {:error, {:incus_delete_failed, status, output}}
@@ -53,9 +59,15 @@ defmodule HostKit.Instance.Backends.Incus do
         _kind -> ["launch", instance.image, instance_name(instance)]
       end
 
+    emit(opts, :instance_launch_started, instance, %{image: instance.image, kind: instance.kind})
+
     case cmd(args, opts) do
-      {_output, 0} -> :ok
-      {output, status} -> {:error, {:incus_launch_failed, status, output}}
+      {_output, 0} ->
+        emit(opts, :instance_launch_finished, instance)
+        :ok
+
+      {output, status} ->
+        {:error, {:incus_launch_failed, status, output}}
     end
   end
 
@@ -89,9 +101,15 @@ defmodule HostKit.Instance.Backends.Incus do
       "connect=#{protocol}:127.0.0.1:#{guest}"
     ]
 
+    emit(opts, :instance_expose_started, instance, port)
+
     case cmd(args, opts) do
-      {_output, 0} -> :ok
-      {output, status} -> recover_device_add(instance, port, device, args, output, status, opts)
+      {_output, 0} ->
+        emit(opts, :instance_expose_finished, instance, port)
+        :ok
+
+      {output, status} ->
+        recover_device_add(instance, port, device, args, output, status, opts)
     end
   end
 
@@ -110,11 +128,8 @@ defmodule HostKit.Instance.Backends.Incus do
 
   defp replace_legacy_device(instance, port, add_args, output, status, opts) do
     case legacy_device(port) do
-      nil ->
-        {:error, {:incus_device_add_failed, status, output}}
-
-      legacy ->
-        remove_and_add_device(instance, legacy, add_args, opts)
+      nil -> {:error, {:incus_device_add_failed, status, output}}
+      legacy -> remove_and_add_device(instance, legacy, add_args, opts)
     end
   end
 
@@ -146,6 +161,7 @@ defmodule HostKit.Instance.Backends.Incus do
 
   defp wait_ready(instance, opts) do
     attempts = Keyword.get(opts, :incus_ready_attempts, 120)
+    emit(opts, :instance_ready_waiting, instance, %{attempts: attempts})
     wait_ready(instance, opts, attempts)
   end
 
@@ -154,6 +170,7 @@ defmodule HostKit.Instance.Backends.Incus do
   defp wait_ready(instance, opts, attempts) do
     case cmd(["exec", instance_name(instance), "--", "true"], opts) do
       {_output, 0} ->
+        emit(opts, :instance_ready_passed, instance)
         :ok
 
       {_output, _status} ->
@@ -196,9 +213,15 @@ defmodule HostKit.Instance.Backends.Incus do
     systemctl restart ssh 2>/dev/null || service ssh restart
     """
 
+    emit(opts, :instance_ssh_bootstrap_started, instance)
+
     case cmd(["exec", instance_name(instance), "--", "sh", "-c", script], opts) do
-      {_output, 0} -> :ok
-      {output, status} -> {:error, {:incus_configure_ssh_failed, status, output}}
+      {_output, 0} ->
+        emit(opts, :instance_ssh_bootstrap_finished, instance)
+        :ok
+
+      {output, status} ->
+        {:error, {:incus_configure_ssh_failed, status, output}}
     end
   end
 
@@ -212,6 +235,23 @@ defmodule HostKit.Instance.Backends.Incus do
     else
       {:error, {:incus_start_failed, output}}
     end
+  end
+
+  defp backend_opts(%Instance{backend_config: config}, opts) do
+    opts
+    |> put_config(:incus, config[:command])
+    |> put_config(:incus_sudo, config[:sudo])
+    |> put_config(:incus_project, config[:project])
+  end
+
+  defp put_config(opts, _key, nil), do: opts
+  defp put_config(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp emit(opts, type, instance, details \\ %{}) do
+    HostKit.Apply.Events.emit(opts, type,
+      resource_id: Instance.id(instance),
+      details: Map.put(details, :backend, :incus)
+    )
   end
 
   defp cmd(args, opts) do

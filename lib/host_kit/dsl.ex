@@ -315,6 +315,26 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro backend(name, [{:do, block}]) do
+    quote do
+      HostKit.DSL.Scope.start_backend_config(unquote(name))
+      unquote(block)
+      HostKit.DSL.Scope.finish_backend_config()
+    end
+  end
+
+  defmacro backend(name, opts) when is_list(opts) do
+    quote do
+      HostKit.DSL.Scope.put_instance_backend(unquote(name), unquote(opts))
+    end
+  end
+
+  defmacro option(key, value) do
+    quote do
+      HostKit.DSL.Scope.put_backend_option(unquote(key), unquote(value))
+    end
+  end
+
   defmacro image(value) do
     quote do
       HostKit.DSL.Scope.put_instance_image(unquote(value))

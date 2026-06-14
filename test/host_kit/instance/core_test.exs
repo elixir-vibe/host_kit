@@ -109,6 +109,34 @@ defmodule HostKit.InstanceTest do
            end)
   end
 
+  test "instance backend supports declarative backend options" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      instance :demo_vm do
+        backend :incus, sudo: true, project: "hostkit", command: "incus"
+        image "images:ubuntu/24.04"
+      end
+
+      instance :block_vm do
+        backend :incus do
+          option :sudo, true
+          option :project, "hostkit"
+        end
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+
+    assert [%HostKit.Instance{} = demo, %HostKit.Instance{} = block] = project.instances
+    assert demo.backend == :incus
+    assert demo.backend_config == %{sudo: true, project: "hostkit", command: "incus"}
+    assert block.backend == :incus
+    assert block.backend_config == %{sudo: true, project: "hostkit"}
+  end
+
   test "instances participate in project resources plans and ephemeral down plans" do
     source = """
     use HostKit.DSL

@@ -7,6 +7,7 @@ defmodule HostKit.DSL.Scope do
   @host_key {__MODULE__, :host}
   @service_key {__MODULE__, :service}
   @instance_key {__MODULE__, :instance}
+  @backend_config_key {__MODULE__, :backend_config}
   @workspace_key {__MODULE__, :workspace}
   @inside_key {__MODULE__, :inside}
   @provider_config_key {__MODULE__, :provider_config}
@@ -279,6 +280,31 @@ defmodule HostKit.DSL.Scope do
   def instance_active?, do: Process.get(@instance_key) != nil
 
   def put_instance_backend(backend), do: update_instance(&Instance.put_backend(&1, backend))
+
+  def put_instance_backend(backend, opts) do
+    update_instance(fn instance ->
+      instance
+      |> Instance.put_backend(backend)
+      |> Instance.put_backend_config(opts)
+    end)
+  end
+
+  def start_backend_config(backend) do
+    put_instance_backend(backend)
+    Process.put(@backend_config_key, %{})
+  end
+
+  def finish_backend_config do
+    config = Process.delete(@backend_config_key) || raise "no HostKit backend config in scope"
+    update_instance(&Instance.put_backend_config(&1, config))
+  end
+
+  def put_backend_option(key, value) do
+    config = Process.get(@backend_config_key) || raise "backend option used outside backend block"
+    Process.put(@backend_config_key, Map.put(config, key, value))
+    :ok
+  end
+
   def put_instance_image(image), do: update_instance(&Instance.put_image(&1, image))
   def put_instance_kind(kind), do: update_instance(&Instance.put_kind(&1, kind))
 
