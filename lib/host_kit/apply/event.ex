@@ -50,7 +50,7 @@ defmodule HostKit.Apply.Event do
     do: "⏭ #{format_resource(event)} #{event.action}"
 
   def format(%__MODULE__{type: :change_failed} = event),
-    do: "✗ #{format_resource(event)} #{event.action}: #{inspect(event.reason)}"
+    do: "✗ #{format_resource(event)} #{event.action}: #{format_reason(event.reason)}"
 
   defp resource_id(%HostKit.Change{resource_id: resource_id}), do: resource_id
   defp resource_id(_change), do: nil
@@ -60,4 +60,13 @@ defmodule HostKit.Apply.Event do
 
   defp format_resource(%__MODULE__{resource_id: {type, name}}), do: "#{type}.#{name}"
   defp format_resource(%__MODULE__{resource_id: resource_id}), do: inspect(resource_id)
+
+  defp format_reason(reason) do
+    reason
+    |> inspect(limit: 10, printable_limit: 500)
+    |> truncate(1_000)
+  end
+
+  defp truncate(value, max) when byte_size(value) > max, do: binary_part(value, 0, max) <> "…"
+  defp truncate(value, _max), do: value
 end
