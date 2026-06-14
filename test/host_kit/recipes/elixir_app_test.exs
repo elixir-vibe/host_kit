@@ -156,4 +156,28 @@ defmodule HostKit.ElixirAppRecipeTest do
 
     assert rollback =~ "Shop.Release.rollback()"
   end
+
+  test "elixir_app recipe can emit Ecto lifecycle commands for multiple repos" do
+    app =
+      HostKit.Recipes.ElixirApp.assigns(:shop,
+        source: [github: "elixir-vibe/host_kit", path: "examples/hello_phoenix", ref: "main"],
+        phoenix: [host: "shop.example.com", port: 4001, secret_key_base: "secret"],
+        ecto: [release: "Shop.Release", repos: ["Shop.Repo", "Shop.AnalyticsRepo"]]
+      )
+
+    assert Enum.map(app.ecto, & &1.name) == [
+             "shop_ecto_migrate_repo",
+             "shop_ecto_migrate_analytics_repo"
+           ]
+
+    assert Enum.map(app.ecto, & &1.migrate) == [
+             "Shop.Release.migrate(Shop.Repo)",
+             "Shop.Release.migrate(Shop.AnalyticsRepo)"
+           ]
+
+    assert Enum.map(app.ecto, & &1.rollback) == [
+             "Shop.Release.rollback(Shop.Repo)",
+             "Shop.Release.rollback(Shop.AnalyticsRepo)"
+           ]
+  end
 end

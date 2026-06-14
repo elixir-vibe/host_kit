@@ -119,6 +119,25 @@ elixir_app(:shop,
 
 This emits a `:before_start` migration command that runs through the built release and a matching down command that calls `Shop.Release.rollback()`.
 
+For multiple repos, HostKit emits one ordered command per repo. Down plans reverse that order:
+
+```elixir
+elixir_app(:shop,
+  source: [github: "acme/shop", path: ".", ref: "main"],
+  phoenix: [host: "shop.example.com", secret_key_base: secret_env("SECRET_KEY_BASE")],
+  ecto: [release: "Shop.Release", repos: ["Shop.Repo", "Shop.AnalyticsRepo"]]
+)
+```
+
+The default expressions are:
+
+```elixir
+Shop.Release.migrate(Shop.Repo)
+Shop.Release.rollback(Shop.Repo)
+```
+
+Use `:migrate` and `:rollback` for custom release functions when the defaults do not fit.
+
 ## Providers
 
 Providers can contribute DSL modules, resource types, renderers, validators, and read/plan/apply lifecycle operations. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.

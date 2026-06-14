@@ -41,7 +41,9 @@ defmodule Mix.Tasks.HostKit.Apply do
           dry_run: :boolean,
           confirm: :boolean,
           track: :boolean,
-          runs_root: :string
+          runs_root: :string,
+          quiet: :boolean,
+          verbose: :boolean
         ],
         aliases: [dry_run: :dry_run]
       )
@@ -50,7 +52,7 @@ defmodule Mix.Tasks.HostKit.Apply do
 
     Options.with_target_opts(opts, project, fn target_opts ->
       plan = load_plan(opts, project, positional, target_opts)
-      reporter = start_reporter()
+      reporter = start_reporter(opts)
 
       try do
         case HostKit.apply(plan, Keyword.put(apply_opts(opts, target_opts), :reporter, reporter)) do
@@ -159,20 +161,41 @@ defmodule Mix.Tasks.HostKit.Apply do
     end
   end
 
-  defp start_reporter do
-    spawn(fn -> reporter_loop() end)
+  defp start_reporter(opts) do
+    spawn(fn ->
+      reporter_loop(%{
+        quiet: Keyword.get(opts, :quiet, false),
+        verbose: Keyword.get(opts, :verbose, false)
+      })
+    end)
   end
 
-  defp reporter_loop do
+  defp reporter_loop(opts) do
     receive do
       {HostKit.Apply, %HostKit.Apply.Event{} = event} ->
-        IO.puts(HostKit.Apply.Event.format(event))
-        reporter_loop()
+        if print_event?(event, opts), do: IO.puts(HostKit.Apply.Event.format(event))
+        reporter_loop(opts)
 
       :stop ->
         :ok
     end
   end
+
+  defp print_event?(_event, %{verbose: true}), do: true
+  defp print_event?(%HostKit.Apply.Event{type: :change_skipped}, _opts), do: false
+
+  defp print_event?(%HostKit.Apply.Event{type: type}, %{quiet: true}),
+    do:
+      type in [
+        :apply_started,
+        :apply_finished,
+        :change_failed,
+        :readiness_failed,
+        :service_failed,
+        :health_check_failed
+      ]
+
+  defp print_event?(_event, _opts), do: true
 
   defp print_results(results) do
     results

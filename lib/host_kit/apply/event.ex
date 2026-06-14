@@ -82,7 +82,8 @@ defmodule HostKit.Apply.Event do
     do: "▶ readiness #{format_resource(event)}"
 
   def format(%__MODULE__{type: :readiness_waiting, details: details}),
-    do: "↻ waiting for readiness: #{Map.get(details, :summary, "not ready")}"
+    do:
+      "↻ readiness waiting #{format_progress(details)}: #{Map.get(details, :summary, "not ready")}"
 
   def format(%__MODULE__{type: :readiness_passed} = event),
     do: "✓ readiness #{format_resource(event)}"
@@ -106,7 +107,7 @@ defmodule HostKit.Apply.Event do
     do: "▶ health check #{Map.get(details, :url)}"
 
   def format(%__MODULE__{type: :health_check_waiting, details: details}),
-    do: "↻ health check waiting #{Map.get(details, :url)}"
+    do: "↻ health check waiting #{Map.get(details, :url)} #{format_progress(details)}"
 
   def format(%__MODULE__{type: :health_check_passed, details: details}),
     do: "✓ health check passed #{Map.get(details, :url)}"
@@ -122,6 +123,12 @@ defmodule HostKit.Apply.Event do
 
   defp format_resource(%__MODULE__{resource_id: {type, name}}), do: "#{type}.#{name}"
   defp format_resource(%__MODULE__{resource_id: resource_id}), do: inspect(resource_id)
+
+  defp format_progress(%{elapsed_ms: elapsed, timeout_ms: timeout, attempt: attempt}) do
+    "attempt=#{attempt} #{div(elapsed, 1_000)}s/#{div(timeout, 1_000)}s"
+  end
+
+  defp format_progress(_details), do: ""
 
   defp format_reason(reason), do: HostKit.Error.format(reason, max: 1_000)
 end

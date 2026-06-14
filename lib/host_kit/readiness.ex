@@ -17,9 +17,15 @@ defmodule HostKit.Readiness do
 
     case prepare(readiness, opts) do
       :ok ->
-        deadline = System.monotonic_time(:millisecond) + readiness.timeout
+        started_at = System.monotonic_time(:millisecond)
+        deadline = started_at + readiness.timeout
 
-        case wait_until(readiness, opts, deadline, []) do
+        case wait_until(readiness, opts, %{
+               deadline: deadline,
+               started_at: started_at,
+               attempt: 1,
+               last_summary: []
+             }) do
           :ok ->
             emit_check_passed(readiness, opts)
             emit_apply(opts, :readiness_passed, readiness)
@@ -63,21 +69,23 @@ defmodule HostKit.Readiness do
     end
   end
 
-  defp wait_until(readiness, opts, deadline, last_summary) do
+  defp wait_until(readiness, opts, state) do
     case check_all(readiness, opts) do
       :ok ->
         :ok
 
       {:error, errors} ->
         summary = summarize_errors(errors)
-        maybe_emit_waiting(readiness, summary, last_summary, opts)
+        now = System.monotonic_time(:millisecond)
+        maybe_emit_waiting(readiness, summary, state, opts, now)
 
-        if System.monotonic_time(:millisecond) >= deadline do
+        if now >= state.deadline do
           emit(:timeout, readiness, %{summary: summary, errors: errors})
           {:error, {:readiness_timeout, readiness.name, errors}}
         else
           Process.sleep(effective_interval(readiness, opts))
-          wait_until(readiness, opts, deadline, summary)
+
+          wait_until(readiness, opts, %{state | attempt: state.attempt + 1, last_summary: summary})
         end
     end
   end
@@ -159,12 +167,23 @@ defmodule HostKit.Readiness do
 
   defp effective_interval(%Readiness{interval: interval}, _opts), do: interval
 
-  defp maybe_emit_waiting(readiness, summary, previous, opts) do
-    if summary != previous do
-      emit(:waiting, readiness, %{summary: summary})
-      emit_apply(opts, :readiness_waiting, readiness, details: %{summary: summary})
-      emit_http_waiting(readiness, opts)
+  defp maybe_emit_waiting(readiness, summary, state, opts, now) do
+    if emit_waiting?(summary, state, now) do
+      details = %{
+        summary: summary,
+        attempt: state.attempt,
+        elapsed_ms: now - state.started_at,
+        timeout_ms: readiness.timeout
+      }
+
+      emit(:waiting, readiness, Map.put(details, :summary, summary))
+      emit_apply(opts, :readiness_waiting, readiness, details: details)
+      emit_http_waiting(readiness, opts, details)
     end
+  end
+
+  defp emit_waiting?(summary, state, now) do
+    summary != state.last_summary or rem(state.attempt, 10) == 0 or now >= state.deadline
   end
 
   defp emit(type, readiness, metadata) do
@@ -208,10 +227,12 @@ defmodule HostKit.Readiness do
     end)
   end
 
-  defp emit_http_waiting(%Readiness{checks: checks} = readiness, opts) do
+  defp emit_http_waiting(%Readiness{checks: checks} = readiness, opts, details) do
     Enum.each(checks, fn
       %HTTP{} = http ->
-        emit_apply(opts, :health_check_waiting, readiness, details: %{url: http.url})
+        emit_apply(opts, :health_check_waiting, readiness,
+          details: Map.merge(details, %{url: http.url})
+        )
 
       _check ->
         :ok

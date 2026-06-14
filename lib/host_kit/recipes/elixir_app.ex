@@ -86,13 +86,13 @@ defmodule HostKit.Recipes.ElixirApp do
         timeout: 300_000
       )
 
-      if app.ecto do
-        command(app.commands.ecto.name,
-          exec: HostKit.Recipes.ElixirApp.release_eval_exec(app, app.ecto.migrate),
-          down: [exec: HostKit.Recipes.ElixirApp.release_eval_exec(app, app.ecto.rollback)],
+      for ecto <- app.ecto do
+        command(ecto.name,
+          exec: HostKit.Recipes.ElixirApp.release_eval_exec(app, ecto.migrate),
+          down: [exec: HostKit.Recipes.ElixirApp.release_eval_exec(app, ecto.rollback)],
           phase: :before_start,
           depends_on: [{:command, app.commands.release.name}],
-          timeout: app.ecto.timeout
+          timeout: ecto.timeout
         )
       end
 
@@ -158,7 +158,7 @@ defmodule HostKit.Recipes.ElixirApp do
         host: Keyword.get(caddy, :host, phoenix_host),
         listen: Keyword.get(caddy, :listen, ":443")
       },
-      ecto: normalize_ecto(ecto)
+      ecto: normalize_ecto(ecto, path_name)
     }
 
     paths = paths(app)
@@ -220,17 +220,39 @@ defmodule HostKit.Recipes.ElixirApp do
     {"sh", ["-c", "set -a && . #{env_path} && set +a && exec #{release_bin} eval #{expression}"]}
   end
 
-  defp normalize_ecto(nil), do: nil
-  defp normalize_ecto(false), do: nil
+  defp normalize_ecto(nil, _app_name), do: []
+  defp normalize_ecto(false, _app_name), do: []
 
-  defp normalize_ecto(opts) when is_list(opts) do
+  defp normalize_ecto(opts, app_name) when is_list(opts) do
     release = Keyword.fetch!(opts, :release)
+    timeout = Keyword.get(opts, :timeout, 300_000)
 
-    %{
-      migrate: Keyword.get(opts, :migrate, "#{release}.migrate()"),
-      rollback: Keyword.get(opts, :rollback, "#{release}.rollback()"),
-      timeout: Keyword.get(opts, :timeout, 300_000)
-    }
+    case Keyword.get(opts, :repos, []) do
+      [] ->
+        [
+          %{
+            name: "#{app_name}_ecto_migrate",
+            migrate: Keyword.get(opts, :migrate, "#{release}.migrate()"),
+            rollback: Keyword.get(opts, :rollback, "#{release}.rollback()"),
+            timeout: timeout
+          }
+        ]
+
+      repos ->
+        repos
+        |> List.wrap()
+        |> Enum.map(fn repo ->
+          repo_name =
+            repo |> to_string() |> String.split(".") |> List.last() |> Macro.underscore()
+
+          %{
+            name: "#{app_name}_ecto_migrate_#{repo_name}",
+            migrate: "#{release}.migrate(#{repo})",
+            rollback: "#{release}.rollback(#{repo})",
+            timeout: timeout
+          }
+        end)
+    end
   end
 
   defp health(phoenix) do
