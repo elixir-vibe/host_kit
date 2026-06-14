@@ -90,6 +90,8 @@ defmodule HostKit.Local do
 
   def read(%Readiness{} = desired), do: read_readiness(desired, [])
 
+  def read(%HostKit.Instance{} = desired), do: HostKit.Instance.Backend.read(desired, [])
+
   def read(%Systemd.Service{name: name} = desired) do
     read_systemd_unit("/etc/systemd/system/#{name}", desired)
   end
@@ -185,6 +187,9 @@ defmodule HostKit.Local do
 
   def read(%Readiness{} = desired, context),
     do: read_readiness(desired, Map.get(context, :opts, []))
+
+  def read(%HostKit.Instance{} = desired, context),
+    do: HostKit.Instance.Backend.read(desired, Map.get(context, :opts, []))
 
   def read(resource, _context), do: read(resource)
 

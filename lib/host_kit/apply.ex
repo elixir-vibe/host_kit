@@ -1,7 +1,7 @@
 defmodule HostKit.Apply do
   @moduledoc "Applies supported HostKit plan changes."
 
-  alias HostKit.{Change, Firewall, Plan, Provider, Proxy, Resources, Runner, Systemd}
+  alias HostKit.{Change, Firewall, Instance, Plan, Provider, Proxy, Resources, Runner, Systemd}
   alias HostKit.Package.Manager
   alias HostKit.Runner.SSH.Connection
 
@@ -226,6 +226,10 @@ defmodule HostKit.Apply do
     apply_or_dry_run(change, opts, fn -> delete_path(proxy.path, [:file], opts) end)
   end
 
+  defp apply_change(%Change{action: :delete, before: %Instance{} = instance} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> HostKit.Instance.Backend.delete(instance, opts) end)
+  end
+
   defp apply_change(%Change{action: :delete}, _opts), do: {:error, :delete_not_supported}
 
   defp apply_change(%Change{action: :create, after: %Account{} = account} = change, opts) do
@@ -306,6 +310,11 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %Package{} = package} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn -> HostKit.Package.install(package, opts) end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Instance{} = instance} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> HostKit.Instance.Backend.apply(instance, opts) end)
   end
 
   defp apply_change(

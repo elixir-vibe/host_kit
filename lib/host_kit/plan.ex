@@ -199,6 +199,7 @@ defmodule HostKit.Plan do
   defp delete_supported?(%Directory{}), do: false
   defp delete_supported?(%HostKit.Firewall{}), do: true
   defp delete_supported?(%HostKit.Proxy{}), do: true
+  defp delete_supported?(%HostKit.Instance{lifecycle: :ephemeral}), do: true
   defp delete_supported?(%HostKit.Systemd.Service{}), do: true
   defp delete_supported?(%HostKit.Systemd.Timer{}), do: true
   defp delete_supported?(_resource), do: false
@@ -394,6 +395,10 @@ defmodule HostKit.Plan do
       Map.get(actual.meta, :content),
       HostKit.Systemd.Timer.render(desired)
     )
+  end
+
+  defp equivalent?(%HostKit.Instance{} = desired, actual) do
+    comparable(desired, actual, [:name, :backend, :image, :kind, :lifecycle, :ports])
   end
 
   defp equivalent?(%HostKit.Workspace.Egress{} = desired, actual) do

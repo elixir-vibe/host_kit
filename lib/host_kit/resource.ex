@@ -27,6 +27,7 @@ defmodule HostKit.Resource do
                       HostKit.Ingress.Route,
                       HostKit.Ingress.Server,
                       HostKit.Ingress.TLS,
+                      HostKit.Instance,
                       HostKit.Listener,
                       HostKit.Package.Resolution,
                       HostKit.Project,

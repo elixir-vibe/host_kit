@@ -98,4 +98,30 @@ defmodule HostKit.InstanceTest do
     assert site.host == ":18080"
     assert [%HostKit.Caddy.Directive.ReverseProxy{upstreams: ["127.0.0.1:80"]}] = site.directives
   end
+
+  test "instances participate in project resources plans and ephemeral down plans" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      instance :demo_vm do
+        backend :incus
+        image "images:ubuntu/24.04"
+        kind :container
+        lifecycle :ephemeral
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+
+    assert [%HostKit.Instance{name: :demo_vm}] = HostKit.Project.resources(project)
+    assert {:ok, plan} = HostKit.plan(project)
+    assert [%HostKit.Change{action: :create, resource_id: {:instance, :demo_vm}}] = plan.changes
+
+    assert {:ok, [%{status: :dry_run}]} = HostKit.apply(plan, dry_run: true)
+
+    assert {:ok, down} = HostKit.down(plan)
+    assert [%HostKit.Change{action: :delete, resource_id: {:instance, :demo_vm}}] = down.changes
+  end
 end
