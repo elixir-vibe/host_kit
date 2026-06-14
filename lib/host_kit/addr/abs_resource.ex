@@ -22,4 +22,12 @@ defmodule HostKit.Addr.AbsResource do
       "module.#{module_path}.#{resource}"
     end
   end
+
+  defimpl Inspect do
+    import Inspect.Algebra
+
+    def inspect(resource, _opts) do
+      concat(["#HostKit.AbsResource<", to_string(resource), ">"])
+    end
+  end
 end

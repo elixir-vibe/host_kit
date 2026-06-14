@@ -15,4 +15,12 @@ defmodule HostKit.Addr.Resource do
     def to_string(%{mode: :managed, type: type, name: name}), do: "#{type}.#{name}"
     def to_string(%{mode: mode, type: type, name: name}), do: "#{mode}.#{type}.#{name}"
   end
+
+  defimpl Inspect do
+    import Inspect.Algebra
+
+    def inspect(resource, _opts) do
+      concat(["#HostKit.Resource<", to_string(resource), ">"])
+    end
+  end
 end

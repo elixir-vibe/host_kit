@@ -61,12 +61,5 @@ defmodule HostKit.Apply.Event do
   defp format_resource(%__MODULE__{resource_id: {type, name}}), do: "#{type}.#{name}"
   defp format_resource(%__MODULE__{resource_id: resource_id}), do: inspect(resource_id)
 
-  defp format_reason(reason) do
-    reason
-    |> inspect(limit: 10, printable_limit: 500)
-    |> truncate(1_000)
-  end
-
-  defp truncate(value, max) when byte_size(value) > max, do: binary_part(value, 0, max) <> "…"
-  defp truncate(value, _max), do: value
+  defp format_reason(reason), do: HostKit.Error.format(reason, max: 1_000)
 end

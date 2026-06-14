@@ -12,4 +12,12 @@ defmodule HostKit.Source.Ref do
   def normalize_input(%__MODULE__{} = input), do: input
   def normalize_input({:source, name}), do: new(name)
   def normalize_input(input), do: to_string(input)
+
+  defimpl Inspect do
+    import Inspect.Algebra
+
+    def inspect(ref, _opts) do
+      concat(["#HostKit.Source.Ref<", to_string(ref.name), ">"])
+    end
+  end
 end

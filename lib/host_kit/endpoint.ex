@@ -94,4 +94,26 @@ defmodule HostKit.Endpoint do
   def url(%__MODULE__{protocol: protocol, host: host, port: port})
       when is_atom(protocol) and is_binary(host) and is_integer(port),
       do: "#{protocol}://#{host}:#{port}"
+
+  defimpl Inspect do
+    import Inspect.Algebra
+
+    def inspect(endpoint, _opts) do
+      suffix =
+        if HostKit.Endpoint.resolved?(endpoint) do
+          " #{HostKit.Endpoint.url(endpoint)}"
+        else
+          ""
+        end
+
+      concat([
+        "#HostKit.Endpoint<",
+        to_string(endpoint.service),
+        ".",
+        to_string(endpoint.name),
+        suffix,
+        ">"
+      ])
+    end
+  end
 end

@@ -27,4 +27,28 @@ defmodule HostKit.Source.Identity do
       "path" => identity.path
     }
   end
+
+  defimpl Inspect do
+    import Inspect.Algebra
+
+    def inspect(identity, _opts) do
+      revision = short_revision(identity.revision)
+      path = if identity.path in [nil, "."], do: "", else: " path=#{identity.path}"
+
+      concat([
+        "#HostKit.Source.Identity<",
+        to_string(identity.type),
+        " ",
+        identity.uri || "",
+        "@",
+        revision || identity.ref || "unknown",
+        path,
+        ">"
+      ])
+    end
+
+    defp short_revision(nil), do: nil
+    defp short_revision(revision) when byte_size(revision) > 12, do: binary_part(revision, 0, 12)
+    defp short_revision(revision), do: revision
+  end
 end
