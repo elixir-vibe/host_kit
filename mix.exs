@@ -4,7 +4,7 @@ defmodule HostKit.MixProject do
   def project do
     [
       app: :host_kit,
-      version: "0.1.0",
+      version: "0.1.0-beta.0",
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
