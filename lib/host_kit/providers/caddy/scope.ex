@@ -29,6 +29,10 @@ defmodule HostKit.Providers.Caddy.Scope do
     update_site(&append_directive(&1, %ReverseProxy{upstreams: [upstream]}))
   end
 
+  def add_reverse_proxy(upstream) when is_atom(upstream) do
+    add_reverse_proxy(HostKit.DSL.Scope.listener_upstream(upstream))
+  end
+
   def add_reverse_proxy(upstream) when is_binary(upstream) do
     update_site(&append_directive(&1, %ReverseProxy{upstreams: [upstream]}))
   end

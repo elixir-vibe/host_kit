@@ -10,6 +10,8 @@ defmodule HostKit.DSL.Scope do
   @inside_key {__MODULE__, :inside}
   @provider_config_key {__MODULE__, :provider_config}
   @mise_key {__MODULE__, :mise}
+  @ssh_key {__MODULE__, :ssh}
+  @bootstrap_key {__MODULE__, :bootstrap}
   @observability_key {__MODULE__, :observability}
   @firewall_key {__MODULE__, :firewall}
   @proxy_key {__MODULE__, :proxy}
@@ -88,6 +90,8 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_mise(opts) do
+    opts = Keyword.put_new(opts, :path, "/usr/local/bin/mise")
+    opts = Keyword.put_new(opts, :system_data_dir, "/usr/local/share/mise")
     Process.put(@mise_key, HostKit.Resources.Mise.new(opts))
   end
 
@@ -211,11 +215,53 @@ defmodule HostKit.DSL.Scope do
   def start_host(name, opts) do
     Process.put(@host_key, %Host{
       name: name,
-      hostname: Keyword.get(opts, :hostname),
+      hostname: Keyword.get(opts, :at, Keyword.get(opts, :hostname)),
       user: Keyword.get(opts, :user),
-      sudo: Keyword.get(opts, :sudo, true),
+      sudo: Keyword.get(opts, :sudo, false),
       meta: Keyword.get(opts, :meta, %{})
     })
+  end
+
+  def start_ssh(opts \\ []) do
+    host = Process.get(@host_key) || raise "ssh/1 must be declared inside host/2"
+
+    Process.put(@ssh_key, true)
+
+    update_current(
+      :host,
+      &update_in(&1.meta[:ssh], fn existing -> Keyword.merge(existing || [], opts) end)
+    )
+
+    if user = Keyword.get(opts, :user), do: update_current(:host, &Map.put(&1, :user, user))
+
+    if Keyword.has_key?(opts, :sudo),
+      do: update_current(:host, &Map.put(&1, :sudo, Keyword.fetch!(opts, :sudo)))
+
+    host
+  end
+
+  def finish_ssh do
+    Process.delete(@ssh_key) || raise "no HostKit ssh in scope"
+    :ok
+  end
+
+  def ssh_active?, do: Process.get(@ssh_key) == true
+
+  def put_ssh(key, value) do
+    update_current(:host, fn host ->
+      host = if key == :user, do: %{host | user: value}, else: host
+      host = if key == :sudo, do: %{host | sudo: value}, else: host
+      update_in(host.meta[:ssh], &Keyword.put(&1 || [], key, value))
+    end)
+  end
+
+  def start_bootstrap do
+    Process.put(@bootstrap_key, true)
+  end
+
+  def finish_bootstrap do
+    Process.delete(@bootstrap_key) || raise "no HostKit bootstrap in scope"
+    :ok
   end
 
   def finish_host do
@@ -322,10 +368,33 @@ defmodule HostKit.DSL.Scope do
     end
   end
 
+  def default_storage_path(:data), do: Path.join("/var/lib", to_string(service_path_name()))
+  def default_storage_path(:state), do: Path.join("/var/lib", to_string(service_path_name()))
+  def default_storage_path(:config), do: Path.join("/etc", to_string(service_path_name()))
+
+  def default_storage_path(name),
+    do: Path.join(["/var/lib", to_string(service_path_name()), to_string(name)])
+
+  def env_path(name, opts \\ []) do
+    Keyword.get(opts, :path) || Path.join(["/etc", to_string(service_path_name()), "#{name}.env"])
+  end
+
+  def put_env(name, path) do
+    update_current(:service, fn service ->
+      env_files = service.meta |> Map.get(:env_files, %{}) |> Map.put(name, path)
+      %{service | meta: Map.put(service.meta, :env_files, env_files)}
+    end)
+  end
+
+  def env_path!(name) do
+    service = Process.get(@service_key) || raise "env/1 must be used inside service/2"
+    service.meta |> Map.get(:env_files, %{}) |> Map.fetch!(name)
+  end
+
   def prefixed(name, value), do: Conventions.prefixed(project_conventions(), name, value)
 
   def put_storage(name, opts) do
-    volume = Storage.volume(name, storage_opts(opts))
+    volume = Storage.volume(name, storage_opts(name, opts))
 
     update_current(:service, fn service ->
       storage = service.meta |> Map.get(:storage, %{}) |> Map.put(name, volume)
@@ -487,6 +556,15 @@ defmodule HostKit.DSL.Scope do
       {nil, opts} -> opts
       {root, opts} -> Keyword.put(opts, :path, root_path(root, Keyword.get(opts, :path)))
     end
+  end
+
+  defp storage_opts(name, opts) do
+    opts =
+      if Keyword.has_key?(opts, :under),
+        do: opts,
+        else: Keyword.put_new(opts, :path, default_storage_path(name))
+
+    storage_opts(opts)
   end
 
   defp project_conventions do

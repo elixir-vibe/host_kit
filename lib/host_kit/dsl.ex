@@ -107,6 +107,30 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro env(name, opts \\ [], do: block) do
+    quote do
+      path = HostKit.DSL.Scope.env_path(unquote(name), unquote(opts))
+
+      opts =
+        unquote(opts)
+        |> Keyword.put_new(:owner, "root")
+        |> Keyword.put_new(:group, service_user())
+
+      HostKit.DSL.EnvFile.Scope.start(path, opts)
+      unquote(block)
+      HostKit.DSL.Scope.put_env(unquote(name), path)
+      HostKit.DSL.Scope.add_resource(HostKit.DSL.EnvFile.Scope.finish())
+    end
+  end
+
+  defmacro env(name) do
+    quote do
+      path = HostKit.DSL.Scope.env_path!(unquote(name))
+      HostKit.DSL.Systemd.Scope.put_service(:environment_file, path)
+      path
+    end
+  end
+
   defmacro ready(name, opts \\ [], do: block) do
     quote do
       HostKit.DSL.Readiness.Scope.start(unquote(name), unquote(opts))
@@ -393,21 +417,82 @@ defmodule HostKit.DSL do
 
   defmacro user(value) do
     quote do
-      HostKit.DSL.Scope.update_current(:host, &Map.put(&1, :user, unquote(value)))
+      if HostKit.DSL.Scope.ssh_active?() do
+        HostKit.DSL.Scope.put_ssh(:user, unquote(value))
+      else
+        HostKit.DSL.Scope.update_current(:host, &Map.put(&1, :user, unquote(value)))
+      end
     end
   end
 
   defmacro sudo(value) do
     quote do
-      HostKit.DSL.Scope.update_current(:host, &Map.put(&1, :sudo, unquote(value)))
+      if HostKit.DSL.Scope.ssh_active?() do
+        HostKit.DSL.Scope.put_ssh(:sudo, unquote(value))
+      else
+        HostKit.DSL.Scope.update_current(:host, &Map.put(&1, :sudo, unquote(value)))
+      end
+    end
+  end
+
+  defmacro ssh(do: block) do
+    quote do
+      HostKit.DSL.Scope.start_ssh([])
+      unquote(block)
+      HostKit.DSL.Scope.finish_ssh()
     end
   end
 
   defmacro ssh(opts) do
     quote do
-      HostKit.DSL.Scope.update_current(:host, fn host ->
-        update_in(host.meta[:ssh], &Keyword.merge(&1 || [], unquote(opts)))
-      end)
+      HostKit.DSL.Scope.start_ssh(unquote(opts))
+      HostKit.DSL.Scope.finish_ssh()
+    end
+  end
+
+  defmacro ssh(opts, do: block) do
+    quote do
+      HostKit.DSL.Scope.start_ssh(unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.finish_ssh()
+    end
+  end
+
+  defmacro identity_file(path) do
+    quote do
+      HostKit.DSL.Scope.put_ssh(:identity_file, unquote(path))
+    end
+  end
+
+  defmacro password(value) do
+    quote do
+      HostKit.DSL.Scope.put_ssh(:password, unquote(value))
+    end
+  end
+
+  defmacro port(value) do
+    quote do
+      HostKit.DSL.Scope.put_ssh(:port, unquote(value))
+    end
+  end
+
+  defmacro accept_hosts(value) do
+    quote do
+      HostKit.DSL.Scope.put_ssh(:silently_accept_hosts, unquote(value))
+    end
+  end
+
+  defmacro retry(opts) do
+    quote do
+      HostKit.DSL.Scope.put_ssh(:retry, unquote(opts))
+    end
+  end
+
+  defmacro bootstrap(do: block) do
+    quote do
+      HostKit.DSL.Scope.start_bootstrap()
+      unquote(block)
+      HostKit.DSL.Scope.finish_bootstrap()
     end
   end
 
@@ -570,6 +655,49 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro isolate(do: block) do
+    quote do
+      HostKit.DSL.Systemd.Scope.start_isolation(:strict_app, [])
+      unquote(block)
+      HostKit.DSL.Systemd.Scope.finish_isolation()
+    end
+  end
+
+  defmacro isolate(profile, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Systemd.Scope.start_isolation(unquote(profile), unquote(opts))
+      unquote(block)
+      HostKit.DSL.Systemd.Scope.finish_isolation()
+    end
+  end
+
+  defmacro memory_max(value) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_isolation_resource(:memory_max, unquote(value))
+    end
+  end
+
+  defmacro writable(name) when is_atom(name) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_isolation_sandbox(
+        :read_write_paths,
+        HostKit.DSL.Scope.storage_path(unquote(name))
+      )
+    end
+  end
+
+  defmacro writable(path) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_isolation_sandbox(:read_write_paths, unquote(path))
+    end
+  end
+
+  defmacro network(:loopback) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_isolation_network(:loopback)
+    end
+  end
+
   defmacro network_policy(opts) do
     quote do
       HostKit.DSL.Systemd.Scope.put_network_policy(unquote(opts))
@@ -649,6 +777,12 @@ defmodule HostKit.DSL do
             update_in(resource.meta[:monitor], &(List.wrap(&1) ++ [check]))
           end)
       end
+    end
+  end
+
+  defmacro account(opts) when is_list(opts) do
+    quote do
+      account(service_user(), unquote(opts))
     end
   end
 

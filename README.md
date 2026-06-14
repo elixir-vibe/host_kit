@@ -32,53 +32,53 @@ The complete example lives in [`examples/full_host.exs`](examples/full_host.exs)
 use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
 project :prod do
-  host :app do
-    hostname "app.example.com"
-    user "root"
-    sudo true
-    ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
-        silently_accept_hosts: true,
-        retry: [attempts: 3]
+  host :app, at: "app.example.com" do
+    ssh do
+      user "root"
+      identity_file Path.expand("~/.ssh/id_ed25519")
+      accept_hosts true
+      retry attempts: 3
+    end
   end
 
-  service :bootstrap do
+  bootstrap do
     package :ca_certificates
 
-    mise path: "/usr/local/bin/mise", system_data_dir: "/usr/local/share/mise" do
+    mise do
       tool :erlang, "29.0.2"
       tool :elixir, "1.20.1"
     end
   end
 
   service :api do
-    account "api", system: true, home: "/var/lib/api"
-    directory "/var/lib/api", owner: "api", group: "api", mode: 0o750
+    account system: true
+    storage :data, mode: 0o750
 
-    env_file "/etc/api/api.env", owner: "root", group: "api" do
+    env :runtime do
       secret :database_url, env: "DATABASE_URL"
     end
 
-    daemon "api.service" do
-      service_user "api"
-      environment_file "/etc/api/api.env"
-      exec_start ["/opt/api/bin/server"]
+    daemon do
+      env :runtime
+      exec ["/opt/api/bin/server"]
 
-      sandbox :strict_app,
-        resources: [memory_max: "512M"],
-        sandbox: [read_write_paths: ["/var/lib/api"]]
+      isolate do
+        memory_max "512M"
+        writable :data
+        network :loopback
+      end
 
-      listen :http, port: 4000, on: :loopback
-      wanted_by :multi_user
+      listen :http, port: 4000
     end
 
-    caddy_site :api, "api.example.com" do
-      reverse_proxy listener(:http)
+    caddy_site "api.example.com" do
+      reverse_proxy :http
     end
   end
 end
 ```
 
-This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, env files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits.
+This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, env files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits. See the [DSL design guidelines](guides/reference/dsl-guidelines.md) for naming, block shape, defaults, and reference style.
 
 Plan, review, apply:
 

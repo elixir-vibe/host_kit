@@ -3,8 +3,10 @@ defmodule HostKit.DSL.Systemd.Scope do
 
   @service_key {__MODULE__, :service}
   @timer_key {__MODULE__, :timer}
+  @isolation_key {__MODULE__, :isolation}
 
   def start_service(name, opts) do
+    opts = Keyword.update(opts, :install, [wanted_by: :multi_user], & &1)
     Process.put(@service_key, HostKit.Systemd.Service.new(name, opts))
   end
 
@@ -98,6 +100,51 @@ defmodule HostKit.DSL.Systemd.Scope do
   def put_install(key, value),
     do: update_current(&%{&1 | install: Keyword.put(&1.install, key, value)})
 
+  def start_isolation(profile, opts \\ []) do
+    Process.put(@isolation_key, %{
+      profile: profile,
+      sandbox: Keyword.get(opts, :sandbox, []),
+      resources: Keyword.get(opts, :resources, []),
+      network: nil
+    })
+  end
+
+  def finish_isolation do
+    isolation = Process.delete(@isolation_key) || raise "no systemd isolation in scope"
+
+    apply_sandbox(isolation.profile,
+      sandbox: isolation.sandbox,
+      resources: isolation.resources
+    )
+
+    if isolation.network == :loopback do
+      put_network_policy(deny: :all, allow: [:loopback])
+    end
+  end
+
+  def put_isolation_resource(key, value) do
+    update_isolation(fn isolation ->
+      %{isolation | resources: Keyword.put(isolation.resources, key, value)}
+    end)
+  end
+
+  def put_isolation_sandbox(:read_write_paths, value) do
+    update_isolation(fn isolation ->
+      paths = isolation.sandbox |> Keyword.get(:read_write_paths, []) |> List.wrap()
+      %{isolation | sandbox: Keyword.put(isolation.sandbox, :read_write_paths, paths ++ [value])}
+    end)
+  end
+
+  def put_isolation_sandbox(key, value) do
+    update_isolation(fn isolation ->
+      %{isolation | sandbox: Keyword.put(isolation.sandbox, key, value)}
+    end)
+  end
+
+  def put_isolation_network(value) do
+    update_isolation(&%{&1 | network: value})
+  end
+
   def apply_sandbox(profile, opts \\ []) do
     sandbox =
       profile
@@ -142,6 +189,12 @@ defmodule HostKit.DSL.Systemd.Scope do
       Process.get(@timer_key) -> update(:timer, fun)
       true -> raise "no systemd unit in scope"
     end
+  end
+
+  defp update_isolation(fun) do
+    isolation = Process.get(@isolation_key) || raise "no systemd isolation in scope"
+    Process.put(@isolation_key, fun.(isolation))
+    :ok
   end
 
   defp update(:service, fun) do

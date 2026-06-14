@@ -4,6 +4,8 @@ Elixir-native host infrastructure declarations, planning, and runtime control.
 
 HostKit is intended to be used from a normal Mix project with `.exs` infrastructure files. The DSL compiles to plain inspectable structs; Mix tasks are wrappers around the runtime API.
 
+For naming, block shape, defaults, and reference style, see [DSL design guidelines](dsl-guidelines.md).
+
 ## Design
 
 - Core owns systemd/systemdkit persistent units.
@@ -187,7 +189,7 @@ end
 HostKit can install OS packages through the target package manager. The DSL is distribution-neutral by default and can be pinned to a manager when needed.
 
 ```elixir
-service :bootstrap do
+bootstrap do
   package :ca_certificates
   package :build_essential, as: "build-essential", update: true
 end
@@ -196,8 +198,8 @@ end
 HostKit can also bootstrap `mise` and install system-wide tool versions. This is intended for host bootstrap and workspace agents; application services should still prefer packaged release artifacts where possible.
 
 ```elixir
-service :bootstrap do
-  mise path: "/usr/local/bin/mise", system_data_dir: "/usr/local/share/mise" do
+bootstrap do
+  mise do
     tool :erlang, "29.0.2"
     tool :elixir, "1.20.1"
   end
@@ -219,15 +221,14 @@ Plan/apply artifacts make remote changes inspectable before apply. Prefer declar
 use HostKit.DSL
 
 project :infra do
-  host :prod do
-    hostname "host.example"
-    user "root"
-    sudo true
-
-    ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
-        password: secret_env("HOSTKIT_SSH_PASSWORD"),
-        silently_accept_hosts: true,
-        retry: [attempts: 3, base_delay: 250, max_delay: 2_000]
+  host :prod, at: "host.example" do
+    ssh do
+      user "root"
+      identity_file Path.expand("~/.ssh/id_ed25519")
+      password secret_env("HOSTKIT_SSH_PASSWORD")
+      accept_hosts true
+      retry attempts: 3, base_delay: 250, max_delay: 2_000
+    end
   end
 end
 ```
@@ -261,14 +262,23 @@ Plan artifacts are JSON and intended to be inspectable. Secret references are st
 }
 ```
 
-`secret_env/1` records an environment-backed secret reference and resolves it only at the control-plane boundary that needs the value. Use it for HostKit's own credentials, such as SSH passwords or future provider API tokens. Target application environment files use the env-file DSL, which is backed by the same secret reference type:
+`secret_env/1` records an environment-backed secret reference and resolves it only at the control-plane boundary that needs the value. Use it for HostKit's own credentials, such as SSH passwords or future provider API tokens. Target application environment files use contextual `env` declarations. Inside `service`, `env :name do ... end` declares a managed env file at the service's config path. Inside `daemon`, `env :name` attaches that same file to the systemd unit:
 
 ```elixir
-env_file "/etc/app/app.env" do
-  set :mix_env, :prod
-  secret :database_url, env: "DATABASE_URL"
+service :app do
+  env :runtime do
+    set :mix_env, :prod
+    secret :database_url, env: "DATABASE_URL"
+  end
+
+  daemon do
+    env :runtime
+    exec ["/opt/app/bin/server"]
+  end
 end
 ```
+
+Use `env_file path do ... end` only when you need an explicit path.
 
 Raw SSH flags remain available as an escape hatch: `--remote`, `--user`, `--port`, `--identity-file`, `--password`, and `--password-env`.
 
@@ -749,10 +759,17 @@ Resources store normalized integer modes, so plan/apply remains simple.
 HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries; secret entry values are not read into plan artifacts for comparison.
 
 ```elixir
-env_file root_path(:config, "env"), owner: "root", group: service_user(), mode: 0o640 do
-  set :MIX_ENV, :prod
-  set :PORT, 4000
-  secret :SECRET_KEY_BASE, env: "SECRET_KEY_BASE"
+service :web do
+  env :runtime do
+    set :MIX_ENV, :prod
+    set :PORT, 4000
+    secret :SECRET_KEY_BASE, env: "SECRET_KEY_BASE"
+  end
+
+  daemon do
+    env :runtime
+    exec ["/opt/web/bin/server"]
+  end
 end
 ```
 
@@ -768,7 +785,27 @@ service sandbox |> HostKit.Runtime.Sandbox.to_systemd_service_options()
 service resources |> HostKit.Runtime.Resources.to_systemd_service_options()
 ```
 
-Built-in profiles include `:web_service`, `:strict_web`, `:small`, `:medium`, and `:large`.
+Built-in profiles include `:web_service`, `:strict_web`, `:strict_app`, `:small`, `:medium`, and `:large`.
+
+The daemon DSL exposes a human-oriented isolation block for common service hardening:
+
+```elixir
+service :api do
+  storage :data, mode: 0o750
+
+  daemon do
+    exec ["/opt/api/bin/server"]
+
+    isolate do
+      memory_max "512M"
+      writable :data
+      network :loopback
+    end
+  end
+end
+```
+
+`daemon do ... end` derives the unit name from the enclosing service and enables it for `multi-user.target` by default. Use explicit systemd directives only when you need non-default unit behavior.
 
 ## Runtime controls
 

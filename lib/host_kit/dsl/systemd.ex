@@ -17,6 +17,23 @@ defmodule HostKit.DSL.Systemd do
     end
   end
 
+  defmacro daemon(do: block) do
+    quote do
+      systemd_service unit_name() do
+        unquote(block)
+      end
+    end
+  end
+
+  defmacro daemon(opts, do: block) when is_list(opts) do
+    quote do
+      systemd_service Keyword.get(unquote(opts), :unit, unit_name()),
+                      Keyword.delete(unquote(opts), :unit) do
+        unquote(block)
+      end
+    end
+  end
+
   defmacro daemon(name, opts \\ [], do: block) do
     quote do
       systemd_service unquote(name), unquote(opts) do
@@ -145,6 +162,12 @@ defmodule HostKit.DSL.Systemd do
   end
 
   defmacro exec_start(value) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_service(:exec_start, unquote(value))
+    end
+  end
+
+  defmacro exec(value) do
     quote do
       HostKit.DSL.Systemd.Scope.put_service(:exec_start, unquote(value))
     end
