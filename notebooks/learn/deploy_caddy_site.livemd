@@ -15,7 +15,7 @@ The setup cell above installs the small dependency set for this notebook: `kino`
 Use short aliases in the rest of the notebook so the code reads like a walkthrough instead of a wall of module names.
 
 ```elixir
-alias Kino.{Control, Input, Markdown}
+alias Kino.{Input, Layout, Markdown}
 alias HostKit, as: HK
 alias HostKit.{Apply, Host, Project}
 alias HostKit.Apply.Event, as: ApplyEvent
@@ -36,36 +36,40 @@ The deployment declaration lives directly in the notebook.
 
 ## Demo settings
 
-First, expose the values someone actually cares about. Evaluate this cell once and fill the form. Then evaluate the next cell; while it waits, click **Plan deployment** to submit the settings.
+First, expose the values someone actually cares about. Evaluate this cell once, edit the inputs, then evaluate the next cell to read the current values. There is no submit button; Livebook keeps the input values in place.
 
 ```elixir
-settings_form =
-  Control.form(
-    [
-      server: Input.text("Server", default: "127.0.0.1"),
-      user: Input.text("SSH user", default: "root"),
-      ssh_port: Input.number("SSH port", default: 22),
-      identity_file: Input.text("SSH identity file", default: "~/.ssh/id_ed25519"),
-      ssh_retries: Input.number("SSH connect attempts", default: 3),
-      public_port: Input.number("Public port", default: 18_080),
-      message: Input.text("Message", default: "Deployed by HostKit"),
-      apply?: Input.checkbox("Apply now", default: false),
-      verify?: Input.checkbox("Verify after apply", default: false)
-    ],
-    submit: "Plan deployment"
-  )
+settings_inputs = %{
+  server: Input.text("Server", default: "127.0.0.1"),
+  user: Input.text("SSH user", default: "root"),
+  ssh_port: Input.number("SSH port", default: 22),
+  identity_file: Input.text("SSH identity file", default: "~/.ssh/id_ed25519"),
+  ssh_retries: Input.number("SSH connect attempts", default: 3),
+  public_port: Input.number("Public port", default: 18_080),
+  message: Input.text("Message", default: "Deployed by HostKit"),
+  apply?: Input.checkbox("Apply now", default: false),
+  verify?: Input.checkbox("Verify after apply", default: false)
+}
 
-Control.subscribe(settings_form, :demo_settings)
-settings_form
+settings_inputs
+|> Map.values()
+|> Layout.grid(columns: 2)
 ```
 
-Read the submitted form. From here on, everything is plain Elixir data that the HostKit declaration can reference.
+Read the current input values. From here on, everything is plain Elixir data that the HostKit declaration can reference.
 
 ```elixir
-settings =
-  receive do
-    {:demo_settings, %{type: :submit, data: data}} -> data
-  end
+settings = %{
+  server: Input.read(settings_inputs.server),
+  user: Input.read(settings_inputs.user),
+  ssh_port: Input.read(settings_inputs.ssh_port),
+  identity_file: Input.read(settings_inputs.identity_file),
+  ssh_retries: Input.read(settings_inputs.ssh_retries),
+  public_port: Input.read(settings_inputs.public_port),
+  message: Input.read(settings_inputs.message),
+  apply?: Input.read(settings_inputs.apply?),
+  verify?: Input.read(settings_inputs.verify?)
+}
 ```
 
 Turn the UI fields into explicit target settings. This keeps credentials and transport details visible without mixing them into the deployment declaration.
