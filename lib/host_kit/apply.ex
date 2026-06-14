@@ -388,24 +388,9 @@ defmodule HostKit.Apply do
 
   defp rendered_content(_resource, default, _opts), do: {:ok, IO.iodata_to_binary(default)}
 
-  defp file_content(%HostKit.BackupRef{path: path}, opts), do: read_file(path, opts)
+  defp file_content(%HostKit.BackupRef{path: path}, opts), do: Runner.read_file(path, opts)
   defp file_content(nil, _opts), do: {:ok, ""}
   defp file_content(content, _opts), do: {:ok, IO.iodata_to_binary(content)}
-
-  defp read_file(path, opts) do
-    case runner(opts) do
-      HostKit.Runner.Local ->
-        Elixir.File.read(path)
-
-      runner ->
-        case Runner.cmd(runner, "sh", ["-c", "cat #{HostKit.Shell.escape(path)}"],
-               stderr_to_stdout: true
-             ) do
-          {content, 0} -> {:ok, content}
-          {output, status} -> {:error, {:command_failed, "cat", status, output}}
-        end
-    end
-  end
 
   defp apply_account(%Account{name: name} = account, opts) do
     args = if account.system, do: ["--system"], else: []
@@ -417,13 +402,18 @@ defmodule HostKit.Apply do
   end
 
   defp apply_env_file(%EnvFile{path: path} = env_file, opts) do
-    with {:ok, content} <- HostKit.Env.render(env_file, opts),
+    with {:ok, content} <- env_file_content(env_file, opts),
          :ok <- mkdir_p(Path.dirname(path), opts),
          :ok <- write_file(path, content, opts),
          :ok <- Ops.chown(path, env_file.owner, env_file.group, opts) do
       Ops.chmod(path, env_file.mode, opts)
     end
   end
+
+  defp env_file_content(%{meta: %{content: %HostKit.BackupRef{}}} = env_file, opts),
+    do: rendered_content(env_file, "", opts)
+
+  defp env_file_content(%EnvFile{} = env_file, opts), do: HostKit.Env.render(env_file, opts)
 
   defp apply_command(%Command{} = command, opts) do
     with :ok <- command_current(command, opts),
@@ -538,8 +528,9 @@ defmodule HostKit.Apply do
     path =
       Keyword.get(opts, :egress_dir, "/etc/nftables.d") |> Path.join("hostkit-egress-#{user}.nft")
 
-    with :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, Firewall.Nftables.render_egress(egress), opts),
+    with {:ok, content} <- rendered_content(egress, Firewall.Nftables.render_egress(egress), opts),
+         :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, content, opts),
          :ok <- Ops.chown(path, "root", "root", opts),
          :ok <- Ops.chmod(path, 0o644, opts) do
       validate_firewall(path, opts)

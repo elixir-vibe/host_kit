@@ -110,12 +110,14 @@ Common options:
 - `--remote HOST` — raw SSH target escape hatch.
 - `--runs-root PATH` — override the HostKit runs root.
 - `--format text|json|inspect` — output format.
+- `--verbose` — include artifact and backup paths in text output.
 
 Examples:
 
 ```sh
 mix host_kit.apply --host prod --track --plan up.plan.json --confirm infra/config.exs
 mix host_kit.runs --host prod infra/config.exs
+mix host_kit.runs --host prod --verbose infra/config.exs
 ```
 
 ## Target selection

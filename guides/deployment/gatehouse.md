@@ -44,6 +44,8 @@ end
 
 The same `ingress` declaration can also be consumed by the Caddy provider. HostKit resolves endpoint references at plan time, then renders Gatehouse targets as ordinary URLs.
 
+`ingress` is the preferred public API for application routing. The lower-level `proxy ..., provider: :gatehouse` resource remains available as an advanced escape hatch when you need to express Gatehouse-specific listeners, services, balancing, health checks, drain behavior, or TLS details that are not yet modeled by provider-neutral ingress.
+
 The full source-build deployment path is covered by an opt-in Incus integration test:
 
 ```sh

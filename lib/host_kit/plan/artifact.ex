@@ -71,20 +71,7 @@ defmodule HostKit.Plan.Artifact do
     end
   end
 
-  defp read_artifact(path, opts) do
-    case Keyword.get(opts, :runner, HostKit.Runner.Local) do
-      HostKit.Runner.Local ->
-        File.read(path)
-
-      runner ->
-        case HostKit.Runner.cmd(runner, "sh", ["-c", "cat #{HostKit.Shell.escape(path)}"],
-               stderr_to_stdout: true
-             ) do
-          {content, 0} -> {:ok, content}
-          {output, status} -> {:error, {:command_failed, "cat", status, output}}
-        end
-    end
-  end
+  defp read_artifact(path, opts), do: HostKit.Runner.read_file(path, opts)
 
   @spec save(Path.t(), Plan.t(), keyword()) :: :ok | {:error, term()}
   def save(path, %Plan{} = plan, opts \\ []) do

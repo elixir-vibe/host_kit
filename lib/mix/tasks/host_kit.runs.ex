@@ -28,7 +28,8 @@ defmodule Mix.Tasks.HostKit.Runs do
           sudo: :boolean,
           require: :keep,
           runs_root: :string,
-          format: :string
+          format: :string,
+          verbose: :boolean
         ]
       )
 
@@ -58,20 +59,47 @@ defmodule Mix.Tasks.HostKit.Runs do
     case Keyword.get(opts, :format, "text") do
       "json" -> records |> Enum.map(&JSONCodec.dump/1) |> Jason.encode!(pretty: true)
       "inspect" -> inspect(records, pretty: true, limit: :infinity)
-      "text" -> Enum.map_join(records, "\n", &format_record/1)
+      "text" -> Enum.map_join(records, "\n", &format_record(&1, opts))
     end
   end
 
-  defp format_record(record) do
-    [
-      record.id,
-      record.direction,
-      record.project,
-      record.applied_at,
-      "changes=#{length(record.changes)}"
-    ]
-    |> Enum.reject(&is_nil/1)
-    |> Enum.join(" ")
+  defp format_record(record, opts) do
+    summary =
+      [
+        record.id,
+        record.direction,
+        record.project,
+        record.applied_at,
+        "changes=#{length(record.changes)}",
+        "artifacts=#{map_size(record.artifacts || %{})}",
+        "backups=#{map_size(record.backups || %{})}"
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" ")
+
+    if Keyword.get(opts, :verbose, false) do
+      [
+        summary,
+        format_paths("artifacts", record.artifacts),
+        format_paths("backups", record.backups)
+      ]
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.join("\n")
+    else
+      summary
+    end
+  end
+
+  defp format_paths(_label, nil), do: ""
+  defp format_paths(_label, map) when map_size(map) == 0, do: ""
+
+  defp format_paths(label, map) do
+    lines =
+      map
+      |> Enum.sort_by(fn {key, _path} -> key end)
+      |> Enum.map(fn {key, path} -> "  #{label}.#{key}=#{path}" end)
+
+    Enum.join(lines, "\n")
   end
 
   defp put_present(opts, _key, nil), do: opts

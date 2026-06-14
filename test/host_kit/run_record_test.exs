@@ -139,6 +139,33 @@ defmodule HostKit.RunRecordTest do
     assert File.read!(proxy_path) == "old proxy"
   end
 
+  test "backup-backed env files restore without re-rendering secrets" do
+    root =
+      Path.join(System.tmp_dir!(), "hostkit-env-backup-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf(root) end)
+
+    env_path = Path.join(root, "app.env")
+    backup_path = Path.join(root, "backup.env")
+    File.write!(env_path, "TOKEN=\"new\"\n")
+    File.write!(backup_path, "TOKEN=\"old\"\n")
+
+    env_file = %HostKit.Resources.EnvFile{
+      path: env_path,
+      entries: [{:secret, "TOKEN", HostKit.Secret.env("HOSTKIT_TEST_MISSING_SECRET")}],
+      meta: %{content: %HostKit.BackupRef{path: backup_path}}
+    }
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :tracked},
+      changes: [%Change{action: :update, resource_id: {:env_file, env_path}, after: env_file}]
+    }
+
+    assert {:ok, _results} = HostKit.apply(plan, confirm: true)
+    assert File.read!(env_path) == "TOKEN=\"old\"\n"
+  end
+
   test "tracked apply records plan artifact references" do
     root =
       Path.join(System.tmp_dir!(), "hostkit-runs-artifacts-#{System.unique_integer([:positive])}")

@@ -31,8 +31,9 @@ defmodule HostKit.Providers.Caddy do
 
     opts = Map.get(context, :opts, [])
 
-    with :ok <- HostKit.Runner.mkdir_p(Ops.runner(opts), Path.dirname(path), opts),
-         :ok <- HostKit.Runner.write_file(Ops.runner(opts), path, render_site(site), opts),
+    with {:ok, content} <- rendered_content(site, render_site(site), opts),
+         :ok <- HostKit.Runner.mkdir_p(Ops.runner(opts), Path.dirname(path), opts),
+         :ok <- HostKit.Runner.write_file(Ops.runner(opts), path, content, opts),
          :ok <- Ops.chown(path, Map.get(config, :owner), Map.get(config, :group), opts) do
       Ops.chmod(path, Map.get(config, :mode, 0o644), opts)
     end
@@ -69,6 +70,11 @@ defmodule HostKit.Providers.Caddy do
   def render_site(%Site{} = site) do
     [site.host, " {\n", Enum.map(site.directives, &render_directive/1), "}\n"]
   end
+
+  defp rendered_content(%{meta: %{content: %HostKit.BackupRef{path: path}}}, _default, opts),
+    do: HostKit.Runner.read_file(path, Keyword.put(opts, :runner, Ops.runner(opts)))
+
+  defp rendered_content(_site, default, _opts), do: {:ok, IO.iodata_to_binary(default)}
 
   defp provider_config(%{project: project}) do
     project.provider_configs
