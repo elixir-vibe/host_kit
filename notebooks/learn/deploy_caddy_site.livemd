@@ -1,14 +1,16 @@
 # Deploy a Caddy static site with HostKit
 
-Start with the small set of notebook dependencies. `kino` gives us friendly inputs, `req` verifies the deployed site, and `host_kit` provides the deployment DSL and runtime APIs.
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.14"},
+  {:kino, "~> 0.19"},
   {:req, "~> 0.5"},
   {:host_kit, "== 0.1.0-beta.1"}
 ])
 ```
+
+## Overview
+
+The setup cell above installs the small dependency set for this notebook: `kino` for friendly inputs, `req` for HTTP verification, and `host_kit` for the deployment DSL and runtime APIs.
 
 Use short aliases in the rest of the notebook so the code reads like a walkthrough instead of a wall of module names.
 
@@ -33,7 +35,7 @@ The deployment declaration lives directly in the notebook.
 
 ## Demo settings
 
-First, expose the values someone actually cares about. Advanced SSH values still come from ordinary environment variables so the demo form stays approachable.
+First, expose the values someone actually cares about. Evaluate this cell once and fill the form. Then evaluate the next cell; while it waits, click **Plan deployment** to submit the settings.
 
 ```elixir
 settings_form =

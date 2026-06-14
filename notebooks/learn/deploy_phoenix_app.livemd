@@ -1,14 +1,16 @@
 # Deploy a Phoenix app with HostKit
 
-Start with the notebook dependencies. `kino` provides friendly inputs, `req` verifies the deployed endpoint, and `host_kit` provides the deployment DSL and runtime APIs.
-
 ```elixir
 Mix.install([
-  {:kino, "~> 0.14"},
+  {:kino, "~> 0.19"},
   {:req, "~> 0.5"},
   {:host_kit, "== 0.1.0-beta.1"}
 ])
 ```
+
+## Overview
+
+The setup cell above installs this notebook's dependencies: `kino` for friendly inputs, `req` for HTTP verification, and `host_kit` for the deployment DSL and runtime APIs.
 
 Use aliases so the rest of the notebook reads like application code.
 
@@ -36,7 +38,7 @@ The deployment declaration lives directly in the notebook. The integration test 
 
 ## Demo settings
 
-Expose a small form for the values people expect to choose during a demo. Advanced SSH values come from environment variables so they are easy to automate in tests and CI.
+Expose a small form for the values people expect to choose during a demo. Evaluate this cell once and fill the form. Then evaluate the next cell; while it waits, click **Plan deployment** to submit the settings.
 
 ```elixir
 settings_form =
