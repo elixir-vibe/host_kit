@@ -56,7 +56,7 @@ defmodule HostKit.Runner do
         send(pid, {:hostkit_runner_trace, command, args, status, duration})
 
       :stdio ->
-        formatted = HostKit.Runner.CommandFormat.format(command, args)
+        formatted = HostKit.Runner.Command.format(command, args)
         IO.puts("[hostkit:cmd] #{duration}ms status=#{status} #{formatted}")
 
       _other ->

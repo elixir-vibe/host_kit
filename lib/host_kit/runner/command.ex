@@ -1,5 +1,5 @@
-defmodule HostKit.Runner.CommandFormat do
-  @moduledoc "Concise formatting for runner commands."
+defmodule HostKit.Runner.Command do
+  @moduledoc "Formatting helpers for commands executed through HostKit runners."
 
   @spec format(String.t(), [term()], keyword()) :: String.t()
   def format(command, args, opts \\ []) do

@@ -38,7 +38,7 @@ defmodule HostKit.Error do
   defp format_output(""), do: ""
   defp format_output(output), do: "\n" <> truncate(String.trim(to_string(output)), 500)
 
-  defp format_command(command, args), do: HostKit.Runner.CommandFormat.format(command, args)
+  defp format_command(command, args), do: HostKit.Runner.Command.format(command, args)
 
   defp truncate(value, max) when byte_size(value) > max, do: binary_part(value, 0, max) <> "…"
   defp truncate(value, _max), do: value
