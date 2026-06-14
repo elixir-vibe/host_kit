@@ -1,11 +1,12 @@
 defmodule HostKit.DSL.Scope do
   @moduledoc false
 
-  alias HostKit.{Conventions, Host, Project, ProviderConfig, Service, Storage}
+  alias HostKit.{Conventions, Host, Instance, Project, ProviderConfig, Service, Storage}
 
   @project_key {__MODULE__, :project}
   @host_key {__MODULE__, :host}
   @service_key {__MODULE__, :service}
+  @instance_key {__MODULE__, :instance}
   @workspace_key {__MODULE__, :workspace}
   @inside_key {__MODULE__, :inside}
   @provider_config_key {__MODULE__, :provider_config}
@@ -223,21 +224,12 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_ssh(opts \\ []) do
-    host = Process.get(@host_key) || raise "ssh/1 must be declared inside host/2"
+    unless Process.get(@host_key) do
+      raise "ssh/1 must be declared inside host/2"
+    end
 
     Process.put(@ssh_key, true)
-
-    update_current(
-      :host,
-      &update_in(&1.meta[:ssh], fn existing -> Keyword.merge(existing || [], opts) end)
-    )
-
-    if user = Keyword.get(opts, :user), do: update_current(:host, &Map.put(&1, :user, user))
-
-    if Keyword.has_key?(opts, :sudo),
-      do: update_current(:host, &Map.put(&1, :sudo, Keyword.fetch!(opts, :sudo)))
-
-    host
+    put_ssh_opts(opts)
   end
 
   def finish_ssh do
@@ -247,12 +239,14 @@ defmodule HostKit.DSL.Scope do
 
   def ssh_active?, do: Process.get(@ssh_key) == true
 
-  def put_ssh(key, value) do
-    update_current(:host, fn host ->
-      host = if key == :user, do: %{host | user: value}, else: host
-      host = if key == :sudo, do: %{host | sudo: value}, else: host
-      update_in(host.meta[:ssh], &Keyword.put(&1 || [], key, value))
-    end)
+  def put_ssh(key, value), do: put_ssh_opts([{key, value}])
+
+  def put_ssh_opts(opts) do
+    if Process.get(@host_key) do
+      update_current(:host, &put_host_ssh_opts(&1, opts))
+    else
+      raise "ssh directive used outside host block"
+    end
   end
 
   def start_bootstrap do
@@ -266,8 +260,32 @@ defmodule HostKit.DSL.Scope do
 
   def finish_host do
     host = Process.delete(@host_key) || raise "no HostKit host in scope"
-    update_project(&Project.add_host(&1, host))
+
+    case Process.get(@instance_key) do
+      nil -> update_project(&Project.add_host(&1, host))
+      instance -> Process.put(@instance_key, Instance.add_host(instance, host))
+    end
   end
+
+  def start_instance(name, opts) do
+    Process.put(@instance_key, Instance.new(name, opts))
+  end
+
+  def finish_instance do
+    instance = Process.delete(@instance_key) || raise "no HostKit instance in scope"
+    update_project(&Project.add_instance(&1, instance))
+  end
+
+  def instance_active?, do: Process.get(@instance_key) != nil
+
+  def put_instance_backend(backend), do: update_instance(&Instance.put_backend(&1, backend))
+  def put_instance_image(image), do: update_instance(&Instance.put_image(&1, image))
+  def put_instance_kind(kind), do: update_instance(&Instance.put_kind(&1, kind))
+
+  def put_instance_lifecycle(lifecycle),
+    do: update_instance(&Instance.put_lifecycle(&1, lifecycle))
+
+  def add_instance_port(name, opts), do: update_instance(&Instance.add_port(&1, name, opts))
 
   def start_service(name, opts) do
     service = Service.new(name, opts)
@@ -286,7 +304,11 @@ defmodule HostKit.DSL.Scope do
 
   def finish_service do
     service = Process.delete(@service_key) || raise "no HostKit service in scope"
-    update_project(&Project.add_service(&1, service))
+
+    case Process.get(@instance_key) do
+      nil -> update_project(&Project.add_service(&1, service))
+      instance -> Process.put(@instance_key, Instance.add_service(instance, service))
+    end
   end
 
   def start_workspace(name, opts) do
@@ -472,6 +494,28 @@ defmodule HostKit.DSL.Scope do
 
   def listener_upstream(name), do: name |> listener() |> HostKit.Listener.upstream()
 
+  defp put_host_ssh_opts(host, opts) do
+    host
+    |> maybe_put_host_user(Keyword.get(opts, :user))
+    |> maybe_put_host_sudo(opts)
+    |> update_in([Access.key(:meta), :ssh], &Keyword.merge(&1 || [], opts))
+  end
+
+  defp maybe_put_host_user(host, nil), do: host
+  defp maybe_put_host_user(host, user), do: %{host | user: user}
+
+  defp maybe_put_host_sudo(host, opts) do
+    if Keyword.has_key?(opts, :sudo), do: %{host | sudo: Keyword.fetch!(opts, :sudo)}, else: host
+  end
+
+  defp update_instance(fun) do
+    instance =
+      Process.get(@instance_key) || raise "instance directive used outside instance block"
+
+    Process.put(@instance_key, fun.(instance))
+    :ok
+  end
+
   defp update_proxy(fun) do
     proxy = Process.get(@proxy_key) || raise "proxy directive used outside proxy block"
     Process.put(@proxy_key, fun.(proxy))
@@ -500,9 +544,10 @@ defmodule HostKit.DSL.Scope do
   end
 
   def add_resource(resource) do
-    case Process.get(@service_key) do
-      nil -> update_project(&Project.add_resource(&1, resource))
-      service -> Process.put(@service_key, Service.add_resource(service, resource))
+    case {Process.get(@service_key), Process.get(@instance_key)} do
+      {nil, nil} -> update_project(&Project.add_resource(&1, resource))
+      {nil, instance} -> Process.put(@instance_key, Instance.add_resource(instance, resource))
+      {service, _instance} -> Process.put(@service_key, Service.add_resource(service, resource))
     end
 
     :ok

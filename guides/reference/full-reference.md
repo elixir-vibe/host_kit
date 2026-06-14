@@ -193,6 +193,48 @@ project :demo do
 end
 ```
 
+## Instances and nested hosts
+
+Top-level `host` declarations describe existing connection targets. `instance` declarations describe lifecycle-managed compute boundaries with backend-selected lifecycle and normal HostKit contents nested inside.
+
+```elixir
+use HostKit.DSL
+
+project :demo do
+  instance :demo_vm do
+    backend :incus
+    image "images:ubuntu/24.04"
+    kind :container
+    lifecycle :ephemeral
+
+    expose :ssh, host: 2222, guest: 22
+    expose :web, host: 18080, guest: 80
+
+    host :guest, at: "127.0.0.1" do
+      ssh do
+        user "root"
+        password "hostkit-demo"
+        port 2222
+        accept_hosts true
+      end
+    end
+
+    service :web do
+      package :caddy
+
+      daemon do
+        exec ["/usr/bin/env", "true"]
+        listen :http, port: 80
+      end
+    end
+  end
+end
+```
+
+The instance owns compute lifecycle metadata (`backend`, `image`, `kind`, `lifecycle`, `expose`). The nested host owns connection metadata. Nested services/resources are ordinary HostKit declarations scoped to the instance contents.
+
+Backend implementations are intentionally separate from the generic DSL. Incus should be implemented as a backend for `instance`, not as a user-facing `incus_machine` DSL.
+
 ## Host bootstrap packages and mise-managed runtimes
 
 HostKit can install OS packages through the target package manager. The DSL is distribution-neutral by default and can be pinned to a manager when needed.

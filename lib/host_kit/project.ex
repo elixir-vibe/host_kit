@@ -1,7 +1,17 @@
 defmodule HostKit.Project do
   @moduledoc "Project-level declaration loaded from HostKit DSL files."
 
-  alias HostKit.{Conventions, Firewall, Provider, ProviderConfig, Proxy, Service, Tenant}
+  alias HostKit.{
+    Conventions,
+    Firewall,
+    Instance,
+    Provider,
+    ProviderConfig,
+    Proxy,
+    Service,
+    Tenant
+  }
+
   alias HostKit.Resources.Mise
 
   @type t :: %__MODULE__{
@@ -9,6 +19,7 @@ defmodule HostKit.Project do
           hosts: [HostKit.Host.t()],
           tenants: [Tenant.t()],
           services: [Service.t()],
+          instances: [Instance.t()],
           resources: [struct()],
           providers: [module()],
           provider_configs: %{optional(atom()) => ProviderConfig.t()},
@@ -21,6 +32,7 @@ defmodule HostKit.Project do
             hosts: [],
             tenants: [],
             services: [],
+            instances: [],
             resources: [],
             providers: [],
             provider_configs: %{},
@@ -92,6 +104,10 @@ defmodule HostKit.Project do
   @spec add_service(t(), Service.t()) :: t()
   def add_service(%__MODULE__{} = project, service),
     do: %{project | services: project.services ++ [service]}
+
+  @spec add_instance(t(), Instance.t()) :: t()
+  def add_instance(%__MODULE__{} = project, %Instance{} = instance),
+    do: %{project | instances: project.instances ++ [instance]}
 
   @spec add_resource(t(), struct()) :: t()
   def add_resource(%__MODULE__{} = project, resource),

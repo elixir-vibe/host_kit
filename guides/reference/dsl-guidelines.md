@@ -94,6 +94,46 @@ end
 ssh user: "deploy", sudo: true, retry: [attempts: 3]
 ```
 
+## Hosts vs instances
+
+A `host` is a connection endpoint. A top-level host points at an existing target; HostKit does not create, start, stop, reset, or destroy it.
+
+```elixir
+host :prod, at: "prod.example.com" do
+  ssh do
+    user "deploy"
+    sudo true
+  end
+end
+```
+
+An `instance` is a lifecycle-managed compute boundary. It selects a backend, image/kind, port exposure, nested host endpoint(s), and normal HostKit contents that should exist inside it.
+
+```elixir
+instance :demo do
+  backend :incus
+  image "images:ubuntu/24.04"
+  kind :container
+  lifecycle :ephemeral
+
+  expose :ssh, host: 2222, guest: 22
+
+  host :guest, at: "127.0.0.1" do
+    ssh do
+      user "root"
+      port 2222
+      accept_hosts true
+    end
+  end
+
+  service :web do
+    package :caddy
+  end
+end
+```
+
+Rule: `instance` manages the compute lifecycle; nested `host` describes how HostKit connects into that instance.
+
 ## References between declarations
 
 Use symbolic names for intra-project references.
@@ -262,11 +302,17 @@ Legend:
 | `path_name` | Reference | Override the service path/identity slug. |
 | `put_in_meta` | Escape hatch | Attach arbitrary metadata to the current service. |
 
-### Host and SSH
+### Hosts, instances, and SSH
 
 | Directive | Level | Purpose |
 | --- | --- | --- |
-| `host` | Canonical | Declare a named deployment host; use `host :app, at: "example.com" do ... end`. |
+| `host` | Canonical | Declare a named connection endpoint; top-level hosts are existing targets, nested hosts are endpoints into an instance. |
+| `instance` | Canonical | Declare a lifecycle-managed compute instance with backend, image, exposed ports, nested hosts, and nested HostKit contents. |
+| `backend` | Canonical | Select the implementation backend for an instance, ingress, proxy, or other backend-driven declaration. |
+| `image` | Canonical | Set the instance image. |
+| `kind` | Canonical | Set the instance kind, such as `:container` or `:vm`. |
+| `lifecycle` | Reference | Set instance lifecycle policy, such as `:persistent` or `:ephemeral`. |
+| `expose` | Canonical | Declare an instance port exposure from host to guest. |
 | `ssh` | Canonical | Configure host SSH transport as a block. |
 | `user` | Canonical | SSH user inside `ssh`. |
 | `identity_file` | Canonical | SSH key path inside `ssh`. |

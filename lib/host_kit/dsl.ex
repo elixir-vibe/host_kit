@@ -301,6 +301,44 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro instance(name, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Scope.start_instance(unquote(name), unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.finish_instance()
+    end
+  end
+
+  defmacro backend(name) do
+    quote do
+      HostKit.DSL.Scope.put_instance_backend(unquote(name))
+    end
+  end
+
+  defmacro image(value) do
+    quote do
+      HostKit.DSL.Scope.put_instance_image(unquote(value))
+    end
+  end
+
+  defmacro kind(value) do
+    quote do
+      HostKit.DSL.Scope.put_instance_kind(unquote(value))
+    end
+  end
+
+  defmacro lifecycle(value) do
+    quote do
+      HostKit.DSL.Scope.put_instance_lifecycle(unquote(value))
+    end
+  end
+
+  defmacro expose(name, opts) do
+    quote do
+      HostKit.DSL.Scope.add_instance_port(unquote(name), unquote(opts))
+    end
+  end
+
   defmacro proxy(name, opts, do: block) do
     quote do
       HostKit.DSL.Scope.start_proxy(unquote(name), unquote(opts))
