@@ -146,11 +146,21 @@ defmodule HostKit.LivebookSessionRunner do
       end
 
       case evaluate_cell!(session_pid, cell.id) do
-        %{type: :control, attrs: %{type: :form}} = form -> form
-        _output -> form
+        output -> find_form(output) || form
       end
     end)
   end
+
+  defp find_form(%{type: :control, attrs: %{type: :form}} = form), do: form
+
+  defp find_form(%{} = map) do
+    map
+    |> Map.values()
+    |> Enum.find_value(&find_form/1)
+  end
+
+  defp find_form(list) when is_list(list), do: Enum.find_value(list, &find_form/1)
+  defp find_form(_other), do: nil
 
   defp evaluable_regular_cells(session_pid) do
     session_pid

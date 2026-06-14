@@ -14,11 +14,10 @@ Mix.install([
 
 ```elixir
 Code.require_file("notebooks/learn/hostkit_demo_helpers.exs", File.cwd!())
+Logger.configure(level: :notice)
 
 alias HostKit, as: HK
-alias HostKit.Apply.Event, as: ApplyEvent
 alias HostKit.LivebookDemo, as: Demo
-alias HostKit.Plan.Format
 alias HostKit.Providers.Caddy
 ```
 
@@ -165,7 +164,11 @@ target_opts = HostKit.Host.target_opts(host)
 ```
 
 ```elixir
-plan |> Format.format() |> Kino.Markdown.new()
+Demo.plan_summary(plan)
+```
+
+```elixir
+Demo.plan_table(plan)
 ```
 
 ## Deploy
@@ -175,20 +178,16 @@ This is the line that changes the target.
 ```elixir
 reporter = self()
 apply_result = HK.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
+Kino.nothing()
 ```
 
 ```elixir
-progress =
-  Stream.repeatedly(fn ->
-    receive do
-      {HostKit.Apply, event} -> ApplyEvent.format(event)
-    after
-      0 -> nil
-    end
-  end)
-  |> Enum.take_while(& &1)
+progress = Demo.collect_apply_progress()
+Demo.apply_summary(apply_result, progress)
+```
 
-{apply_result, progress}
+```elixir
+Demo.apply_table(apply_result)
 ```
 
 ## Verify
@@ -197,5 +196,5 @@ Readiness checks in the declaration already restart and wait for the service dur
 
 ```elixir
 response = Req.get!(public_url)
-{response.status, response.body, public_url}
+Demo.verify_summary(response, public_url)
 ```

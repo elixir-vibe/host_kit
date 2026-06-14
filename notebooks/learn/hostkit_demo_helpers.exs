@@ -36,13 +36,6 @@ defmodule HostKit.LivebookDemo do
 
   def target_form(defaults \\ []) do
     defaults = Map.new(defaults)
-    status = Kino.Frame.new() |> Kino.render()
-
-    Kino.Frame.render(
-      status,
-      Markdown.new("Enter SSH details and click **Check SSH connection**.")
-    )
-
     caller = self()
 
     form =
@@ -68,13 +61,20 @@ defmodule HostKit.LivebookDemo do
         submit: "Check SSH connection"
       )
 
+    status = Kino.Frame.new()
+
+    Kino.Frame.render(
+      status,
+      Markdown.new("Enter SSH details and click **Check SSH connection**.")
+    )
+
     Kino.listen(form, fn %{type: :submit, data: settings} ->
       settings = with_uploaded_key(settings)
       send(caller, {:demo_settings, settings})
       Kino.Frame.render(status, check_ssh(settings))
     end)
 
-    form
+    Kino.Layout.grid([form, status], columns: 1)
   end
 
   def await_target(_form) do
@@ -93,6 +93,102 @@ defmodule HostKit.LivebookDemo do
         Markdown.new("⚠️ **SSH failed** — #{ssh_error(reason)}")
     end
   end
+
+  def plan_summary(plan) do
+    counts = Enum.frequencies_by(plan.changes, & &1.action)
+
+    Markdown.new("""
+    ### Plan summary
+
+    - Create: #{Map.get(counts, :create, 0)}
+    - Update: #{Map.get(counts, :update, 0)}
+    - Delete: #{Map.get(counts, :delete, 0)}
+    - Read errors: #{Map.get(counts, :read, 0)}
+    - Unchanged: #{Map.get(counts, :no_op, 0)}
+    """)
+  end
+
+  def plan_table(plan) do
+    plan.changes
+    |> Enum.map(fn change ->
+      %{
+        action: change.action,
+        resource: format_resource(change.resource_id),
+        status: format_reason(change.reason)
+      }
+    end)
+    |> Kino.DataTable.new(keys: [:action, :resource, :status], name: "Plan changes", num_rows: 20)
+  end
+
+  def collect_apply_progress do
+    Stream.repeatedly(fn ->
+      receive do
+        {HostKit.Apply, event} -> HostKit.Apply.Event.format(event)
+      after
+        0 -> nil
+      end
+    end)
+    |> Enum.take_while(& &1)
+  end
+
+  def apply_summary({:ok, results}, progress) when is_list(results) do
+    counts = Enum.frequencies_by(results, &Map.get(&1, :status, :unknown))
+
+    Markdown.new("""
+    ### Deploy summary
+
+    - Applied: #{Map.get(counts, :applied, 0)}
+    - Skipped: #{Map.get(counts, :skipped, 0)}
+    - Failed: #{Map.get(counts, :failed, 0)}
+    - Events: #{length(progress)}
+    """)
+  end
+
+  def apply_summary(other, progress) do
+    Markdown.new("""
+    ### Deploy result
+
+    - Result: `#{inspect(other)}`
+    - Events: #{length(progress)}
+    """)
+  end
+
+  def apply_table({:ok, results}) when is_list(results) do
+    results
+    |> Enum.map(fn result ->
+      change = Map.get(result, :change)
+
+      %{
+        status: Map.get(result, :status),
+        action: change && change.action,
+        resource: change && format_resource(change.resource_id)
+      }
+    end)
+    |> Kino.DataTable.new(
+      keys: [:status, :action, :resource],
+      name: "Deploy results",
+      num_rows: 20
+    )
+  end
+
+  def apply_table(result),
+    do: Kino.DataTable.new([%{result: inspect(result)}], name: "Deploy result")
+
+  def verify_summary(response, public_url) do
+    Markdown.new("""
+    ### Verify
+
+    ✅ `#{response.status}` from [#{public_url}](#{public_url})
+    """)
+  end
+
+  defp format_resource(%HostKit.Addr.Resource{} = resource), do: to_string(resource)
+  defp format_resource({type, name}), do: "#{type}.#{name}"
+  defp format_resource(other), do: inspect(other)
+
+  defp format_reason(nil), do: "in sync"
+  defp format_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
+  defp format_reason(reason), do: inspect(reason)
 
   defp ssh_error(reason) when is_list(reason) do
     reason
