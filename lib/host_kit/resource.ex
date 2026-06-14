@@ -13,6 +13,7 @@ defmodule HostKit.Resource do
                       HostKit.Caddy.Site,
                       HostKit.Change,
                       HostKit.Apply.Event,
+                      HostKit.BackupRef,
                       HostKit.CommandLine,
                       HostKit.Conventions,
                       HostKit.Diagnostic,

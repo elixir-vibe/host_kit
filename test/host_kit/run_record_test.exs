@@ -72,6 +72,14 @@ defmodule HostKit.RunRecordTest do
     assert [{resource_id, backup_path}] = Map.to_list(record.backups)
     assert resource_id =~ ":file"
     assert File.read!(backup_path) == "old"
+
+    restored_plan = HostKit.RunRecord.apply_backups(plan, record)
+
+    assert [
+             %HostKit.Change{
+               before: %HostKit.Resources.File{content: %HostKit.BackupRef{path: ^backup_path}}
+             }
+           ] = restored_plan.changes
   end
 
   test "tracked apply records plan artifact references" do

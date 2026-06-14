@@ -98,6 +98,13 @@ defmodule HostKit.RunRecord do
     end
   end
 
+  @spec apply_backups(Plan.t(), t()) :: Plan.t()
+  def apply_backups(%Plan{} = plan, %__MODULE__{} = record) do
+    backups = record.backups || %{}
+    changes = Enum.map(plan.changes, &apply_change_backup(&1, backups))
+    %Plan{plan | changes: changes}
+  end
+
   @spec runs_root(Plan.t() | nil, keyword()) :: String.t()
   def runs_root(plan \\ nil, opts) do
     opts
@@ -107,6 +114,25 @@ defmodule HostKit.RunRecord do
       root -> root
     end
   end
+
+  defp apply_change_backup(
+         %HostKit.Change{resource_id: resource_id, before: %HostKit.Resources.File{} = file} =
+           change,
+         backups
+       ) do
+    case Map.get(backups, inspect(resource_id)) do
+      path when is_binary(path) ->
+        %HostKit.Change{
+          change
+          | before: %HostKit.Resources.File{file | content: %HostKit.BackupRef{path: path}}
+        }
+
+      _missing ->
+        change
+    end
+  end
+
+  defp apply_change_backup(change, _backups), do: change
 
   def validate_version!(@version), do: @version
 

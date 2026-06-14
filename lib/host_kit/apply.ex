@@ -371,10 +371,30 @@ defmodule HostKit.Apply do
     do: {:error, :file_content_managed_elsewhere}
 
   defp apply_file(%File{path: path, content: content} = file, opts) do
-    with :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, IO.iodata_to_binary(content || ""), opts),
+    with {:ok, content} <- file_content(content, opts),
+         :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, content, opts),
          :ok <- Ops.chown(path, file.owner, file.group, opts) do
       Ops.chmod(path, file.mode, opts)
+    end
+  end
+
+  defp file_content(%HostKit.BackupRef{path: path}, opts), do: read_file(path, opts)
+  defp file_content(nil, _opts), do: {:ok, ""}
+  defp file_content(content, _opts), do: {:ok, IO.iodata_to_binary(content)}
+
+  defp read_file(path, opts) do
+    case runner(opts) do
+      HostKit.Runner.Local ->
+        Elixir.File.read(path)
+
+      runner ->
+        case Runner.cmd(runner, "sh", ["-c", "cat #{HostKit.Shell.escape(path)}"],
+               stderr_to_stdout: true
+             ) do
+          {content, 0} -> {:ok, content}
+          {output, status} -> {:error, {:command_failed, "cat", status, output}}
+        end
     end
   end
 

@@ -59,14 +59,19 @@ defmodule Mix.Tasks.HostKit.Down do
   end
 
   defp load_up_plan!(opts, positional, target_opts) do
-    path =
-      if Keyword.get(opts, :last, false) do
-        latest_plan_artifact!(opts, target_opts)
-      else
+    if Keyword.get(opts, :last, false) do
+      {path, record} = latest_plan_artifact!(opts, target_opts)
+      path |> load_plan_artifact!(target_opts) |> HostKit.RunRecord.apply_backups(record)
+    else
+      path =
         Keyword.get(opts, :plan) || List.first(positional) ||
           Mix.raise("expected a plan artifact")
-      end
 
+      load_plan_artifact!(path, target_opts)
+    end
+  end
+
+  defp load_plan_artifact!(path, target_opts) do
     case HostKit.Plan.Artifact.load(path, target_opts) do
       {:ok, plan} -> plan
       {:error, reason} -> Mix.raise("could not load HostKit plan artifact: #{inspect(reason)}")
@@ -77,8 +82,8 @@ defmodule Mix.Tasks.HostKit.Down do
     run_opts = put_present(target_opts, :hostkit_runs_root, Keyword.get(opts, :runs_root))
 
     case HostKit.RunRecord.latest(run_opts) do
-      {:ok, %{artifacts: %{"up_plan" => path}}} when is_binary(path) ->
-        path
+      {:ok, %{artifacts: %{"up_plan" => path}} = record} when is_binary(path) ->
+        {path, record}
 
       {:ok, record} ->
         Mix.raise(

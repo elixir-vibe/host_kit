@@ -59,15 +59,18 @@ defmodule Mix.Tasks.HostKit.DownTest do
     up_path = Path.join(root, "up.plan.json")
     down_path = Path.join(root, "down.plan.json")
     runs_root = Path.join(root, "runs")
-    before = %HostKit.Resources.File{path: "/tmp/demo", content: "old"}
-    after_resource = %HostKit.Resources.File{path: "/tmp/demo", content: "new"}
+    backups_root = Path.join(root, "backups")
+    file_path = Path.join(root, "demo.txt")
+    File.write!(file_path, "old")
+    before = %HostKit.Resources.File{path: file_path, content: "old"}
+    after_resource = %HostKit.Resources.File{path: file_path, content: "new"}
 
     plan = %Plan{
       project: %HostKit.Project{name: :demo},
       changes: [
         %Change{
           action: :update,
-          resource_id: {:file, "/tmp/demo"},
+          resource_id: {:file, file_path},
           before: before,
           after: after_resource
         }
@@ -77,10 +80,11 @@ defmodule Mix.Tasks.HostKit.DownTest do
     assert :ok = Artifact.save(up_path, plan)
 
     assert {:ok, _results} =
-             HostKit.apply(%Plan{plan | changes: []},
+             HostKit.apply(plan,
                confirm: true,
                track: true,
                hostkit_runs_root: runs_root,
+               hostkit_backups_root: backups_root,
                up_plan_artifact: up_path
              )
 
@@ -91,6 +95,18 @@ defmodule Mix.Tasks.HostKit.DownTest do
 
     assert output =~ "1 to update"
     assert {:ok, down_plan} = Artifact.load(down_path)
-    assert [%Change{action: :update, before: ^after_resource, after: ^before}] = down_plan.changes
+
+    assert [
+             %Change{
+               action: :update,
+               before: ^after_resource,
+               after: %HostKit.Resources.File{content: %HostKit.BackupRef{} = backup}
+             }
+           ] = down_plan.changes
+
+    assert File.read!(backup.path) == "old"
+    assert File.read!(file_path) == "new"
+    assert {:ok, _results} = HostKit.apply(down_plan, confirm: true)
+    assert File.read!(file_path) == "old"
   end
 end
