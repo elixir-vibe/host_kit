@@ -10,6 +10,14 @@ Mix.install([
 
 This notebook is a small, readable HostKit demo:
 
+```elixir
+alias HostKit, as: HK
+alias HostKit.{Apply, Host, Project, Runner}
+alias HostKit.Apply.Event, as: ApplyEvent
+alias HostKit.Plan.{Artifact, Format}
+alias HostKit.Providers.Caddy
+```
+
 1. declare a target and a static site,
 2. inspect the plan,
 3. optionally apply it,
@@ -105,7 +113,9 @@ caddyfile = """
 import #{caddy_sites_dir}/*.caddy
 """
 
-use HostKit.DSL, providers: [HostKit.Providers.Caddy]
+alias HostKit.Providers.Caddy
+
+use HostKit.DSL, providers: [Caddy]
 
 project =
   project :deploy_caddy_site do
@@ -116,7 +126,7 @@ project =
       ssh ssh_opts
     end
 
-    provider :caddy, HostKit.Providers.Caddy do
+    provider :caddy, Caddy do
       set :sites_dir, caddy_sites_dir
     end
 
@@ -160,22 +170,22 @@ project
 
 ```elixir
 host = hd(project.hosts)
-target_opts = HostKit.Host.target_opts(host)
-{:ok, plan} = HostKit.plan(project, target_opts)
+target_opts = Host.target_opts(host)
+{:ok, plan} = HK.plan(project, target_opts)
 
-plan |> HostKit.Plan.Format.format() |> Kino.Markdown.new()
+plan |> Format.format() |> Kino.Markdown.new()
 ```
 
 ## Inspect generated resources
 
 ```elixir
-HostKit.Project.resources(project)
+Project.resources(project)
 ```
 
 ## Save an artifact
 
 ```elixir
-:ok = HostKit.Plan.Artifact.save(artifact_path, plan)
+:ok = Artifact.save(artifact_path, plan)
 artifact_path
 ```
 
@@ -188,7 +198,7 @@ reporter = self()
 
 apply_result =
   if apply? do
-    HostKit.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
+    HK.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
   else
     {:skipped, :set_apply_to_true}
   end
@@ -196,7 +206,7 @@ apply_result =
 progress =
   Stream.repeatedly(fn ->
     receive do
-      {HostKit.Apply, event} -> HostKit.Apply.Event.format(event)
+      {Apply, event} -> ApplyEvent.format(event)
     after
       0 -> nil
     end
@@ -210,16 +220,16 @@ progress =
 
 ```elixir
 if verify? do
-  runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
+  runner = {Runner.SSH, Host.ssh_options(host)}
 
   restart =
     if host.sudo do
-      HostKit.Runner.cmd(runner, "sudo", ["systemctl", "restart", caddy_service_name], stderr_to_stdout: true)
+      Runner.cmd(runner, "sudo", ["systemctl", "restart", caddy_service_name], stderr_to_stdout: true)
     else
-      HostKit.Runner.cmd(runner, "systemctl", ["restart", caddy_service_name], stderr_to_stdout: true)
+      Runner.cmd(runner, "systemctl", ["restart", caddy_service_name], stderr_to_stdout: true)
     end
 
-  response = HostKit.Runner.cmd(runner, "curl", ["-fsS", verify_url], stderr_to_stdout: true)
+  response = Runner.cmd(runner, "curl", ["-fsS", verify_url], stderr_to_stdout: true)
   {restart, response, public_url}
 else
   {:skipped, public_url}
