@@ -794,8 +794,10 @@ defmodule HostKit.DSL do
 
   defmacro account(name, opts) do
     quote do
+      account_name = HostKit.Account.name!(unquote(name))
+
       HostKit.DSL.Scope.add_resource(%HostKit.Resources.Account{
-        name: HostKit.Account.name!(unquote(name)),
+        name: account_name,
         system: Keyword.get(unquote(opts), :system, false),
         home: Keyword.get(unquote(opts), :home),
         shell: Keyword.get(unquote(opts), :shell, "/usr/sbin/nologin"),
@@ -803,6 +805,10 @@ defmodule HostKit.DSL do
         rollback: Keyword.get(unquote(opts), :rollback, :keep),
         meta: Keyword.get(unquote(opts), :meta, %{})
       })
+
+      if HostKit.DSL.Scope.service_active?() do
+        HostKit.DSL.Scope.put_service_account(account_name)
+      end
     end
   end
 

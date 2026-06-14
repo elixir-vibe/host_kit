@@ -19,18 +19,24 @@ project :toys do
     # Optional: override the path/identity slug used by root_path/2 and service_user/0.
     path_name "git"
 
-    account service_user(), system: true, home: root_path(:state, "home")
+    account system: true
+    storage :data, mode: 0o750
+    storage :state, mode: 0o750
 
-    directory root_path(:data), owner: service_user(), group: service_user(), mode: 0o750
-    directory root_path(:config), owner: "root", group: service_user(), mode: 0o750
+    env :runtime do
+      set :USER, service_user()
+    end
 
-    daemon unit_name() do
+    daemon do
       description "Forgejo"
-      service_user service_user()
       working_directory root_path(:source)
-      exec_start [Path.join(root_path(:source), "bin/forgejo"), "web"]
-      read_write_paths [root_path(:data), root_path(:state)]
-      wanted_by :multi_user
+      env :runtime
+      exec [Path.join(root_path(:source), "bin/forgejo"), "web"]
+
+      isolate do
+        writable :data
+        writable :state
+      end
     end
   end
 end
@@ -40,8 +46,10 @@ Useful helpers:
 
 - `roots source: ..., data: ..., state: ..., config: ...` declares project path roots.
 - `prefixes user: ..., unit: ...` declares naming prefixes.
-- `root_path(:data)` resolves the current service's data path.
-- `root_path(:data, "repositories")` resolves a child path.
+- `storage :data` defaults under the declared `:data` root.
+- `env :runtime` defaults under the declared `:config` root.
+- `root_path(:source)` resolves the current service's source path.
+- `root_path(:data, "repositories")` resolves an explicit child path when you need one.
 - `service_name()` returns the current service name.
 - `service_user()` returns the convention-derived service account name.
 - `unit_name()` returns the convention-derived systemd unit name.

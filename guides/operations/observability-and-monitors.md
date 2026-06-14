@@ -17,15 +17,16 @@ project :prod do
   end
 
   service :api do
-    daemon "api.service" do
+    daemon do
       description "API"
-      exec_start ["/opt/api/bin/server"]
+      exec ["/opt/api/bin/server"]
+      listen :http, port: 4000
       logs stdout: :journal, stderr: :journal, identifier: "api"
       monitor :systemd, name: :api_unit, expect: [state: :active], severity: :critical
     end
 
-    caddy_site :api, "api.example.com" do
-      reverse_proxy "127.0.0.1:4000"
+    caddy_site "api.example.com" do
+      reverse_proxy :http
       logs driver: :access, attributes: [service_name: :api]
       monitor :http, name: :api_http, url: "https://api.example.com", expect: [status: 200]
     end

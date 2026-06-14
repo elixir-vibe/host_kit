@@ -27,28 +27,32 @@ project :toys do
 
   prefixes user: "toys-", unit: "toys-"
 
-  host :elixir_toys do
-    hostname "elixir.toys"
-    user "dannote"
-    sudo true
+  host :elixir_toys, at: "elixir.toys" do
+    ssh do
+      user "dannote"
+      sudo true
+    end
   end
 
   service :exograph do
-    account "toys-exograph", system: true, home: "/var/lib/toys/exograph/home"
-    directory "/srv/toys/exograph", owner: "toys-exograph", group: "toys-exograph", mode: 0o755
+    account system: true
+    storage :data, mode: 0o755
+    storage :state, mode: 0o750
 
-    daemon "toys-exograph.service" do
+    daemon do
       description "Exograph search"
       after_target :network_online
       wants :network_online
-      service_user "toys-exograph"
-      working_directory "/opt/toys/src/exograph"
-      exec_start ["/usr/local/bin/mix", "exograph.index.hex", "--web", "--port", "4200"]
+      working_directory root_path(:source)
+      exec ["/usr/local/bin/mix", "exograph.index.hex", "--web", "--port", "4200"]
       restart :on_failure
       restart_sec 10
-      hardening :web_service
-      read_write_paths ["/srv/toys/exograph", "/var/lib/toys/exograph"]
-      wanted_by :multi_user
+
+      isolate do
+        writable :data
+        writable :state
+        network :loopback
+      end
     end
   end
 end
@@ -176,9 +180,14 @@ project :demo do
   end
 
   service :web do
-    caddy_site :web, "example.com", path: "web.caddy" do
+    daemon do
+      exec ["/opt/web/bin/server"]
+      listen :http, port: 4000
+    end
+
+    caddy_site "example.com", path: "web.caddy" do
       encode [:zstd, :gzip]
-      reverse_proxy "127.0.0.1:4000"
+      reverse_proxy :http
     end
   end
 end
@@ -621,8 +630,8 @@ daemon unit_name() do
   listen :http, port: 3000, on: :loopback
 end
 
-caddy_site :web, "web.example.com" do
-  reverse_proxy listener(:http)
+caddy_site "web.example.com" do
+  reverse_proxy :http
 end
 ```
 
@@ -721,13 +730,14 @@ Systemd services and Caddy sites get default collection intent even without glob
 Declarations can carry monitoring intent for a later monitoring service or config generator:
 
 ```elixir
-daemon unit_name() do
-  run exec_start: ["/usr/bin/env", "true"]
+daemon do
+  exec ["/usr/bin/env", "true"]
+  listen :http, port: 4000
   monitor :systemd, expect: [state: :active], severity: :critical
 end
 
-caddy_site :web, "web.example.com" do
-  reverse_proxy "127.0.0.1:4000"
+caddy_site "web.example.com" do
+  reverse_proxy :http
   monitor :http, url: "https://web.example.com", expect: [status: 200]
 end
 ```

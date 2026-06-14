@@ -349,6 +349,15 @@ defmodule HostKit.DSL.Scope do
     prefixed(:user, service_identity_name())
   end
 
+  def service_account do
+    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    Map.get(service.meta, :account)
+  end
+
+  def put_service_account(name) do
+    update_current(:service, &put_in(&1.meta[:account], name))
+  end
+
   def unit_name(suffix \\ ".service") do
     prefixed(:unit, service_identity_name()) <> suffix
   end
@@ -368,15 +377,21 @@ defmodule HostKit.DSL.Scope do
     end
   end
 
-  def default_storage_path(:data), do: Path.join("/var/lib", to_string(service_path_name()))
-  def default_storage_path(:state), do: Path.join("/var/lib", to_string(service_path_name()))
-  def default_storage_path(:config), do: Path.join("/etc", to_string(service_path_name()))
+  def default_storage_path(:data), do: default_root_path(:data, "/var/lib")
+  def default_storage_path(:state), do: default_root_path(:state, "/var/lib")
+  def default_storage_path(:config), do: default_root_path(:config, "/etc")
 
   def default_storage_path(name),
-    do: Path.join(["/var/lib", to_string(service_path_name()), to_string(name)])
+    do:
+      Path.join([
+        default_root(:data, "/var/lib"),
+        to_string(service_path_name()),
+        to_string(name)
+      ])
 
   def env_path(name, opts \\ []) do
-    Keyword.get(opts, :path) || Path.join(["/etc", to_string(service_path_name()), "#{name}.env"])
+    Keyword.get(opts, :path) ||
+      Path.join([default_root(:config, "/etc"), to_string(service_path_name()), "#{name}.env"])
   end
 
   def put_env(name, path) do
@@ -565,6 +580,14 @@ defmodule HostKit.DSL.Scope do
         else: Keyword.put_new(opts, :path, default_storage_path(name))
 
     storage_opts(opts)
+  end
+
+  defp default_root_path(root, fallback) do
+    Path.join(default_root(root, fallback), to_string(service_path_name()))
+  end
+
+  defp default_root(root, fallback) do
+    Conventions.root(project_conventions(), root, fallback)
   end
 
   defp project_conventions do

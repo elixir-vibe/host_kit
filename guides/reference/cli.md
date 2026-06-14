@@ -132,12 +132,12 @@ mix host_kit.runs --host prod --prune --keep 20 infra/config.exs
 Prefer `--host` with a declared host:
 
 ```elixir
-host :prod do
-  hostname "host.example"
-  user "root"
-  sudo true
-  ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
-      retry: [attempts: 3, base_delay: 250, max_delay: 2_000]
+host :prod, at: "host.example" do
+  ssh do
+    user "root"
+    identity_file Path.expand("~/.ssh/id_ed25519")
+    retry attempts: 3, base_delay: 250, max_delay: 2_000
+  end
 end
 ```
 

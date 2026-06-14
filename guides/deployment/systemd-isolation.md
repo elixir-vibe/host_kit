@@ -10,40 +10,39 @@ project :prod do
   prefixes user: "app-", unit: "app-"
 
   service :api do
-    account service_user(), system: true, home: root_path(:state, "home")
+    account system: true
+    storage :data, mode: 0o750
+    storage :state, mode: 0o750
 
-    directory root_path(:data), owner: service_user(), group: service_user(), mode: 0o750
-    directory root_path(:state), owner: service_user(), group: service_user(), mode: 0o750
-
-    env_file root_path(:config, "api.env"), owner: "root", group: service_user() do
+    env :runtime do
       set :mix_env, :prod
       secret :database_url, env: "DATABASE_URL"
     end
 
-    daemon unit_name() do
+    daemon do
       description "API"
       after_target :network_online
       wants :network_online
-
-      service_user service_user()
       working_directory root_path(:source)
-      environment_file root_path(:config, "api.env")
-      exec_start [Path.join(root_path(:source), "bin/server")]
+      env :runtime
+      exec [Path.join(root_path(:source), "bin/server")]
       restart :on_failure
       restart_sec 10
 
-      sandbox :strict_app,
-        resources: [memory_max: "512M", tasks_max: 256],
-        sandbox: [read_write_paths: [root_path(:data), root_path(:state)]]
+      isolate do
+        memory_max "512M"
+        writable :data
+        writable :state
+        network :loopback
+      end
 
-      listen :http, port: 4000, on: :loopback
-      wanted_by :multi_user
+      listen :http, port: 4000
     end
   end
 end
 ```
 
-`strict_app` expands to systemd hardening options such as:
+`isolate do ... end` applies HostKit's default strict app sandbox. It expands to systemd hardening options such as:
 
 - `NoNewPrivileges=`
 - `PrivateTmp=`
@@ -58,6 +57,4 @@ end
 - `LockPersonality=`
 - `SystemCallArchitectures=native`
 
-Use the `sandbox:` option to override sandbox fields and `resources:` to set resource controls. For less strict services, use `sandbox :web_service` or `sandbox :vibe_dev`.
-
-Lower-level systemd directives are still available through `unit`, `service`, `run`, `install`, and specific helpers such as `after_target`, `wants`, `requires`, `read_write_paths`, and `hardening`.
+Use `isolate :profile do ... end` only when selecting a specific isolation profile is the point. Lower-level systemd directives remain available through `unit`, `service`, `run`, `install`, and specific helpers such as `after_target`, `wants`, `requires`, `read_write_paths`, `sandbox`, and `hardening`.

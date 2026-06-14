@@ -27,20 +27,19 @@ mix deps.get
 use HostKit.DSL
 
 project :demo do
-  host :local_vm do
-    hostname "192.0.2.10"
-    user "root"
-    sudo true
-
-    ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
-        silently_accept_hosts: true
+  host :local_vm, at: "192.0.2.10" do
+    ssh do
+      user "root"
+      identity_file Path.expand("~/.ssh/id_ed25519")
+      accept_hosts true
+    end
   end
 
-  service :bootstrap do
+  bootstrap do
     package :ca_certificates
     package :curl
 
-    mise path: "/usr/local/bin/mise", system_data_dir: "/usr/local/share/mise" do
+    mise do
       tool :erlang, "29.0.2"
       tool :elixir, "1.20.1"
     end
@@ -89,18 +88,28 @@ Use `--dry-run` instead of `--confirm` to exercise the apply path without changi
 Control-plane secrets are represented as references:
 
 ```elixir
-ssh password: secret_env("HOSTKIT_SSH_PASSWORD"),
-    silently_accept_hosts: true
+ssh do
+  user "root"
+  password secret_env("HOSTKIT_SSH_PASSWORD")
+  accept_hosts true
+end
 ```
 
 HostKit resolves the environment variable only when opening the SSH connection. Plan artifacts contain `HOSTKIT_SSH_PASSWORD`, not the password value.
 
-Target application env files use the env-file DSL:
+Target application env files use contextual `env` declarations:
 
 ```elixir
-env_file "/etc/app/app.env" do
-  set :mix_env, :prod
-  secret :database_url, env: "DATABASE_URL"
+service :app do
+  env :runtime do
+    set :mix_env, :prod
+    secret :database_url, env: "DATABASE_URL"
+  end
+
+  daemon do
+    env :runtime
+    exec ["/opt/app/bin/server"]
+  end
 end
 ```
 

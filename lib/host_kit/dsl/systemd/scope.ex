@@ -6,7 +6,11 @@ defmodule HostKit.DSL.Systemd.Scope do
   @isolation_key {__MODULE__, :isolation}
 
   def start_service(name, opts) do
-    opts = Keyword.update(opts, :install, [wanted_by: :multi_user], & &1)
+    opts =
+      opts
+      |> Keyword.update(:install, [wanted_by: :multi_user], & &1)
+      |> put_default_service_account()
+
     Process.put(@service_key, HostKit.Systemd.Service.new(name, opts))
   end
 
@@ -182,6 +186,26 @@ defmodule HostKit.DSL.Systemd.Scope do
 
   def apply_hardening(level),
     do: raise(ArgumentError, "unknown systemd hardening preset: #{inspect(level)}")
+
+  defp put_default_service_account(opts) do
+    if HostKit.DSL.Scope.service_active?() do
+      case HostKit.DSL.Scope.service_account() do
+        nil ->
+          opts
+
+        account ->
+          service =
+            opts
+            |> Keyword.get(:service, [])
+            |> Keyword.put_new(:user, account)
+            |> Keyword.put_new(:group, account)
+
+          Keyword.put(opts, :service, service)
+      end
+    else
+      opts
+    end
+  end
 
   defp update_current(fun) do
     cond do

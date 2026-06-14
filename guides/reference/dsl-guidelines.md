@@ -168,6 +168,7 @@ Inside `service :api`, `daemon do ... end` means:
 
 - unit name derives from the service (`api.service` by default),
 - install target defaults to `multi-user.target`,
+- if the service declared `account system: true`, the daemon defaults to that account for `User=` and `Group=`,
 - low-level systemd install directives are omitted from happy-path code.
 
 Use explicit systemd directives only for non-default boot behavior.

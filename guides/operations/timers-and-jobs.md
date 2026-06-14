@@ -7,13 +7,18 @@ use HostKit.DSL
 
 project :prod do
   service :maintenance do
+    account system: true
+    storage :backups, path: "/srv/backups", mode: 0o750
+
     job "backup.service" do
       description "Backup app data"
-      service_user "backup"
+      service_user service_user()
       working_directory "/srv/app"
-      exec_start ["/opt/app/bin/backup"]
-      sandbox :strict_app,
-        sandbox: [read_write_paths: ["/srv/backups"]]
+      exec ["/opt/app/bin/backup"]
+
+      isolate do
+        writable :backups
+      end
     end
 
     schedule "backup.timer" do

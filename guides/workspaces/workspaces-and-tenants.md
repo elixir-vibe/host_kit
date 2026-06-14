@@ -17,12 +17,17 @@ project :dev_host do
     service :preview do
       directory root_path(:data), mode: :private_dir
 
-      daemon unit_name() do
+      daemon do
         service_user service_user()
         working_directory root_path(:data)
-        exec_start ["/usr/bin/env", "mix", "phx.server"]
-        sandbox :vibe_dev
-        listen :http, port: 4000, on: :loopback
+        exec ["/usr/bin/env", "mix", "phx.server"]
+
+        isolate :vibe_dev do
+          writable root_path(:data)
+          network :loopback
+        end
+
+        listen :http, port: 4000
       end
 
       preview :http, port: 4000, domain: "alice-blog.dev.example.com"
@@ -43,6 +48,6 @@ Useful pieces:
 - `agent`/`workspace_agent` declare the agent service boundary.
 - `preview` expands to listener/provider metadata for preview routes.
 - `inside` and `inside_monitor` describe checks intended to run inside the sandbox.
-- Ordinary HostKit DSL still works inside a workspace: `directory`, `daemon`, `sandbox`, `listen`, `monitor`, and provider resources.
+- Ordinary HostKit DSL still works inside a workspace: `directory`, `daemon`, `isolate`, `listen`, `monitor`, and provider resources.
 
 Workspaces are intentionally inspectable. They are not a separate runtime system hidden behind opaque state; they compile to HostKit services/resources plus metadata.

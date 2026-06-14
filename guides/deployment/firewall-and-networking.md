@@ -14,13 +14,14 @@ project :prod do
   end
 
   service :api do
-    daemon "api.service" do
-      exec_start ["/opt/api/bin/server"]
+    daemon do
+      exec ["/opt/api/bin/server"]
 
-      listen :http, port: 4000, on: :loopback
+      listen :http, port: 4000
 
-      network_policy deny: :all,
-                     allow: [:loopback]
+      isolate do
+        network :loopback
+      end
     end
   end
 end
@@ -33,7 +34,7 @@ Firewall policy renders to nftables. `network_policy` compiles into systemd serv
 Firewall policy can also live inside a host declaration:
 
 ```elixir
-host :prod, hostname: "app.example.com" do
+host :prod, at: "app.example.com" do
   firewall do
     allow tcp: 22, from: :any
     allow tcp: [80, 443], from: :any
@@ -51,13 +52,13 @@ use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
 project :prod do
   service :api do
-    daemon "api.service" do
-      exec_start ["/opt/api/bin/server"]
-      listen :http, port: 4000, on: :loopback
+    daemon do
+      exec ["/opt/api/bin/server"]
+      listen :http, port: 4000
     end
 
-    caddy_site :api, "api.example.com" do
-      reverse_proxy listener(:http)
+    caddy_site "api.example.com" do
+      reverse_proxy :http
     end
   end
 end

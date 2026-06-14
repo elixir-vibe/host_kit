@@ -10,20 +10,19 @@ The control machine runs HostKit. The target machine only needs SSH and a suppor
 use HostKit.DSL
 
 project :prod do
-  host :server do
-    hostname "203.0.113.10"
-    user "root"
-    sudo true
-
-    ssh password: secret_env("HOSTKIT_SSH_PASSWORD"),
-        silently_accept_hosts: true
+  host :server, at: "203.0.113.10" do
+    ssh do
+      user "root"
+      password secret_env("HOSTKIT_SSH_PASSWORD")
+      accept_hosts true
+    end
   end
 
-  service :bootstrap do
+  bootstrap do
     package :ca_certificates
     package :curl
 
-    mise path: "/usr/local/bin/mise", system_data_dir: "/usr/local/share/mise" do
+    mise do
       tool :erlang, "29.0.2"
       tool :elixir, "1.20.1"
     end
@@ -34,8 +33,11 @@ end
 Identity-file auth is preferred when available:
 
 ```elixir
-ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
-    silently_accept_hosts: true
+ssh do
+  user "root"
+  identity_file Path.expand("~/.ssh/id_ed25519")
+  accept_hosts true
+end
 ```
 
 ## Package resolution and locks
