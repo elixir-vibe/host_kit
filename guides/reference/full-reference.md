@@ -110,11 +110,12 @@ Run records are intentionally compact: they identify the run, project, direction
 The Elixir app recipe can emit lifecycle commands for common BEAM deployment operations. Ecto migrations are represented as normal commands with explicit down commands:
 
 ```elixir
-elixir_app(:shop,
-  source: [github: "acme/shop", path: ".", ref: "main"],
-  phoenix: [host: "shop.example.com", secret_key_base: secret_env("SECRET_KEY_BASE")],
-  ecto: [release: "Shop.Release"]
-)
+elixir_app :shop do
+  source github: "acme/shop", path: ".", ref: "main"
+  phoenix host: "shop.example.com", secret_key_base: secret_env("SECRET_KEY_BASE")
+
+  ecto release: "Shop.Release"
+end
 ```
 
 This emits a `:before_start` migration command that runs through the built release and a matching down command that calls `Shop.Release.rollback()`.
@@ -122,11 +123,15 @@ This emits a `:before_start` migration command that runs through the built relea
 For multiple repos, HostKit emits one ordered command per repo. Down plans reverse that order:
 
 ```elixir
-elixir_app(:shop,
-  source: [github: "acme/shop", path: ".", ref: "main"],
-  phoenix: [host: "shop.example.com", secret_key_base: secret_env("SECRET_KEY_BASE")],
-  ecto: [release: "Shop.Release", repos: ["Shop.Repo", "Shop.AnalyticsRepo"]]
-)
+elixir_app :shop do
+  source github: "acme/shop", path: ".", ref: "main"
+  phoenix host: "shop.example.com", secret_key_base: secret_env("SECRET_KEY_BASE")
+
+  ecto release: "Shop.Release" do
+    repo "Shop.Repo"
+    repo "Shop.AnalyticsRepo"
+  end
+end
 ```
 
 The default expressions are:

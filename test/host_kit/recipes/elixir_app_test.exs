@@ -105,6 +105,49 @@ defmodule HostKit.ElixirAppRecipeTest do
     assert Enum.any?(plan.resources, &match?(%HostKit.Caddy.Site{host: "hello.example.com"}, &1))
   end
 
+  test "elixir_app block DSL expands to the same recipe options" do
+    defmodule ElixirAppRecipeBlockProject do
+      use HostKit.DSL,
+        providers: [HostKit.Providers.Caddy, HostKit.Providers.Elixir]
+
+      def project do
+        project :demo do
+          elixir_app :shop do
+            source(github: "elixir-vibe/host_kit", path: "examples/hello_phoenix", ref: "main")
+            phoenix(host: "shop.example.com", port: 4001, secret_key_base: "secret")
+
+            ecto release: "Shop.Release" do
+              repo("Shop.Repo")
+              repo("Shop.AnalyticsRepo")
+            end
+          end
+        end
+      end
+    end
+
+    project = ElixirAppRecipeBlockProject.project()
+    resources = HostKit.Project.resources(project)
+
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Command{name: "shop_ecto_migrate_repo", phase: :before_start} ->
+               true
+
+             _resource ->
+               false
+           end)
+
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Command{
+               name: "shop_ecto_migrate_analytics_repo",
+               phase: :before_start
+             } ->
+               true
+
+             _resource ->
+               false
+           end)
+  end
+
   test "elixir_app recipe emits reversible Ecto lifecycle command" do
     defmodule ElixirAppRecipeEctoProject do
       use HostKit.DSL,
