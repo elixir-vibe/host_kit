@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## v0.1.0-beta.2
+## v0.1.0-beta.2 - 2026-06-14
 
 - Added generic `instance` DSL for lifecycle-managed compute boundaries with backend selection, nested host endpoints, nested services/resources, and target-scoped content planning.
 - Added Incus instance backend support for launch/start/delete, proxy port exposure, readiness checks, and demo SSH bootstrap.
