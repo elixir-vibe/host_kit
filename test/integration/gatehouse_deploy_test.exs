@@ -27,7 +27,9 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     account_name = "hk-gh-#{rem(unique, 100_000)}"
     mode = System.get_env("HOSTKIT_GATEHOUSE_DEPLOY_MODE", "source")
     runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
-    source_repo = if mode == "source", do: create_source_repo!(host, unique), else: nil
+
+    source_repo =
+      if mode == "source", do: create_unpublished_gatehouse_fixture_repo!(host, unique), else: nil
 
     cleanup.(root)
 
@@ -190,7 +192,12 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     end
   end
 
-  defp create_source_repo!(host, unique) do
+  # Temporary fixture until Gatehouse's sibling dependencies (`safe_rpc` and `systemdkit`)
+  # are published as Hex packages. End-user deployments should point Gatehouse at a
+  # normal Git source and let Mix resolve Hex dependencies; this helper only builds a
+  # target-readable Git repository for integration coverage while the dependencies are
+  # still local sibling projects.
+  defp create_unpublished_gatehouse_fixture_repo!(host, unique) do
     workspace = Path.expand("..", File.cwd!())
     archive = Path.join(System.tmp_dir!(), "hostkit-gatehouse-source-#{unique}.tgz")
     remote_archive = "/tmp/hostkit-gatehouse-source-#{unique}.tgz"
