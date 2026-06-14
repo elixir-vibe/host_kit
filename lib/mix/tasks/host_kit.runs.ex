@@ -56,7 +56,7 @@ defmodule Mix.Tasks.HostKit.Runs do
 
   defp format_records(records, opts) do
     case Keyword.get(opts, :format, "text") do
-      "json" -> Jason.encode!(records, pretty: true)
+      "json" -> records |> Enum.map(&JSONCodec.dump/1) |> Jason.encode!(pretty: true)
       "inspect" -> inspect(records, pretty: true, limit: :infinity)
       "text" -> Enum.map_join(records, "\n", &format_record/1)
     end
@@ -64,11 +64,11 @@ defmodule Mix.Tasks.HostKit.Runs do
 
   defp format_record(record) do
     [
-      Map.get(record, "id"),
-      Map.get(record, "direction"),
-      Map.get(record, "project"),
-      Map.get(record, "applied_at"),
-      "changes=#{length(Map.get(record, "changes", []))}"
+      record.id,
+      record.direction,
+      record.project,
+      record.applied_at,
+      "changes=#{length(record.changes)}"
     ]
     |> Enum.reject(&is_nil/1)
     |> Enum.join(" ")

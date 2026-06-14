@@ -1,11 +1,50 @@
 defmodule HostKit.RunRecord do
   @moduledoc "Minimal host-side record of an applied HostKit plan."
 
+  use JSONCodec, fast_path: :json
+
   alias HostKit.{Conventions, Plan, Resource, Runner}
 
   @version 1
 
-  @type t :: map()
+  defmodule Change do
+    @moduledoc "One compact change entry in a HostKit run record."
+
+    use JSONCodec, fast_path: :json
+
+    @type t :: %__MODULE__{
+            resource_id: term(),
+            action: String.t(),
+            status: String.t(),
+            reason: term()
+          }
+
+    defstruct resource_id: nil,
+              action: nil,
+              status: nil,
+              reason: nil
+  end
+
+  @type t :: %__MODULE__{
+          version: pos_integer(),
+          id: String.t(),
+          project: String.t(),
+          direction: String.t(),
+          applied_at: String.t(),
+          changes: [Change.t()],
+          artifacts: %{String.t() => String.t()}
+        }
+
+  defstruct version: @version,
+            id: nil,
+            project: nil,
+            direction: nil,
+            applied_at: nil,
+            changes: [],
+            artifacts: %{}
+
+  codec(:version, transform: :validate_version!)
+  codec(:changes, type: {:list, Change})
 
   @spec write(Plan.t(), [HostKit.Apply.result()], keyword()) :: :ok | {:error, term()}
   def write(%Plan{} = plan, results, opts) do
@@ -16,7 +55,7 @@ defmodule HostKit.RunRecord do
       with {:ok, artifacts} <- write_artifacts(plan, id, opts),
            :ok <- Runner.mkdir_p(runner(opts), Path.dirname(path), opts) do
         content =
-          Jason.encode_to_iodata!(record(plan, results, id, opts, artifacts), pretty: true)
+          record(plan, results, id, artifacts) |> dump() |> Jason.encode_to_iodata!(pretty: true)
 
         Runner.write_file(runner(opts), path, content, opts)
       end
@@ -48,7 +87,7 @@ defmodule HostKit.RunRecord do
     |> run_path(opts)
     |> read_text(opts)
     |> case do
-      {:ok, content} -> Jason.decode(content)
+      {:ok, content} -> decode(content)
       {:error, reason} -> {:error, reason}
     end
   end
@@ -63,6 +102,16 @@ defmodule HostKit.RunRecord do
     end
   end
 
+  def validate_version!(@version), do: @version
+
+  def validate_version!(version) do
+    raise JSONCodec.Error,
+      path: [:version],
+      expected: @version,
+      got: version,
+      reason: :unsupported_run_record_version
+  end
+
   defp load_records(files, opts) do
     Enum.flat_map(files, fn path ->
       case load(Path.basename(path), opts) do
@@ -72,7 +121,7 @@ defmodule HostKit.RunRecord do
     end)
   end
 
-  defp sort_records(records), do: Enum.sort_by(records, &Map.get(&1, "applied_at", ""), :desc)
+  defp sort_records(records), do: Enum.sort_by(records, &(&1.applied_at || ""), :desc)
 
   defp list_files(opts) do
     root = runs_root(nil, opts)
@@ -117,9 +166,8 @@ defmodule HostKit.RunRecord do
     end
   end
 
-  defp record(%Plan{} = plan, results, id, _opts, artifacts) do
-    %{
-      version: @version,
+  defp record(%Plan{} = plan, results, id, artifacts) do
+    %__MODULE__{
       id: id,
       project: project_name(plan.project),
       direction: plan.opts |> Keyword.get(:direction, :up) |> to_string(),
@@ -160,7 +208,7 @@ defmodule HostKit.RunRecord do
   end
 
   defp change_record(%{change: change, status: status}) do
-    %{
+    %Change{
       resource_id: Resource.dump(change.resource_id),
       action: to_string(change.action),
       status: to_string(status),

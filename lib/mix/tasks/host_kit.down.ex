@@ -77,12 +77,12 @@ defmodule Mix.Tasks.HostKit.Down do
     run_opts = put_present(target_opts, :hostkit_runs_root, Keyword.get(opts, :runs_root))
 
     case HostKit.RunRecord.latest(run_opts) do
-      {:ok, %{"artifacts" => %{"up_plan" => path}}} when is_binary(path) ->
+      {:ok, %{artifacts: %{"up_plan" => path}}} when is_binary(path) ->
         path
 
       {:ok, record} ->
         Mix.raise(
-          "latest HostKit run #{inspect(record["id"])} does not reference an up plan artifact"
+          "latest HostKit run #{inspect(record.id)} does not reference an up plan artifact"
         )
 
       {:error, reason} ->
