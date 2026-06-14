@@ -115,6 +115,7 @@ Common options:
 - `--verbose` — include artifact and backup paths in text output.
 - `--latest` — show only the latest run.
 - `--id RUN_ID` — show one run by id.
+- `--prune --keep N` — remove older run records plus copied artifact/backup payload directories, keeping the newest `N` runs.
 
 Examples:
 
@@ -123,6 +124,7 @@ mix host_kit.apply --host prod --track --plan up.plan.json --confirm infra/confi
 mix host_kit.runs --host prod infra/config.exs
 mix host_kit.runs --host prod --verbose infra/config.exs
 mix host_kit.runs --host prod --latest --verbose infra/config.exs
+mix host_kit.runs --host prod --prune --keep 20 infra/config.exs
 ```
 
 ## Target selection

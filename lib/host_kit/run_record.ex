@@ -78,6 +78,21 @@ defmodule HostKit.RunRecord do
     end
   end
 
+  @spec prune(keyword(), keyword()) :: {:ok, [t()]} | {:error, term()}
+  def prune(run_opts \\ [], opts) do
+    keep = Keyword.get(opts, :keep, 20)
+
+    with {:ok, records} <- list(run_opts) do
+      {kept, pruned} = Enum.split(records, keep)
+      _kept = kept
+
+      case prune_records(pruned, run_opts) do
+        :ok -> {:ok, pruned}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
   @spec latest(keyword()) :: {:ok, t()} | {:error, term()}
   def latest(opts \\ []) do
     case list(opts) do
@@ -153,6 +168,61 @@ defmodule HostKit.RunRecord do
   end
 
   defp sort_records(records), do: Enum.sort_by(records, &(&1.applied_at || ""), :desc)
+
+  defp prune_records([], _opts), do: :ok
+
+  defp prune_records([record | rest], opts) do
+    with :ok <- prune_record(record, opts) do
+      prune_records(rest, opts)
+    end
+  end
+
+  defp prune_record(%__MODULE__{} = record, opts) do
+    paths = [run_path(record.id, opts) | prune_paths(record)]
+
+    Enum.reduce_while(paths, :ok, fn path, :ok ->
+      case rm_rf(path, opts) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp prune_paths(record) do
+    []
+    |> Kernel.++(payload_dirs(record.artifacts || %{}))
+    |> Kernel.++(payload_dirs(record.backups || %{}))
+    |> Enum.uniq()
+  end
+
+  defp payload_dirs(paths) do
+    Enum.map(paths, fn {_key, path} -> Path.dirname(path) end)
+  end
+
+  defp rm_rf(path, opts) do
+    if runner(opts) == HostKit.Runner.Local and not Keyword.get(opts, :sudo, false) do
+      path
+      |> File.rm_rf()
+      |> case do
+        {:ok, _files} -> :ok
+        {:error, reason, file} -> {:error, {:rm_rf_failed, file, reason}}
+      end
+    else
+      rm_rf_with_runner(path, opts)
+    end
+  end
+
+  defp rm_rf_with_runner(path, opts) do
+    {command, args} =
+      if Keyword.get(opts, :sudo, false),
+        do: {"sudo", ["rm", "-rf", path]},
+        else: {"rm", ["-rf", path]}
+
+    case Runner.cmd(runner(opts), command, args, Keyword.merge(opts, stderr_to_stdout: true)) do
+      {_output, 0} -> :ok
+      {output, status} -> {:error, {:command_failed, command, args, status, output}}
+    end
+  end
 
   defp list_files(opts) do
     root = runs_root(nil, opts)

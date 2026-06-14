@@ -92,7 +92,7 @@ defmodule Mix.Tasks.HostKit.Apply do
         end
 
       artifact_path ->
-        target_opts = expand_target_opts(target_opts)
+        target_opts = Options.expand_target_opts(target_opts)
 
         with {:ok, artifact} <- HostKit.Plan.Artifact.load_artifact(artifact_path),
              :ok <- validate_artifact_target(artifact, target_opts),
@@ -155,13 +155,6 @@ defmodule Mix.Tasks.HostKit.Apply do
 
   defp validate_package_manager(_target, _target_opts), do: :ok
 
-  defp expand_target_opts(opts) do
-    case Keyword.pop(opts, :target) do
-      {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
-      {nil, opts} -> opts
-    end
-  end
-
   defp start_reporter(opts) do
     spawn(fn ->
       reporter_loop(%{
@@ -215,7 +208,7 @@ defmodule Mix.Tasks.HostKit.Apply do
 
   defp apply_opts(opts, target_opts) do
     target_opts
-    |> expand_target_opts()
+    |> Options.expand_target_opts()
     |> Keyword.merge(
       dry_run: Keyword.get(opts, :dry_run, false),
       confirm: Keyword.get(opts, :confirm, false),

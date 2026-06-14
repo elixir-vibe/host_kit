@@ -31,18 +31,39 @@ defmodule Mix.Tasks.HostKit.Runs do
           format: :string,
           verbose: :boolean,
           latest: :boolean,
-          id: :string
+          id: :string,
+          prune: :boolean,
+          keep: :integer
         ]
       )
 
     project = load_project(opts, positional)
 
     Options.with_target_opts(opts, project, fn target_opts ->
-      case load_records(opts, run_opts(opts, target_opts)) do
-        {:ok, records} -> IO.puts(format_records(records, opts))
-        {:error, reason} -> Mix.raise("could not list HostKit runs: #{inspect(reason)}")
-      end
+      opts
+      |> run_opts(target_opts)
+      |> run_command(opts)
     end)
+  end
+
+  defp run_command(run_opts, opts) do
+    if Keyword.get(opts, :prune, false),
+      do: prune_runs(run_opts, opts),
+      else: list_runs(run_opts, opts)
+  end
+
+  defp prune_runs(run_opts, opts) do
+    case HostKit.RunRecord.prune(run_opts, keep: Keyword.get(opts, :keep, 20)) do
+      {:ok, pruned} -> IO.puts("pruned #{length(pruned)} HostKit run(s)")
+      {:error, reason} -> Mix.raise("could not prune HostKit runs: #{inspect(reason)}")
+    end
+  end
+
+  defp list_runs(run_opts, opts) do
+    case load_records(opts, run_opts) do
+      {:ok, records} -> IO.puts(format_records(records, opts))
+      {:error, reason} -> Mix.raise("could not list HostKit runs: #{inspect(reason)}")
+    end
   end
 
   defp load_project(opts, positional) do
@@ -54,15 +75,8 @@ defmodule Mix.Tasks.HostKit.Runs do
 
   defp run_opts(opts, target_opts) do
     target_opts
-    |> expand_target_opts()
+    |> Options.expand_target_opts()
     |> put_present(:hostkit_runs_root, Keyword.get(opts, :runs_root))
-  end
-
-  defp expand_target_opts(opts) do
-    case Keyword.pop(opts, :target) do
-      {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
-      {nil, opts} -> opts
-    end
   end
 
   defp load_records(opts, run_opts) do

@@ -166,6 +166,47 @@ defmodule HostKit.RunRecordTest do
     assert File.read!(env_path) == "TOKEN=\"old\"\n"
   end
 
+  test "prune removes old run records and payload directories" do
+    root =
+      Path.join(System.tmp_dir!(), "hostkit-runs-prune-#{System.unique_integer([:positive])}")
+
+    runs_root = Path.join(root, "runs")
+    File.mkdir_p!(runs_root)
+    on_exit(fn -> File.rm_rf(root) end)
+
+    old_artifact_dir = Path.join([runs_root, "artifacts", "old"])
+    old_backup_dir = Path.join([root, "backups", "old"])
+    File.mkdir_p!(old_artifact_dir)
+    File.mkdir_p!(old_backup_dir)
+    File.write!(Path.join(old_artifact_dir, "up.plan.json"), "{}")
+    File.write!(Path.join(old_backup_dir, "file.bak"), "old")
+
+    old = %HostKit.RunRecord{
+      id: "20200101-000000-demo-up",
+      project: "demo",
+      direction: "up",
+      applied_at: "2020-01-01T00:00:00Z",
+      artifacts: %{"up_plan" => Path.join(old_artifact_dir, "up.plan.json")},
+      backups: %{"{:file, \"/tmp/demo\"}" => Path.join(old_backup_dir, "file.bak")}
+    }
+
+    new = %HostKit.RunRecord{
+      id: "20210101-000000-demo-up",
+      project: "demo",
+      direction: "up",
+      applied_at: "2021-01-01T00:00:00Z"
+    }
+
+    File.write!(Path.join(runs_root, old.id <> ".json"), Jason.encode!(JSONCodec.dump(old)))
+    File.write!(Path.join(runs_root, new.id <> ".json"), Jason.encode!(JSONCodec.dump(new)))
+
+    assert {:ok, [^old]} = HostKit.RunRecord.prune([hostkit_runs_root: runs_root], keep: 1)
+    refute File.exists?(Path.join(runs_root, old.id <> ".json"))
+    refute File.exists?(old_artifact_dir)
+    refute File.exists?(old_backup_dir)
+    assert File.exists?(Path.join(runs_root, new.id <> ".json"))
+  end
+
   test "tracked apply records plan artifact references" do
     root =
       Path.join(System.tmp_dir!(), "hostkit-runs-artifacts-#{System.unique_integer([:positive])}")

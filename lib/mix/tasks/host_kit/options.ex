@@ -14,6 +14,13 @@ defmodule Mix.Tasks.HostKit.Options do
     end
   end
 
+  def expand_target_opts(opts) do
+    case Keyword.pop(opts, :target) do
+      {%HostKit.Target{} = target, opts} -> HostKit.Target.opts(target, opts)
+      {nil, opts} -> opts
+    end
+  end
+
   def with_target_opts(opts, project \\ nil, fun) do
     cond do
       host_name = Keyword.get(opts, :host) ->

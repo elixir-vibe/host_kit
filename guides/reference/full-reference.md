@@ -121,6 +121,8 @@ Tracked applies also write backup payloads for previous file-like state when tha
 
 Source updates are intentionally not inferred as reversible by default: a previous Git remote/ref may no longer be reachable. Treat source rollback as an explicit lifecycle operation or pair it with a backup/source-bundle strategy.
 
+Run retention is explicit. Use `mix host_kit.runs --prune --keep N` to remove older run records plus their copied plan artifact and backup payload directories.
+
 ## Elixir app lifecycle helpers
 
 The Elixir app recipe can emit lifecycle commands for common BEAM deployment operations. Ecto migrations are represented as normal commands with explicit down commands:
