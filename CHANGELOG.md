@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.1.0-beta.2
+
 - Added generic `instance` DSL for lifecycle-managed compute boundaries with backend selection, nested host endpoints, nested services/resources, and target-scoped content planning.
 - Added Incus instance backend support for launch/start/delete, proxy port exposure, readiness checks, and demo SSH bootstrap.
 - Added backend-neutral `mix host_kit.instance status|ensure|destroy INSTANCE [config.exs]` for declared instance lifecycle.
