@@ -3,10 +3,17 @@
 # Deploy a Phoenix app with HostKit
 
 ```elixir
+host_kit_dep =
+  if File.exists?(Path.join(File.cwd!(), "mix.exs")) do
+    {:host_kit, path: File.cwd!()}
+  else
+    {:host_kit, github: "elixir-vibe/host_kit"}
+  end
+
 Mix.install([
   {:kino, "~> 0.19"},
   {:req, "~> 0.5"},
-  {:host_kit, "== 0.1.0-beta.1"}
+  host_kit_dep
 ])
 ```
 
@@ -162,11 +169,8 @@ use HK,
 
 project =
   project :deploy_phoenix_app do
-    host :target do
-      hostname target.host
-      user target.user
-      sudo target.sudo
-      ssh target.ssh
+    host :target, at: target.host do
+      ssh Keyword.merge(target.ssh, user: target.user, sudo: target.sudo)
     end
 
     provider :caddy, Caddy do
@@ -185,11 +189,10 @@ project =
         group: "root",
         mode: 0o644
 
-      daemon caddy_service_name do
+      daemon unit: caddy_service_name do
         description "HostKit Phoenix demo Caddy"
-        exec_start ["/usr/bin/caddy", "run", "--config", caddy_config_path]
+        exec ["/usr/bin/caddy", "run", "--config", caddy_config_path]
         restart :on_failure
-        wanted_by :multi_user
       end
 
       ready :phoenix_caddy do

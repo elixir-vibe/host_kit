@@ -193,6 +193,40 @@ The profile name is an internal preset selected by the DSL default. Advanced use
 
 Profile names must describe security intent, not implementation mechanics. Avoid vague names in first-touch docs. `:strict_app` currently means the default strict service sandbox: no new privileges, protected system/home/kernel surfaces, restricted address families, explicit writable paths, and resource controls.
 
+## Escape-hatch and deprecation policy
+
+HostKit keeps low-level directives when they expose a real Linux/systemd/provider primitive that advanced users may need. Those directives are **escape hatches**, not canonical application DSL.
+
+### Stays as escape hatch
+
+These stay available and documented in the directive inventory/reference because they map directly to backend concepts:
+
+- `systemd_service`, `systemd_timer`
+- `unit`, `service`, `timer`, `install`
+- `environment_file`, `exec_start`, `exec_stop`, `wanted_by`, `read_write_paths`
+- `sandbox` for direct profile/options application
+- explicit `env_file path do ... end`
+- explicit `listener(:name)` when a string upstream is required
+- explicit named Caddy sites: `caddy_site :name, "host" do ... end`
+
+### Not canonical in user-facing docs
+
+These should not appear in README/getting-started/tutorial happy paths unless the section is explicitly about the low-level primitive:
+
+- `hostname` inside `host`; use `host :name, at: ...`
+- root SSH plus `sudo true`; root does not need sudo
+- `service :bootstrap`; use `bootstrap do`
+- paired `env_file` and `environment_file`; use contextual `env`
+- raw `exec_start`; use `exec`
+- raw `wanted_by :multi_user`; `daemon do` defaults it
+- raw `read_write_paths`; use `writable :storage`
+- `sandbox :strict_app`; use `isolate do`
+- `reverse_proxy listener(:http)`; use `reverse_proxy :http`
+
+### Deprecation threshold
+
+Do not deprecate an escape hatch just because it is low-level. Deprecate only when there is a strictly better directive that preserves the same power and the old spelling creates ambiguity or unsafe behavior. Deprecations should include migration examples and should not break existing plan/apply projects silently.
+
 ## README standard
 
 The README example should showcase killer features without plumbing:

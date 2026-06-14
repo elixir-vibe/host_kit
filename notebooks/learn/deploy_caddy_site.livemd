@@ -3,10 +3,17 @@
 # Deploy a Caddy static site with HostKit
 
 ```elixir
+host_kit_dep =
+  if File.exists?(Path.join(File.cwd!(), "mix.exs")) do
+    {:host_kit, path: File.cwd!()}
+  else
+    {:host_kit, github: "elixir-vibe/host_kit"}
+  end
+
 Mix.install([
   {:kino, "~> 0.19"},
   {:req, "~> 0.5"},
-  {:host_kit, "== 0.1.0-beta.1"}
+  host_kit_dep
 ])
 ```
 
@@ -99,11 +106,8 @@ use HK.DSL, providers: [Caddy]
 
 project =
   project :deploy_caddy_site do
-    host :target do
-      hostname target.host
-      user target.user
-      sudo target.sudo
-      ssh target.ssh
+    host :target, at: target.host do
+      ssh Keyword.merge(target.ssh, user: target.user, sudo: target.sudo)
     end
 
     provider :caddy, Caddy do
@@ -130,14 +134,13 @@ project =
         group: "root",
         mode: 0o644
 
-      daemon caddy_service_name do
+      daemon unit: caddy_service_name do
         description "HostKit demo Caddy site"
-        exec_start ["/usr/bin/caddy", "run", "--config", caddy_config_path]
+        exec ["/usr/bin/caddy", "run", "--config", caddy_config_path]
         restart :on_failure
-        wanted_by :multi_user
       end
 
-      caddy_site :hello, site_address do
+      caddy_site site_address do
         root site_root
         file_server()
       end
