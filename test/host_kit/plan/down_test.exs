@@ -84,6 +84,53 @@ defmodule HostKit.Plan.DownTest do
     refute File.exists?(path)
   end
 
+  test "down plan uses explicit command down steps" do
+    migrate =
+      HostKit.Resources.Command.new(:migrate,
+        exec: {"bin/app", ["eval", "App.Release.migrate()"]},
+        cwd: "/opt/app",
+        env: %{"MIX_ENV" => "prod"},
+        down: {"bin/app", ["eval", "App.Release.rollback()"]}
+      )
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :rollback_test},
+      changes: [%Change{action: :create, resource_id: {:command, :migrate}, after: migrate}]
+    }
+
+    assert {:ok, down_plan} = HostKit.down(plan)
+
+    assert [
+             %Change{
+               action: :create,
+               resource_id: {:command, "migrate_down"},
+               after: %HostKit.Resources.Command{
+                 name: "migrate_down",
+                 exec: {"bin/app", ["eval", "App.Release.rollback()"]},
+                 cwd: "/opt/app",
+                 env: %{"MIX_ENV" => "prod"}
+               }
+             }
+           ] = down_plan.changes
+  end
+
+  test "down plan treats command noop rollback as explicit" do
+    command =
+      HostKit.Resources.Command.new(:warm_cache,
+        exec: {"bin/app", ["eval", "App.Cache.warm()"]},
+        down: :noop
+      )
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :rollback_test},
+      changes: [%Change{action: :create, resource_id: {:command, :warm_cache}, after: command}]
+    }
+
+    assert {:ok, down_plan} = HostKit.down(plan)
+    assert down_plan.changes == []
+    assert down_plan.diagnostics.warnings == []
+  end
+
   test "down plan records warnings for irreversible resources" do
     package = %HostKit.Resources.Package{name: :git}
 

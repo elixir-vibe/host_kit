@@ -1,5 +1,6 @@
 defmodule HostKit.Integration.GatehouseDeployTest do
   use ExUnit.Case, async: false
+  require HostKit.IntegrationCase
 
   @moduletag :integration
   @tag timeout: 1_200_000
@@ -85,13 +86,16 @@ defmodule HostKit.Integration.GatehouseDeployTest do
 
     assert {:ok, plan} = HostKit.plan(project, target_opts)
 
-    assert {:ok, down_plan} =
-             HostKit.down(plan,
-               only: [
-                 {:proxy, :web},
-                 {:systemd_service, service_unit}
-               ]
-             )
+    runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
+
+    down_plan =
+      HostKit.IntegrationCase.on_exit_rollback(plan, target_opts,
+        only: [
+          {:proxy, :web},
+          {:systemd_service, service_unit}
+        ],
+        before_rollback: fn -> sudo_cmd(host, runner, ["systemctl", "stop", service_unit]) end
+      )
 
     assert Enum.map(down_plan.changes, & &1.resource_id) == [
              {:systemd_service, service_unit},
@@ -101,7 +105,6 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     assert {:ok, _dry_run} = HostKit.apply(down_plan, Keyword.merge(target_opts, dry_run: true))
     assert {:ok, _results} = HostKit.apply(plan, Keyword.merge(target_opts, confirm: true))
 
-    runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
     assert {:ok, "active\n"} = wait_until_active(host, runner, service_unit, 120)
   end
 

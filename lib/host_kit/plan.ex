@@ -4,7 +4,7 @@ defmodule HostKit.Plan do
   alias HostKit.Addr
   alias HostKit.{Change, Diagnostic, Diagnostics, Project, Resource}
   alias HostKit.Package.{Manager, Resolver}
-  alias HostKit.Resources.{Capability, Directory, EnvFile, File, Package, Source}
+  alias HostKit.Resources.{Capability, Command, Directory, EnvFile, File, Package, Source}
 
   @type t :: %__MODULE__{
           project: Project.t(),
@@ -63,6 +63,7 @@ defmodule HostKit.Plan do
       |> Enum.reduce({[], []}, fn change, {changes, warnings} ->
         case down_change(change) do
           {:ok, down} -> {[down | changes], warnings}
+          {:skip, nil} -> {changes, warnings}
           {:skip, warning} -> {changes, [warning | warnings]}
         end
       end)
@@ -106,6 +107,27 @@ defmodule HostKit.Plan do
        reason: {:down, change.reason}
      }}
   end
+
+  defp down_change(
+         %Change{action: :create, after: %Command{down: %Command{} = down_command}} = change
+       ) do
+    {:ok,
+     %Change{
+       action: :create,
+       resource_id: Resource.id(down_command),
+       before: nil,
+       after: down_command,
+       reason: {:down, change.resource_id}
+     }}
+  end
+
+  defp down_change(%Change{action: :create, after: %Command{down: :noop}}), do: {:skip, nil}
+
+  defp down_change(%Change{action: :create, after: %Command{down: :irreversible}} = change),
+    do: {:skip, irreversible(change, :explicitly_irreversible)}
+
+  defp down_change(%Change{action: :create, after: %Command{down: nil}} = change),
+    do: {:skip, irreversible(change, :missing_down_command)}
 
   defp down_change(%Change{action: :create, after: resource} = change) do
     if delete_supported?(resource) do

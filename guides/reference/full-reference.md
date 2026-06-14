@@ -71,6 +71,21 @@ Partial rollback uses the same plan model:
   HostKit.down(plan, only: [{:file, "/etc/gatehouse/config.exs"}])
 ```
 
+Command-like operations need semantic down steps because HostKit cannot infer the opposite of an arbitrary command:
+
+```elixir
+command :migrate,
+  exec: {"bin/app", ["eval", "App.Release.migrate()"]},
+  phase: :before_start,
+  down: {"bin/app", ["eval", "App.Release.rollback()"]}
+
+command :warm_cache,
+  exec: {"bin/app", ["eval", "App.Cache.warm()"]},
+  down: :noop
+```
+
+The down command is emitted as an ordinary command change in the down plan. `down: :irreversible` records an explicit warning and omits the command from the down plan.
+
 CLI usage mirrors this:
 
 ```sh
@@ -78,6 +93,20 @@ mix host_kit.plan infra/config.exs --host prod --out up.plan.json
 mix host_kit.down up.plan.json --out down.plan.json
 mix host_kit.apply --plan down.plan.json --confirm
 ```
+
+## Elixir app lifecycle helpers
+
+The Elixir app recipe can emit lifecycle commands for common BEAM deployment operations. Ecto migrations are represented as normal commands with explicit down commands:
+
+```elixir
+elixir_app(:shop,
+  source: [github: "acme/shop", path: ".", ref: "main"],
+  phoenix: [host: "shop.example.com", secret_key_base: secret_env("SECRET_KEY_BASE")],
+  ecto: [release: "Shop.Release"]
+)
+```
+
+This emits a `:before_start` migration command that runs through the built release and a matching down command that calls `Shop.Release.rollback()`.
 
 ## Providers
 

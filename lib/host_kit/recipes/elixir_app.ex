@@ -86,6 +86,16 @@ defmodule HostKit.Recipes.ElixirApp do
         timeout: 300_000
       )
 
+      if app.ecto do
+        command(app.commands.ecto.name,
+          exec: HostKit.Recipes.ElixirApp.release_eval_exec(app, app.ecto.migrate),
+          down: [exec: HostKit.Recipes.ElixirApp.release_eval_exec(app, app.ecto.rollback)],
+          phase: :before_start,
+          depends_on: [{:command, app.commands.release.name}],
+          timeout: app.ecto.timeout
+        )
+      end
+
       endpoint(:http,
         port: app.phoenix.port,
         protocol: :http,
@@ -125,6 +135,7 @@ defmodule HostKit.Recipes.ElixirApp do
     runtime = Keyword.get(opts, :runtime, [])
     release = Keyword.get(opts, :release, [])
     caddy = Keyword.get(opts, :caddy, [])
+    ecto = Keyword.get(opts, :ecto)
 
     app = %{
       name: path_name,
@@ -146,7 +157,8 @@ defmodule HostKit.Recipes.ElixirApp do
       caddy: %{
         host: Keyword.get(caddy, :host, phoenix_host),
         listen: Keyword.get(caddy, :listen, ":443")
-      }
+      },
+      ecto: normalize_ecto(ecto)
     }
 
     paths = paths(app)
@@ -195,7 +207,29 @@ defmodule HostKit.Recipes.ElixirApp do
       deps: %{name: command_name(app, :deps)},
       assets: %{name: command_name(app, :assets)},
       release: %{name: command_name(app, :release)},
+      ecto: %{name: command_name(app, :ecto_migrate)},
       ready: %{name: command_name(app, :ready)}
+    }
+  end
+
+  def release_eval_exec(app, expression) do
+    env_path = HostKit.Shell.escape(app.paths.env)
+    release_bin = HostKit.Shell.escape(app.paths.release_bin)
+    expression = HostKit.Shell.escape(expression)
+
+    {"sh", ["-c", "set -a && . #{env_path} && set +a && exec #{release_bin} eval #{expression}"]}
+  end
+
+  defp normalize_ecto(nil), do: nil
+  defp normalize_ecto(false), do: nil
+
+  defp normalize_ecto(opts) when is_list(opts) do
+    release = Keyword.fetch!(opts, :release)
+
+    %{
+      migrate: Keyword.get(opts, :migrate, "#{release}.migrate()"),
+      rollback: Keyword.get(opts, :rollback, "#{release}.rollback()"),
+      timeout: Keyword.get(opts, :timeout, 300_000)
     }
   end
 

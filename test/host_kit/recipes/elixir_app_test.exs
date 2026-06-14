@@ -104,4 +104,56 @@ defmodule HostKit.ElixirAppRecipeTest do
 
     assert Enum.any?(plan.resources, &match?(%HostKit.Caddy.Site{host: "hello.example.com"}, &1))
   end
+
+  test "elixir_app recipe emits reversible Ecto lifecycle command" do
+    defmodule ElixirAppRecipeEctoProject do
+      use HostKit.DSL,
+        providers: [HostKit.Providers.Caddy, HostKit.Providers.Elixir]
+
+      def project do
+        project :demo do
+          elixir_app(:shop,
+            source: [github: "elixir-vibe/host_kit", path: "examples/hello_phoenix", ref: "main"],
+            phoenix: [host: "shop.example.com", port: 4001, secret_key_base: "secret"],
+            ecto: [release: "Shop.Release"]
+          )
+        end
+      end
+    end
+
+    project = ElixirAppRecipeEctoProject.project()
+    resources = HostKit.Project.resources(project)
+
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Command{
+               name: "shop_ecto_migrate",
+               exec: {"sh", ["-c", migrate]},
+               down: %HostKit.Resources.Command{exec: {"sh", ["-c", rollback]}},
+               phase: :before_start,
+               depends_on: [{:command, "shop_release"}]
+             } ->
+               migrate =~ "Shop.Release.migrate()" and rollback =~ "Shop.Release.rollback()"
+
+             _resource ->
+               false
+           end)
+
+    assert {:ok, plan} =
+             HostKit.plan(project,
+               package_repo: "ubuntu_24_04",
+               package_lock: fixture_path("package_locks/beam_apt.package.lock")
+             )
+
+    assert {:ok, down_plan} = HostKit.down(plan, only: [{:command, "shop_ecto_migrate"}])
+
+    assert [
+             %HostKit.Change{
+               action: :create,
+               resource_id: {:command, "shop_ecto_migrate_down"},
+               after: %HostKit.Resources.Command{exec: {"sh", ["-c", rollback]}}
+             }
+           ] = down_plan.changes
+
+    assert rollback =~ "Shop.Release.rollback()"
+  end
 end
