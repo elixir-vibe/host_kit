@@ -198,7 +198,7 @@ defmodule HostKit.LivebookSessionRunner do
   end
 
   defp settings_receive_cell?(cell) do
-    String.contains?(cell.source, "{:demo_settings") and String.contains?(cell.source, ":submit")
+    String.contains?(cell.source, "{:demo_settings")
   end
 
   defp submit_form!(%{destination: destination, ref: ref}, data) do
@@ -227,6 +227,7 @@ defmodule HostKit.LivebookSessionRunner do
           user: env("HOSTKIT_LIVEBOOK_USER", System.get_env("USER") || "root"),
           ssh_port: env_integer("HOSTKIT_LIVEBOOK_SSH_PORT", 22),
           identity_file: env("HOSTKIT_LIVEBOOK_IDENTITY_FILE", "~/.ssh/id_ed25519"),
+          password: env("HOSTKIT_LIVEBOOK_SSH_PASSWORD", ""),
           ssh_retries: env_integer("HOSTKIT_LIVEBOOK_SSH_RETRIES", 3),
           public_port: env_integer("HOSTKIT_LIVEBOOK_CADDY_PORT", 18_080),
           message: "Validated by HostKit Livebook session runner",
@@ -240,6 +241,7 @@ defmodule HostKit.LivebookSessionRunner do
           user: env("HOSTKIT_LIVEBOOK_USER", System.get_env("USER") || "root"),
           ssh_port: env_integer("HOSTKIT_LIVEBOOK_SSH_PORT", 22),
           identity_file: env("HOSTKIT_LIVEBOOK_IDENTITY_FILE", "~/.ssh/id_ed25519"),
+          password: env("HOSTKIT_LIVEBOOK_SSH_PASSWORD", ""),
           ssh_retries: env_integer("HOSTKIT_LIVEBOOK_SSH_RETRIES", 3),
           public_hostname: env("HOSTKIT_LIVEBOOK_PHOENIX_HOSTNAME", "phoenix.example.com"),
           public_port: env_integer("HOSTKIT_LIVEBOOK_PHOENIX_PORT", 18_081),

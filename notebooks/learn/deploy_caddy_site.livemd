@@ -15,7 +15,7 @@ The setup cell above installs the small dependency set for this notebook: `kino`
 Use short aliases in the rest of the notebook so the code reads like a walkthrough instead of a wall of module names.
 
 ```elixir
-alias Kino.{Control, Frame, Input, Layout, Markdown}
+alias Kino.{Control, Frame, Input, Markdown}
 alias HostKit, as: HK
 alias HostKit.{Apply, Host, Project}
 alias HostKit.Apply.Event, as: ApplyEvent
@@ -36,93 +36,99 @@ The deployment declaration lives directly in the notebook.
 
 ## Demo settings
 
-First, expose the values someone actually cares about. Evaluate this cell once, edit the inputs, then evaluate the next cell to read the current values. There is no submit button; Livebook keeps the input values in place.
+First, expose the values someone actually cares about. Evaluate this cell once, edit the fields, then click **Check SSH connection**. The button tests transport immediately and stores the submitted settings for the following cells. It does not apply anything.
 
 ```elixir
-settings_inputs = %{
-  server: Input.text("Server", default: "127.0.0.1"),
-  user: Input.text("SSH user", default: "root"),
-  ssh_port: Input.number("SSH port", default: 22),
-  identity_file: Input.text("SSH identity file", default: "~/.ssh/id_ed25519"),
-  ssh_retries: Input.number("SSH connect attempts", default: 3),
-  public_port: Input.number("Public port", default: 18_080),
-  message: Input.text("Message", default: "Deployed by HostKit"),
-  apply?: Input.checkbox("Apply now", default: false),
-  verify?: Input.checkbox("Verify after apply", default: false)
-}
+settings_form =
+  Control.form(
+    [
+      server: Input.text("Server", default: "127.0.0.1"),
+      user: Input.text("SSH user", default: "root"),
+      ssh_port: Input.number("SSH port", default: 22),
+      identity_file: Input.text("SSH identity file (optional when using password)", default: "~/.ssh/id_ed25519"),
+      password: Input.password("SSH password (optional)", default: ""),
+      ssh_retries: Input.number("SSH connect attempts", default: 3),
+      public_port: Input.number("Public port", default: 18_080),
+      message: Input.text("Message", default: "Deployed by HostKit"),
+      apply?: Input.checkbox("Apply now", default: false),
+      verify?: Input.checkbox("Verify after apply", default: false)
+    ],
+    submit: "Check SSH connection"
+  )
 
-settings_inputs
-|> Map.values()
-|> Layout.grid(columns: 2)
-```
+ssh_check_result = Frame.new() |> Kino.render()
+notebook = self()
 
-Use this button whenever you want to check SSH connectivity with the current input values. It does not apply anything.
+Kino.listen(settings_form, fn %{type: :submit, data: data} ->
+  send(notebook, {:demo_settings, data})
 
-```elixir
-ssh_check_button = Control.button("Check SSH connection")
-ssh_check_result = Frame.new()
+  identity_file = data.identity_file |> String.trim()
 
-Kino.listen(ssh_check_button, fn _event ->
-  server = Input.read(settings_inputs.server)
-  user = Input.read(settings_inputs.user)
-  ssh_port = Input.read(settings_inputs.ssh_port)
-
-  ssh_opts = [
-    host: server,
-    user: user,
-    sudo: true,
-    port: ssh_port,
-    identity_file: Path.expand(Input.read(settings_inputs.identity_file)),
-    silently_accept_hosts: true,
-    retry: [attempts: Input.read(settings_inputs.ssh_retries)],
-    connect_timeout: 5_000
-  ]
+  ssh_opts =
+    [
+      host: data.server,
+      user: data.user,
+      sudo: true,
+      port: data.ssh_port,
+      silently_accept_hosts: true,
+      retry: [attempts: data.ssh_retries],
+      connect_timeout: 5_000
+    ]
+    |> then(fn opts ->
+      if identity_file == "", do: opts, else: Keyword.put(opts, :identity_file, Path.expand(identity_file))
+    end)
+    |> then(fn opts ->
+      if data.password == "", do: opts, else: Keyword.put(opts, :password, data.password)
+    end)
 
   markdown =
     case Connection.open(ssh_opts) do
       {:ok, conn} ->
         Connection.close(conn)
-        Markdown.new("✅ **SSH check passed.** Connected to #{user}@#{server}:#{ssh_port}")
+        Markdown.new("✅ **SSH check passed.** Connected to #{data.user}@#{data.server}:#{data.ssh_port}")
 
       {:error, reason} ->
-        Markdown.new("⚠️ **SSH check failed.** Could not connect to #{user}@#{server}:#{ssh_port}: `#{inspect(reason)}`")
+        Markdown.new("⚠️ **SSH check failed.** Could not connect to #{data.user}@#{data.server}:#{data.ssh_port}: `#{inspect(reason)}`")
     end
 
   Frame.render(ssh_check_result, markdown)
 end)
 
-Layout.grid([ssh_check_button, ssh_check_result], columns: 1)
+settings_form
 ```
 
-Read the current input values. From here on, everything is plain Elixir data that the HostKit declaration can reference.
+Read the submitted settings. If this cell is waiting, click **Check SSH connection** above.
 
 ```elixir
-settings = %{
-  server: Input.read(settings_inputs.server),
-  user: Input.read(settings_inputs.user),
-  ssh_port: Input.read(settings_inputs.ssh_port),
-  identity_file: Input.read(settings_inputs.identity_file),
-  ssh_retries: Input.read(settings_inputs.ssh_retries),
-  public_port: Input.read(settings_inputs.public_port),
-  message: Input.read(settings_inputs.message),
-  apply?: Input.read(settings_inputs.apply?),
-  verify?: Input.read(settings_inputs.verify?)
-}
+settings =
+  receive do
+    {:demo_settings, data} -> data
+  end
 ```
 
 Turn the UI fields into explicit target settings. This keeps credentials and transport details visible without mixing them into the deployment declaration.
 
 ```elixir
+identity_file = String.trim(settings.identity_file)
+
+ssh =
+  [
+    port: settings.ssh_port,
+    silently_accept_hosts: true,
+    retry: [attempts: settings.ssh_retries]
+  ]
+  |> then(fn opts ->
+    if identity_file == "", do: opts, else: Keyword.put(opts, :identity_file, Path.expand(identity_file))
+  end)
+  |> then(fn opts ->
+    if settings.password == "", do: opts, else: Keyword.put(opts, :password, settings.password)
+  end)
+
 target = %{
   host: settings.server,
   user: settings.user,
   sudo: true,
-  ssh: [
-    port: settings.ssh_port,
-    identity_file: Path.expand(settings.identity_file),
-    silently_accept_hosts: true,
-    retry: [attempts: settings.ssh_retries]
-  ]
+  ssh: ssh
 }
 ```
 
