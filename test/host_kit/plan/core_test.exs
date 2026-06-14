@@ -1,5 +1,5 @@
 defmodule HostKit.PlanTest do
-  use ExUnit.Case, async: true
+  use HostKit.Case, async: true
 
   alias HostKit.Addr.Resource
   alias HostKit.Caddy.Site
@@ -22,6 +22,4 @@ defmodule HostKit.PlanTest do
 
     assert plan.summary == %{caddy_site: 1}
   end
-
-  defp fixture_path(name), do: Path.expand("fixtures/#{name}", __DIR__)
 end

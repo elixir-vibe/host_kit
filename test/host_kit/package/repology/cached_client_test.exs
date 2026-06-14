@@ -106,6 +106,7 @@ defmodule HostKit.Package.Repology.CachedClientTest do
   end
 
   defp cache_dir do
-    Path.join(System.tmp_dir!(), "host-kit-repology-cache-#{System.unique_integer([:positive])}")
+    suffix = "#{System.unique_integer([:positive, :monotonic])}-#{:erlang.phash2(make_ref())}"
+    Path.join(System.tmp_dir!(), "host-kit-repology-cache-#{suffix}")
   end
 end

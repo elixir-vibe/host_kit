@@ -1,5 +1,5 @@
 defmodule HostKit.CaddyLocalPlanTest do
-  use ExUnit.Case, async: false
+  use HostKit.Case, async: false
 
   test "caddy provider config lets local planning compare rendered site files" do
     tmp = Path.join(System.tmp_dir!(), "host-kit-caddy-#{System.unique_integer([:positive])}")
@@ -28,6 +28,4 @@ defmodule HostKit.CaddyLocalPlanTest do
 
   defp restore_env(nil), do: System.delete_env("HOST_KIT_CADDY_TEST_SITES_DIR")
   defp restore_env(value), do: System.put_env("HOST_KIT_CADDY_TEST_SITES_DIR", value)
-
-  defp fixture_path(name), do: Path.expand("fixtures/#{name}", __DIR__)
 end

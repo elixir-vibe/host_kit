@@ -1,5 +1,5 @@
 defmodule HostKit.ProviderTest do
-  use ExUnit.Case, async: true
+  use HostKit.Case, async: true
 
   test "providers can contribute DSL and renderers" do
     project = HostKit.load!(fixture_path("plugin_project.hostkit"))
@@ -12,6 +12,4 @@ defmodule HostKit.ProviderTest do
     assert {:ok, rendered} = HostKit.Render.render(project, {:test_site, "example.test"})
     assert IO.iodata_to_binary(rendered) == "example.test -> 127.0.0.1:4000\n"
   end
-
-  defp fixture_path(name), do: Path.expand("fixtures/#{name}", __DIR__)
 end

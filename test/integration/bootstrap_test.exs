@@ -1,5 +1,5 @@
 defmodule HostKit.BootstrapIntegrationTest do
-  use ExUnit.Case, async: false
+  use HostKit.Case, async: false
 
   @moduletag :integration
 
@@ -132,8 +132,8 @@ defmodule HostKit.BootstrapIntegrationTest do
   end
 
   defp package_lock_fixture do
-    "../fixtures/package_locks/beam_apt.package.lock"
-    |> Path.expand(__DIR__)
+    "package_locks/beam_apt.package.lock"
+    |> fixture_path()
     |> HostKit.Package.Lock.load!()
   end
 

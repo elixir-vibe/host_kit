@@ -1,5 +1,5 @@
 defmodule HostKit.CaddyStaticTest do
-  use ExUnit.Case, async: true
+  use HostKit.Case, async: true
 
   test "renders static file server site" do
     project = HostKit.load!(fixture_path("caddy_static_project.hostkit"))
@@ -16,6 +16,4 @@ defmodule HostKit.CaddyStaticTest do
     assert %{"handler" => "vars", "root" => "/srv/toys/www/elixir.toys"} in handlers
     assert %{"browse" => nil, "handler" => "file_server"} in handlers
   end
-
-  defp fixture_path(name), do: Path.expand("fixtures/#{name}", __DIR__)
 end

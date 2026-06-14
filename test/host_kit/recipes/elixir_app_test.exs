@@ -1,5 +1,5 @@
 defmodule HostKit.ElixirAppRecipeTest do
-  use ExUnit.Case, async: true
+  use HostKit.Case, async: true
 
   test "elixir_app recipe expands to ordinary HostKit resources" do
     defmodule ElixirAppRecipeProject do
@@ -99,7 +99,7 @@ defmodule HostKit.ElixirAppRecipeTest do
     assert {:ok, plan} =
              HostKit.plan(project,
                package_repo: "ubuntu_24_04",
-               package_lock: "test/fixtures/package_locks/beam_apt.package.lock"
+               package_lock: fixture_path("package_locks/beam_apt.package.lock")
              )
 
     assert Enum.any?(plan.resources, &match?(%HostKit.Caddy.Site{host: "hello.example.com"}, &1))

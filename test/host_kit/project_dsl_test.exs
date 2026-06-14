@@ -1,5 +1,5 @@
 defmodule HostKit.ProjectDSLTest do
-  use ExUnit.Case, async: true
+  use HostKit.Case, async: true
 
   test "project-local DSLs can define service conventions" do
     project = HostKit.load!(fixture_path("project_dsl.hostkit"))
@@ -149,6 +149,4 @@ defmodule HostKit.ProjectDSLTest do
       Code.compile_string(missing_prefix)
     end
   end
-
-  defp fixture_path(name), do: Path.expand("fixtures/#{name}", __DIR__)
 end

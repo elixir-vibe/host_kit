@@ -1,5 +1,5 @@
 defmodule HostKit.CaddyProviderTest do
-  use ExUnit.Case, async: true
+  use HostKit.Case, async: true
 
   alias HostKit.Addr.Resource
   alias HostKit.Caddy.Directive.{Encode, ReverseProxy}
@@ -103,6 +103,4 @@ defmodule HostKit.CaddyProviderTest do
 
   defp restore_env(nil), do: System.delete_env("HOST_KIT_CADDY_TEST_SITES_DIR")
   defp restore_env(value), do: System.put_env("HOST_KIT_CADDY_TEST_SITES_DIR", value)
-
-  defp fixture_path(name), do: Path.expand("fixtures/#{name}", __DIR__)
 end

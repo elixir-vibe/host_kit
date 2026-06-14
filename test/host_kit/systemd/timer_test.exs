@@ -1,5 +1,5 @@
 defmodule HostKit.SystemdTimerTest do
-  use ExUnit.Case, async: true
+  use HostKit.Case, async: true
 
   test "renders systemd timer from keyword section DSL" do
     project = HostKit.load!(fixture_path("timer_project.hostkit"))
@@ -19,6 +19,4 @@ defmodule HostKit.SystemdTimerTest do
            WantedBy=timers.target
            """
   end
-
-  defp fixture_path(name), do: Path.expand("fixtures/#{name}", __DIR__)
 end

@@ -1,5 +1,5 @@
 defmodule HostKit.CLIRemoteIntegrationTest do
-  use ExUnit.Case, async: false
+  use HostKit.Case, async: false
 
   import ExUnit.CaptureIO
 
@@ -27,7 +27,7 @@ defmodule HostKit.CLIRemoteIntegrationTest do
     data_dir = "#{root}/share"
     config_path = Path.join(System.tmp_dir!(), "hostkit-cli-#{unique}.exs")
     plan_path = Path.join(System.tmp_dir!(), "hostkit-cli-#{unique}.plan.json")
-    lock_path = Path.expand("../fixtures/package_locks/beam_apt.package.lock", __DIR__)
+    lock_path = fixture_path("package_locks/beam_apt.package.lock")
 
     cleanup.(root)
 
