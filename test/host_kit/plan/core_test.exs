@@ -13,7 +13,7 @@ defmodule HostKit.PlanTest do
     assert [
              %Change{
                action: :create,
-               resource_id: %Resource{type: :caddy_site, name: :search},
+               resource_id: %Resource{type: :caddy_site, name: "search.elixir.toys"},
                before: nil,
                after: %Site{host: "search.elixir.toys"},
                reason: :desired_state

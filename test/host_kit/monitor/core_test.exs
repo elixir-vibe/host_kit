@@ -7,13 +7,14 @@ defmodule HostKit.MonitorTest do
 
     project :demo do
       service :web do
-        daemon "web.service" do
-          run exec_start: ["/usr/bin/env", "true"]
+        daemon do
+          exec ["/usr/bin/env", "true"]
+          listen :http, port: 4000
           monitor :systemd, name: :web_unit, expect: [state: :active], severity: :critical
         end
 
-        caddy_site :web, "web.example.com" do
-          reverse_proxy "127.0.0.1:4000"
+        caddy_site "web.example.com" do
+          reverse_proxy :http
           monitor :http, name: :web_http, url: "https://web.example.com", expect: [status: 200]
         end
       end
@@ -34,7 +35,7 @@ defmodule HostKit.MonitorTest do
     assert http.name == :web_http
     assert http.target == "https://web.example.com"
     assert http.expect == [status: 200]
-    assert to_string(http.resource_id) == "caddy_site.web"
+    assert to_string(http.resource_id) == "caddy_site.web.example.com"
   end
 
   test "monitor after a resource attaches to the last resource" do

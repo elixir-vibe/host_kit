@@ -14,7 +14,7 @@ defmodule HostKit.CaddyProviderTest do
              %HostKit.Service{
                resources: [
                  %Site{
-                   name: :search,
+                   name: "search.elixir.toys",
                    host: "search.elixir.toys",
                    directives: [
                      %Encode{formats: [:zstd, :gzip]},
@@ -25,9 +25,10 @@ defmodule HostKit.CaddyProviderTest do
              }
            ] = project.services
 
-    assert Site.id(site) == Resource.new(:caddy_site, :search)
+    assert Site.id(site) == Resource.new(:caddy_site, "search.elixir.toys")
 
-    assert {:ok, rendered} = HostKit.Render.render(project, Resource.new(:caddy_site, :search))
+    assert {:ok, rendered} =
+             HostKit.Render.render(project, Resource.new(:caddy_site, "search.elixir.toys"))
 
     route = rendered |> IO.iodata_to_binary() |> Jason.decode!()
 
@@ -52,7 +53,7 @@ defmodule HostKit.CaddyProviderTest do
       service :hello_phoenix do
         endpoint :http, port: 4000, protocol: :http
 
-        caddy_site :hello_phoenix, "app.example.com" do
+        caddy_site "app.example.com" do
           reverse_proxy endpoint(:hello_phoenix, :http)
         end
       end
@@ -90,7 +91,7 @@ defmodule HostKit.CaddyProviderTest do
 
       project :demo do
         service :web do
-          caddy_site :search, "search.elixir.toys" do
+          caddy_site "search.elixir.toys" do
             reverse_proxy "127.0.0.1:4200"
           end
         end

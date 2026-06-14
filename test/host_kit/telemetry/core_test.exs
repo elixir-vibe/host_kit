@@ -11,12 +11,13 @@ defmodule HostKit.TelemetryTest do
       end
 
       service :web do
-        daemon "web.service" do
-          run exec_start: ["/usr/bin/env", "true"]
+        daemon do
+          exec ["/usr/bin/env", "true"]
+          listen :http, port: 4000
         end
 
-        caddy_site :web, "web.example.com" do
-          reverse_proxy "127.0.0.1:4000"
+        caddy_site "web.example.com" do
+          reverse_proxy :http
         end
       end
     end
@@ -29,7 +30,7 @@ defmodule HostKit.TelemetryTest do
     assert systemd.signals == [:logs, :metrics]
     assert systemd.attributes == %{environment: :test}
 
-    assert to_string(caddy.resource_id) == "caddy_site.web"
+    assert to_string(caddy.resource_id) == "caddy_site.web.example.com"
     assert caddy.signals == [:logs, :metrics]
     assert caddy.attributes == %{environment: :test}
   end
@@ -48,8 +49,8 @@ defmodule HostKit.TelemetryTest do
           telemetry metrics: false, attributes: [component: :worker]
         end
 
-        daemon "worker.service" do
-          run exec_start: ["/usr/bin/env", "true"]
+        daemon do
+          exec ["/usr/bin/env", "true"]
         end
       end
     end
@@ -71,8 +72,8 @@ defmodule HostKit.TelemetryTest do
       end
 
       service :worker do
-        daemon "worker.service" do
-          run exec_start: ["/usr/bin/env", "true"]
+        daemon do
+          exec ["/usr/bin/env", "true"]
           telemetry logs: :journald, metrics: false, service_name: "worker"
         end
       end
@@ -93,12 +94,13 @@ defmodule HostKit.TelemetryTest do
 
     project :demo do
       service :web do
-        daemon "web.service" do
-          run exec_start: ["/usr/bin/env", "true"]
+        daemon do
+          exec ["/usr/bin/env", "true"]
+          listen :http, port: 4000
         end
 
-        caddy_site :web, "web.example.com" do
-          reverse_proxy "127.0.0.1:4000"
+        caddy_site "web.example.com" do
+          reverse_proxy :http
         end
       end
     end

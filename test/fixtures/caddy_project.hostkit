@@ -2,7 +2,7 @@ use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
 project :caddy_demo do
   service :exograph do
-    caddy_site :search, "search.elixir.toys" do
+    caddy_site "search.elixir.toys" do
       encode [:zstd, :gzip]
       reverse_proxy "127.0.0.1:4200"
     end

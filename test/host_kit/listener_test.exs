@@ -7,9 +7,9 @@ defmodule HostKit.ListenerTest do
 
     project :demo do
       service :web do
-        daemon "web.service" do
-          run exec_start: ["/usr/bin/env", "true"]
-          listen :http, port: 3000, on: :loopback
+        daemon do
+          exec ["/usr/bin/env", "true"]
+          listen :http, port: 3000
         end
       end
     end
@@ -28,13 +28,13 @@ defmodule HostKit.ListenerTest do
 
     project :demo do
       service :web do
-        daemon "web.service" do
-          run exec_start: ["/usr/bin/env", "true"]
-          listen :http, port: 3000, on: :loopback
+        daemon do
+          exec ["/usr/bin/env", "true"]
+          listen :http, port: 3000
         end
 
-        caddy_site :web, "web.example.com" do
-          reverse_proxy listener(:http)
+        caddy_site "web.example.com" do
+          reverse_proxy :http
         end
       end
     end
@@ -53,8 +53,8 @@ defmodule HostKit.ListenerTest do
 
     project :demo do
       service :web do
-        daemon "web.service" do
-          run exec_start: ["/usr/bin/env", "true"]
+        daemon do
+          exec ["/usr/bin/env", "true"]
           listen 3000, on: {127, 0, 0, 1}
         end
       end

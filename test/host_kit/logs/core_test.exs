@@ -11,12 +11,13 @@ defmodule HostKit.LogsTest do
       end
 
       service :web do
-        daemon "web.service" do
-          run exec_start: ["/usr/bin/env", "true"]
+        daemon do
+          exec ["/usr/bin/env", "true"]
+          listen :http, port: 4000
         end
 
-        caddy_site :web, "web.example.com" do
-          reverse_proxy "127.0.0.1:4000"
+        caddy_site "web.example.com" do
+          reverse_proxy :http
         end
       end
     end
@@ -31,7 +32,7 @@ defmodule HostKit.LogsTest do
     assert systemd.ship == true
     assert systemd.attributes == %{environment: :test}
 
-    assert to_string(caddy.resource_id) == "caddy_site.web"
+    assert to_string(caddy.resource_id) == "caddy_site.web.example.com"
     assert caddy.driver == :journald
   end
 
@@ -49,8 +50,8 @@ defmodule HostKit.LogsTest do
           logs retention: "30d", attributes: [component: :worker]
         end
 
-        daemon "worker.service" do
-          run exec_start: ["/usr/bin/env", "true"]
+        daemon do
+          exec ["/usr/bin/env", "true"]
         end
       end
     end
@@ -69,8 +70,8 @@ defmodule HostKit.LogsTest do
 
     project :demo do
       service :web do
-        daemon "web.service" do
-          run exec_start: ["/usr/bin/env", "true"]
+        daemon do
+          exec ["/usr/bin/env", "true"]
           logs identifier: "web", stdout: :journal, stderr: :journal, ship: true
         end
       end
