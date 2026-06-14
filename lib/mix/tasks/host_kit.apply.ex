@@ -42,6 +42,7 @@ defmodule Mix.Tasks.HostKit.Apply do
           confirm: :boolean,
           track: :boolean,
           runs_root: :string,
+          backups_root: :string,
           quiet: :boolean,
           verbose: :boolean
         ],
@@ -220,6 +221,7 @@ defmodule Mix.Tasks.HostKit.Apply do
       track: Keyword.get(opts, :track, false)
     )
     |> put_present(:hostkit_runs_root, Keyword.get(opts, :runs_root))
+    |> put_present(:hostkit_backups_root, Keyword.get(opts, :backups_root))
     |> put_present(:up_plan_artifact, Keyword.get(opts, :plan))
   end
 

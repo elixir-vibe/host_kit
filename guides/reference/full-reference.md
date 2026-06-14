@@ -114,6 +114,8 @@ mix host_kit.runs --host prod infra/config.exs
 
 Run records are intentionally compact: they identify the run, project, direction, timestamp, and applied change statuses. They do not replace plan artifacts; use plan artifacts for inspectable up/down plan contents. When a tracked apply is started from `--plan`, HostKit copies that up-plan artifact under the runs root and records the copied path so `mix host_kit.down --last` can work from the tracked run.
 
+Tracked applies also write backup payloads for previous file-like state when that state was captured in the plan. Backup payloads live under `hostkit_backups/<run-id>/` or the `--backups-root` override.
+
 ## Elixir app lifecycle helpers
 
 The Elixir app recipe can emit lifecycle commands for common BEAM deployment operations. Ecto migrations are represented as normal commands with explicit down commands:

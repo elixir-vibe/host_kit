@@ -34,6 +34,46 @@ defmodule HostKit.RunRecordTest do
     assert loaded.id == record["id"]
   end
 
+  test "tracked apply stores backup payloads for previous file-like state" do
+    root =
+      Path.join(System.tmp_dir!(), "hostkit-runs-backups-#{System.unique_integer([:positive])}")
+
+    path = Path.join(root, "demo.txt")
+    runs_root = Path.join(root, "runs")
+    backups_root = Path.join(root, "backups")
+    File.mkdir_p!(root)
+    File.write!(path, "old")
+    on_exit(fn -> File.rm_rf(root) end)
+
+    before = %HostKit.Resources.File{path: path, content: "old", mode: 0o644}
+    after_resource = %HostKit.Resources.File{path: path, content: "new", mode: 0o644}
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :tracked},
+      changes: [
+        %Change{
+          action: :update,
+          resource_id: {:file, path},
+          before: before,
+          after: after_resource
+        }
+      ]
+    }
+
+    assert {:ok, _results} =
+             HostKit.apply(plan,
+               confirm: true,
+               track: true,
+               hostkit_runs_root: runs_root,
+               hostkit_backups_root: backups_root
+             )
+
+    assert {:ok, record} = HostKit.RunRecord.latest(hostkit_runs_root: runs_root)
+    assert [{resource_id, backup_path}] = Map.to_list(record.backups)
+    assert resource_id =~ ":file"
+    assert File.read!(backup_path) == "old"
+  end
+
   test "tracked apply records plan artifact references" do
     root =
       Path.join(System.tmp_dir!(), "hostkit-runs-artifacts-#{System.unique_integer([:positive])}")

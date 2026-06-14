@@ -32,7 +32,8 @@ defmodule HostKit.RunRecord do
           direction: String.t(),
           applied_at: String.t(),
           changes: [Change.t()],
-          artifacts: %{String.t() => String.t()}
+          artifacts: %{String.t() => String.t()},
+          backups: %{String.t() => String.t()}
         }
 
   defstruct version: @version,
@@ -41,7 +42,8 @@ defmodule HostKit.RunRecord do
             direction: nil,
             applied_at: nil,
             changes: [],
-            artifacts: %{}
+            artifacts: %{},
+            backups: %{}
 
   codec(:version, transform: :validate_version!)
   codec(:changes, type: {:list, Change})
@@ -53,9 +55,13 @@ defmodule HostKit.RunRecord do
       path = record_path(plan, opts, id)
 
       with {:ok, artifacts} <- write_artifacts(plan, id, opts),
+           {:ok, backups} <- write_backups(plan, results, id, opts),
            :ok <- Runner.mkdir_p(runner(opts), Path.dirname(path), opts) do
         content =
-          record(plan, results, id, artifacts) |> dump() |> Jason.encode_to_iodata!(pretty: true)
+          plan
+          |> record(results, id, artifacts, backups)
+          |> dump()
+          |> Jason.encode_to_iodata!(pretty: true)
 
         Runner.write_file(runner(opts), path, content, opts)
       end
@@ -166,14 +172,15 @@ defmodule HostKit.RunRecord do
     end
   end
 
-  defp record(%Plan{} = plan, results, id, artifacts) do
+  defp record(%Plan{} = plan, results, id, artifacts, backups) do
     %__MODULE__{
       id: id,
       project: project_name(plan.project),
       direction: plan.opts |> Keyword.get(:direction, :up) |> to_string(),
       applied_at: DateTime.utc_now() |> DateTime.to_iso8601(),
       changes: Enum.map(results, &change_record/1),
-      artifacts: artifacts
+      artifacts: artifacts,
+      backups: backups
     }
   end
 
@@ -207,6 +214,69 @@ defmodule HostKit.RunRecord do
     end
   end
 
+  defp write_backups(plan, results, id, opts) do
+    root = Path.join([backups_root(plan, opts), id])
+
+    Enum.reduce_while(results, {:ok, %{}}, &write_backup_step(&1, &2, root, opts))
+  end
+
+  defp write_backup_step(result, {:ok, backups}, root, opts) do
+    case backup_content(result) do
+      {:ok, resource_id, content} ->
+        write_backup_content(backups, resource_id, content, root, opts)
+
+      :skip ->
+        {:cont, {:ok, backups}}
+    end
+  end
+
+  defp write_backup_content(backups, resource_id, content, root, opts) do
+    path = Path.join(root, backup_filename(resource_id))
+
+    case write_backup(path, content, opts) do
+      :ok -> {:cont, {:ok, Map.put(backups, inspect(resource_id), path)}}
+      {:error, reason} -> {:halt, {:error, reason}}
+    end
+  end
+
+  defp backup_content(%{change: %{before: nil}}), do: :skip
+
+  defp backup_content(%{
+         change: %{resource_id: resource_id, before: %HostKit.Resources.File{content: content}}
+       })
+       when is_binary(content), do: {:ok, resource_id, content}
+
+  defp backup_content(%{
+         change: %{resource_id: resource_id, before: %{meta: %{content: content}}}
+       })
+       when is_binary(content), do: {:ok, resource_id, content}
+
+  defp backup_content(_result), do: :skip
+
+  defp write_backup(path, content, opts) do
+    with :ok <- Runner.mkdir_p(runner(opts), Path.dirname(path), opts) do
+      Runner.write_file(runner(opts), path, content, opts)
+    end
+  end
+
+  defp backup_filename(resource_id) do
+    resource_id
+    |> inspect()
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9_.-]+/, "-")
+    |> String.trim("-.")
+    |> Kernel.<>(".bak")
+  end
+
+  defp backups_root(plan, opts) do
+    opts
+    |> Keyword.get(:hostkit_backups_root)
+    |> case do
+      nil -> plan |> plan_project() |> project_conventions() |> Conventions.backups_root()
+      root -> root
+    end
+  end
+
   defp change_record(%{change: change, status: status}) do
     %Change{
       resource_id: Resource.dump(change.resource_id),
@@ -230,6 +300,6 @@ defmodule HostKit.RunRecord do
   defp plan_project(%Plan{project: project}), do: project
   defp plan_project(nil), do: nil
   defp project_conventions(nil), do: Conventions.new()
-  defp project_conventions(project), do: project.conventions
+  defp project_conventions(%{conventions: conventions}), do: Conventions.new(conventions)
   defp runner(opts), do: Keyword.get(opts, :runner, HostKit.Runner.Local)
 end

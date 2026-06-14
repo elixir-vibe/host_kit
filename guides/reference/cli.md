@@ -85,6 +85,7 @@ Common options:
 - `--require PATH` — load project-local DSL/support code before config.
 - `--track` — write a minimal run record after apply.
 - `--runs-root PATH` — override the HostKit runs root for tracked applies.
+- `--backups-root PATH` — override the HostKit backup payload root for tracked applies.
 - `--quiet` — print only high-level progress and failures.
 - `--verbose` — print all apply events, including skipped changes.
 
