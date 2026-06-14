@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added SSH connection retry policy via `ssh retry: ...` with apply progress events for retry start/success/exhaustion.
+- Added negative-path coverage for failed initial SSH connection and mid-apply transport failure handling.
+- Improved plan/read-error formatting and compact Inspect output for plans, changes, and common resources.
+
 ## v0.1.0-beta.1
 
 - Included Livebook demos and internal architecture guide in Hex package docs.

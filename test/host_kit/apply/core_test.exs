@@ -1,6 +1,8 @@
 defmodule HostKit.ApplyTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias HostKit.Apply
   alias HostKit.Change
   alias HostKit.Plan
@@ -199,6 +201,97 @@ defmodule HostKit.ApplyTest do
     assert Elixir.File.read!(Path.join(root, "demo.timer")) =~ "[Timer]"
 
     Elixir.File.rm_rf!(root)
+  end
+
+  test "retries initial ssh connection before apply starts" do
+    connect_fun = fn _host, _port, _ssh_opts, _timeout -> {:error, :econnrefused} end
+    plan = %Plan{changes: []}
+
+    capture_log(fn ->
+      assert {:error, {:ssh_connect_failed, :econnrefused}} =
+               Apply.run(plan,
+                 confirm: true,
+                 reporter: self(),
+                 runner:
+                   {HostKit.Runner.SSH,
+                    host: "example.test",
+                    user: "root",
+                    connect_fun: connect_fun,
+                    retry: [attempts: 2, base_delay: 0]}
+               )
+    end)
+
+    assert_receive {HostKit.Apply, %HostKit.Apply.Event{type: :transport_retry_started}}
+    assert_receive {HostKit.Apply, %HostKit.Apply.Event{type: :transport_retry_exhausted}}
+    refute_received {HostKit.Apply, %HostKit.Apply.Event{type: :apply_started}}
+  end
+
+  test "stops at first runner transport failure and reports the failed change" do
+    first = "/tmp/hostkit-first"
+    second = "/tmp/hostkit-second"
+
+    plan = %Plan{
+      changes: [
+        %Change{
+          action: :create,
+          resource_id: {:directory, first},
+          after: %Directory{path: first}
+        },
+        %Change{
+          action: :create,
+          resource_id: {:directory, second},
+          after: %Directory{path: second}
+        }
+      ]
+    }
+
+    defmodule FlakyRunner do
+      @behaviour HostKit.Runner
+
+      @impl true
+      def mkdir_p(path, opts) do
+        attempt = Agent.get_and_update(opts[:attempts], fn count -> {count, count + 1} end)
+        send(opts[:test_pid], {:mkdir_p, path, attempt})
+
+        case attempt do
+          0 -> :ok
+          _ -> {:error, {:ssh_connect_failed, :closed}}
+        end
+      end
+
+      @impl true
+      def cmd(_command, _args, _opts), do: {"", 0}
+
+      @impl true
+      def write_file(_path, _content, _opts), do: :ok
+    end
+
+    {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+    assert {:error, {{:directory, ^second}, {:ssh_connect_failed, :closed}}} =
+             Apply.run(plan,
+               confirm: true,
+               reporter: self(),
+               runner: {FlakyRunner, attempts: attempts, test_pid: self()}
+             )
+
+    assert_received {:mkdir_p, ^first, 0}
+    assert_received {:mkdir_p, ^second, 1}
+
+    assert_received {HostKit.Apply,
+                     %HostKit.Apply.Event{
+                       type: :change_finished,
+                       resource_id: {:directory, ^first}
+                     }}
+
+    assert_received {HostKit.Apply,
+                     %HostKit.Apply.Event{
+                       type: :change_failed,
+                       resource_id: {:directory, ^second},
+                       reason: {:ssh_connect_failed, :closed}
+                     }}
+
+    refute_received {HostKit.Apply, %HostKit.Apply.Event{type: :apply_finished}}
   end
 
   test "refuses to write redacted files" do

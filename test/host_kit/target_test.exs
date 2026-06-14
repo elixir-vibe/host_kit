@@ -27,6 +27,24 @@ defmodule HostKit.TargetTest do
     assert opts[:dry_run] == true
   end
 
+  test "host DSL keeps ssh retry options with the target" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      host :prod do
+        hostname "example.test"
+        user "root"
+        ssh retry: [attempts: 3, base_delay: 0], silently_accept_hosts: true
+      end
+    end
+    """
+
+    {%HostKit.Project{hosts: [host]}, _binding} = Code.eval_string(source)
+
+    assert HostKit.Host.ssh_options(host)[:retry] == [attempts: 3, base_delay: 0]
+  end
+
   test "top-level apply accepts targets" do
     target = HostKit.Target.local(:dev)
     plan = %HostKit.Plan{changes: []}

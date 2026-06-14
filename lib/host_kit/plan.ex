@@ -22,6 +22,36 @@ defmodule HostKit.Plan do
             opts: [],
             diagnostics: %HostKit.Diagnostics{}
 
+  defimpl Inspect do
+    import Inspect.Algebra
+
+    def inspect(%HostKit.Plan{} = plan, _opts) do
+      counts = Enum.frequencies_by(plan.changes, & &1.action)
+      project = if plan.project, do: " #{plan.project.name}", else: ""
+
+      summary =
+        [
+          "#HostKit.Plan<",
+          project,
+          " create=",
+          count(counts, :create),
+          " update=",
+          count(counts, :update),
+          " delete=",
+          count(counts, :delete),
+          " read_errors=",
+          count(counts, :read),
+          " unchanged=",
+          count(counts, :no_op),
+          ">"
+        ]
+
+      concat(summary)
+    end
+
+    defp count(counts, action), do: counts |> Map.get(action, 0) |> Integer.to_string()
+  end
+
   @spec build(Project.t(), keyword()) :: {:ok, t()} | {:error, HostKit.Diagnostics.t() | term()}
   def build(%Project{} = project, opts \\ []) do
     resources = Project.resources(project)

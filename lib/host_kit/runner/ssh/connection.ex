@@ -3,6 +3,8 @@ defmodule HostKit.Runner.SSH.Connection do
 
   @behaviour HostKit.Runner
 
+  alias HostKit.Runner.SSH.Retry
+
   @default_port 22
   @timeout 30_000
   @default_preferred_algorithms [
@@ -20,8 +22,18 @@ defmodule HostKit.Runner.SSH.Connection do
   def open(opts) do
     host = Keyword.fetch!(opts, :host) |> to_charlist()
     port = Keyword.get(opts, :port, @default_port)
+    timeout = Keyword.get(opts, :connect_timeout, @timeout)
+    connect_fun = Keyword.get(opts, :connect_fun, &:ssh.connect/4)
 
-    :ssh.connect(host, port, ssh_opts(opts), Keyword.get(opts, :connect_timeout, @timeout))
+    retry_open(
+      connect_fun,
+      host,
+      port,
+      ssh_opts(opts),
+      timeout,
+      Retry.normalize(opts[:retry]),
+      opts
+    )
   end
 
   @spec close(t()) :: :ok
@@ -128,6 +140,49 @@ defmodule HostKit.Runner.SSH.Connection do
         :ssh_connection.close(conn, channel)
         {output, 255}
     end
+  end
+
+  defp retry_open(connect_fun, host, port, ssh_opts, timeout, retry, opts, attempt \\ 1) do
+    case connect_fun.(host, port, ssh_opts, timeout) do
+      {:ok, _conn} = ok ->
+        if attempt > 1 do
+          emit_transport_retry(opts, :transport_retry_succeeded,
+            attempt: attempt,
+            attempts: retry.attempts
+          )
+        end
+
+        ok
+
+      {:error, reason} when attempt < retry.attempts ->
+        delay = Retry.delay(retry, attempt)
+
+        emit_transport_retry(opts, :transport_retry_started,
+          attempt: attempt + 1,
+          attempts: retry.attempts,
+          delay_ms: delay,
+          reason: reason
+        )
+
+        if delay > 0, do: Process.sleep(delay)
+        retry_open(connect_fun, host, port, ssh_opts, timeout, retry, opts, attempt + 1)
+
+      {:error, reason} = error ->
+        if retry.attempts > 1 do
+          emit_transport_retry(opts, :transport_retry_exhausted,
+            attempt: attempt,
+            attempts: retry.attempts,
+            reason: reason
+          )
+        end
+
+        error
+    end
+  end
+
+  defp emit_transport_retry(opts, type, details) do
+    details = details |> Map.new() |> Map.put(:transport, :ssh)
+    HostKit.Apply.Events.emit(opts, type, details: details)
   end
 
   defp ssh_opts(opts) do

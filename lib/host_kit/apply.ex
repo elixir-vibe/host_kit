@@ -334,10 +334,7 @@ defmodule HostKit.Apply do
   defp emit(opts, type, attrs \\ []) do
     attrs = maybe_put_lifecycle(attrs, opts)
 
-    case Keyword.get(opts, :reporter) do
-      pid when is_pid(pid) -> send(pid, {__MODULE__, HostKit.Apply.Event.new(type, attrs)})
-      nil -> :ok
-    end
+    HostKit.Apply.Events.emit(opts, type, attrs)
   end
 
   defp maybe_put_lifecycle(attrs, opts) do

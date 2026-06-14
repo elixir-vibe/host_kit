@@ -43,6 +43,7 @@ settings_form =
       user: Input.text("SSH user", default: "root"),
       ssh_port: Input.number("SSH port", default: 22),
       identity_file: Input.text("SSH identity file", default: "~/.ssh/id_ed25519"),
+      ssh_retries: Input.number("SSH connect attempts", default: 3),
       public_port: Input.number("Public port", default: 18_080),
       message: Input.text("Message", default: "Deployed by HostKit"),
       apply?: Input.checkbox("Apply now", default: false),
@@ -74,7 +75,8 @@ target = %{
   ssh: [
     port: settings.ssh_port,
     identity_file: Path.expand(settings.identity_file),
-    silently_accept_hosts: true
+    silently_accept_hosts: true,
+    retry: [attempts: settings.ssh_retries]
   ]
 }
 ```

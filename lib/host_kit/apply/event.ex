@@ -20,6 +20,9 @@ defmodule HostKit.Apply.Event do
           | :health_check_waiting
           | :health_check_passed
           | :health_check_failed
+          | :transport_retry_started
+          | :transport_retry_succeeded
+          | :transport_retry_exhausted
 
   @type t :: %__MODULE__{
           type: type(),
@@ -115,6 +118,20 @@ defmodule HostKit.Apply.Event do
   def format(%__MODULE__{type: :health_check_failed, details: details} = event),
     do: "✗ health check #{Map.get(details, :url)}: #{format_reason(event.reason)}"
 
+  def format(%__MODULE__{type: :transport_retry_started, details: details}) do
+    suffix = "after #{Map.fetch!(details, :delay_ms)}ms"
+    format_transport_retry("↻", "reconnect", details, suffix)
+  end
+
+  def format(%__MODULE__{type: :transport_retry_succeeded, details: details}) do
+    format_transport_retry("✓", "reconnect", details)
+  end
+
+  def format(%__MODULE__{type: :transport_retry_exhausted, details: details} = event) do
+    suffix = "attempts exhausted: #{format_reason(Map.get(details, :reason) || event.reason)}"
+    format_transport_retry("✗", "reconnect", details, suffix)
+  end
+
   defp resource_id(%HostKit.Change{resource_id: resource_id}), do: resource_id
   defp resource_id(_change), do: nil
 
@@ -123,6 +140,13 @@ defmodule HostKit.Apply.Event do
 
   defp format_resource(%__MODULE__{resource_id: {type, name}}), do: "#{type}.#{name}"
   defp format_resource(%__MODULE__{resource_id: resource_id}), do: inspect(resource_id)
+
+  defp format_transport_retry(prefix, action, details, suffix \\ nil) do
+    base =
+      "#{prefix} #{Map.fetch!(details, :transport)} #{action} attempt=#{Map.fetch!(details, :attempt)}/#{Map.fetch!(details, :attempts)}"
+
+    if suffix, do: base <> " " <> suffix, else: base
+  end
 
   defp format_progress(%{elapsed_ms: elapsed, timeout_ms: timeout, attempt: attempt}) do
     "attempt=#{attempt} #{div(elapsed, 1_000)}s/#{div(timeout, 1_000)}s"

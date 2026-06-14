@@ -192,5 +192,5 @@ defmodule HostKit.Plan.Format do
   defp format_resource_id(resource_id), do: inspect(resource_id)
 
   defp format_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
-  defp format_reason(reason), do: inspect(reason)
+  defp format_reason(reason), do: HostKit.Error.format(reason)
 end

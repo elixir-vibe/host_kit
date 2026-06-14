@@ -226,7 +226,8 @@ project :infra do
 
     ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
         password: secret_env("HOSTKIT_SSH_PASSWORD"),
-        silently_accept_hosts: true
+        silently_accept_hosts: true,
+        retry: [attempts: 3, base_delay: 250, max_delay: 2_000]
   end
 end
 ```
@@ -239,6 +240,8 @@ mix host_kit.plan --host prod \
 mix host_kit.apply --host prod \
   --plan host_kit.plan.json --confirm infra/config.exs
 ```
+
+`ssh retry: ...` is an SSH transport policy. It retries connection establishment for transient SSH startup/network failures; it does not blindly rerun arbitrary deployment commands after a command has been sent to the remote host. Use `retry: 3` as shorthand for three attempts, `retry: false` to disable, or keyword options with `:attempts`, `:base_delay`/`:base_delay_ms`, and `:max_delay`/`:max_delay_ms`. Retry progress is emitted as apply events and mirrored to Logger for collection.
 
 Plan artifacts are JSON and intended to be inspectable. Secret references are stored as references, not values, for example:
 

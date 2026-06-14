@@ -184,6 +184,8 @@ Events are sent as:
 {HostKit.Apply, %HostKit.Apply.Event{}}
 ```
 
+HostKit also emits `[:apply, :event]` telemetry for every apply event. SSH retry events are mirrored to Logger by default for later collection; pass `log_events: true` to mirror all apply events.
+
 ### `HostKit.Apply.Event`
 
 Events are the primary user-facing progress API. They cover:
@@ -192,7 +194,8 @@ Events are the primary user-facing progress API. They cover:
 - change lifecycle,
 - command lifecycle metadata,
 - service restart/readiness progress,
-- HTTP health checks.
+- HTTP health checks,
+- SSH transport retry progress for connection establishment.
 
 Lifecycle command events include:
 

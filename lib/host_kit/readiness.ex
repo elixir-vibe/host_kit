@@ -244,18 +244,12 @@ defmodule HostKit.Readiness do
   end
 
   defp emit_apply(opts, type, readiness, attrs \\ []) do
-    case Keyword.get(opts, :reporter) do
-      pid when is_pid(pid) ->
-        attrs =
-          attrs
-          |> Keyword.put_new(:resource_id, HostKit.Resources.Readiness.id(readiness))
-          |> Keyword.put_new(:details, %{})
+    attrs =
+      attrs
+      |> Keyword.put_new(:resource_id, HostKit.Resources.Readiness.id(readiness))
+      |> Keyword.put_new(:details, %{})
 
-        send(pid, {HostKit.Apply, HostKit.Apply.Event.new(type, attrs)})
-
-      _other ->
-        :ok
-    end
+    HostKit.Apply.Events.emit(opts, type, attrs)
   end
 
   defp summarize_errors(errors) do

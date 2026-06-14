@@ -36,7 +36,9 @@ project :prod do
     hostname "app.example.com"
     user "root"
     sudo true
-    ssh identity_file: Path.expand("~/.ssh/id_ed25519"), silently_accept_hosts: true
+    ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
+        silently_accept_hosts: true,
+        retry: [attempts: 3]
   end
 
   service :bootstrap do

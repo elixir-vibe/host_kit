@@ -136,8 +136,11 @@ host :prod do
   hostname "host.example"
   user "root"
   sudo true
-  ssh identity_file: Path.expand("~/.ssh/id_ed25519")
+  ssh identity_file: Path.expand("~/.ssh/id_ed25519"),
+      retry: [attempts: 3, base_delay: 250, max_delay: 2_000]
 end
 ```
+
+`ssh retry: ...` retries SSH connection establishment for flaky transport before apply work starts; it does not rerun arbitrary remote commands after they may have reached the host.
 
 Raw `--remote` flags remain available for ad-hoc usage, but they are less reproducible than checked-in `.exs` host config.

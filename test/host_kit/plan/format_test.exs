@@ -34,7 +34,33 @@ defmodule HostKit.PlanFormatTest do
              ~ caddy_site.git
                update drift
              ? file./etc/app/env
-               read {:read_error, :eacces}
+               read read failed: :eacces
+             """)
+  end
+
+  test "formats remote read failures as user-facing text" do
+    plan = %HostKit.Plan{
+      changes: [
+        %Change{
+          action: :read,
+          resource_id: {:directory, "/srv/app"},
+          reason: {:read_error, {:remote_read_failed, ":econnrefused"}}
+        },
+        %Change{
+          action: :read,
+          resource_id: {:package, :caddy},
+          reason: {:read_error, :package_manager_not_found}
+        }
+      ]
+    }
+
+    assert Format.format(plan) ==
+             String.trim_trailing("""
+             Plan: 0 to create, 0 to update, 0 to delete, 2 read errors, 0 unchanged
+             ? directory./srv/app
+               read read failed: remote read failed: SSH connection refused
+             ? package.caddy
+               read read failed: package manager not found on target
              """)
   end
 
