@@ -25,6 +25,16 @@ defmodule HostKit.Runner.SSH do
   end
 
   defp with_connection(opts, error_mode, fun) do
+    case Keyword.fetch(opts, :conn) do
+      {:ok, conn} ->
+        fun.(conn)
+
+      :error ->
+        open_connection(opts, error_mode, fun)
+    end
+  end
+
+  defp open_connection(opts, error_mode, fun) do
     case Connection.open(opts) do
       {:ok, conn} ->
         run_and_close(conn, fun)

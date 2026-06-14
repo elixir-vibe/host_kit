@@ -3,6 +3,7 @@ defmodule HostKit.Apply do
 
   alias HostKit.{Change, Firewall, Plan, Provider, Proxy, Resources, Runner, Systemd}
   alias HostKit.Package.Manager
+  alias HostKit.Runner.SSH.Connection
 
   alias Resources.{
     Command,
@@ -30,7 +31,7 @@ defmodule HostKit.Apply do
       |> maybe_put_package_manager(plan)
 
     with :ok <- confirm(opts) do
-      apply_changes(plan.changes, opts)
+      with_reusable_runner(opts, fn opts -> apply_changes(plan.changes, opts) end)
     end
   end
 
@@ -57,23 +58,42 @@ defmodule HostKit.Apply do
     end
   end
 
+  defp with_reusable_runner(opts, fun) do
+    case reusable_ssh_opts(opts) do
+      {:ok, ssh_opts} ->
+        case Connection.open(ssh_opts) do
+          {:ok, conn} ->
+            try do
+              opts
+              |> Keyword.put(:runner, {Connection, conn: conn})
+              |> fun.()
+            after
+              Connection.close(conn)
+            end
+
+          {:error, reason} ->
+            {:error, {:ssh_connect_failed, reason}}
+        end
+
+      :skip ->
+        fun.(opts)
+    end
+  end
+
+  defp reusable_ssh_opts(opts) do
+    case Keyword.get(opts, :runner, HostKit.Runner.Local) do
+      HostKit.Runner.SSH -> {:ok, opts}
+      {HostKit.Runner.SSH, runner_opts} -> {:ok, Keyword.merge(runner_opts, opts)}
+      {Connection, _runner_opts} -> :skip
+      _runner -> :skip
+    end
+  end
+
   defp apply_changes(changes, opts) do
     emit(opts, :apply_started)
 
     changes
-    |> Enum.reduce_while({:ok, [], false}, fn change, {:ok, results, reload?} ->
-      report_change_start(change, opts)
-
-      case apply_change(change, opts) do
-        {:ok, result} ->
-          report_change_result(change, result, opts)
-          {:cont, {:ok, [result | results], reload? or systemd_change?(result)}}
-
-        {:error, reason} ->
-          emit(opts, :change_failed, change: change, reason: reason)
-          {:halt, {:error, {change.resource_id, reason}}}
-      end
-    end)
+    |> Enum.reduce_while({:ok, [], false}, &apply_change_step(&1, &2, opts))
     |> then(fn
       {:ok, results, reload?} ->
         results = Enum.reverse(results)
@@ -86,6 +106,28 @@ defmodule HostKit.Apply do
       error ->
         error
     end)
+  end
+
+  defp apply_change_step(change, {:ok, results, reload?}, opts) do
+    report_change_start(change, opts)
+
+    case timed_change(change, fn -> apply_change(change, opts) end) do
+      {:ok, result} ->
+        report_change_result(change, result, opts)
+        {:cont, {:ok, [result | results], reload? or systemd_change?(result)}}
+
+      {:error, reason} ->
+        emit(opts, :change_failed, change: change, reason: reason)
+        {:halt, {:error, {change.resource_id, reason}}}
+    end
+  end
+
+  defp timed_change(%Change{} = change, fun) do
+    HostKit.Telemetry.span(
+      [:apply, :resource],
+      %{resource_id: change.resource_id, action: change.action},
+      fun
+    )
   end
 
   defp apply_change(%Change{action: :no_op} = change, _opts), do: {:ok, skipped(change)}

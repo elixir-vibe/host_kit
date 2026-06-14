@@ -42,6 +42,7 @@ defmodule HostKit.MixProject do
       {:hammer, "~> 7.0"},
       {:dotenvy, "~> 1.1"},
       {:bash, "~> 0.5.1"},
+      {:telemetry, "~> 1.0"},
       {:ex_doc, "~> 0.38", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},

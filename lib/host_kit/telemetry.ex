@@ -4,8 +4,54 @@ defmodule HostKit.Telemetry do
   alias HostKit.Project
   alias HostKit.Telemetry.Signal
 
+  @type event :: [atom()]
+  @type measurements :: map()
+  @type metadata :: map()
+
   @spec config(keyword()) :: map()
   def config(value), do: HostKit.Observability.config(value)
+
+  @doc "Emits a HostKit telemetry event under the `[:host_kit, ...]` prefix."
+  @spec execute(event(), measurements(), metadata()) :: :ok
+  def execute(event, measurements \\ %{}, metadata \\ %{}) when is_list(event) do
+    :telemetry.execute([:host_kit | event], measurements, metadata)
+  end
+
+  @doc "Runs a function while emitting `:start`, `:stop`, and `:exception` telemetry events."
+  @spec span(event(), metadata(), (-> result)) :: result when result: term()
+  def span(event, metadata \\ %{}, fun) when is_list(event) and is_function(fun, 0) do
+    start_time = System.monotonic_time()
+    execute(event ++ [:start], %{system_time: System.system_time()}, metadata)
+
+    try do
+      result = fun.()
+      duration = System.monotonic_time() - start_time
+
+      execute(
+        event ++ [:stop],
+        %{duration: duration},
+        Map.put(metadata, :result, result_status(result))
+      )
+
+      result
+    catch
+      kind, reason ->
+        duration = System.monotonic_time() - start_time
+        stacktrace = __STACKTRACE__
+
+        execute(
+          event ++ [:exception],
+          %{duration: duration},
+          Map.merge(metadata, %{kind: kind, reason: reason, stacktrace: stacktrace})
+        )
+
+        :erlang.raise(kind, reason, stacktrace)
+    end
+  end
+
+  @spec duration_ms(integer()) :: integer()
+  def duration_ms(native_duration),
+    do: System.convert_time_unit(native_duration, :native, :millisecond)
 
   @spec signals(Project.t()) :: [Signal.t()]
   def signals(%Project{} = project) do
@@ -14,6 +60,11 @@ defmodule HostKit.Telemetry do
     project.services
     |> Enum.flat_map(&service_signals(&1, project_defaults))
   end
+
+  defp result_status({:ok, _value}), do: :ok
+  defp result_status(:ok), do: :ok
+  defp result_status({:error, _reason}), do: :error
+  defp result_status(_other), do: :ok
 
   defp service_signals(service, project_defaults) do
     service_defaults = merge_config(project_defaults, telemetry_config(service.meta, %{}))

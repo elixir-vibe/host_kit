@@ -7,8 +7,7 @@ defmodule HostKit.Readiness do
 
   @spec current?(Readiness.t(), keyword()) :: boolean()
   def current?(%Readiness{} = readiness, opts) do
-    readiness.checks
-    |> Enum.all?(&(check(&1, opts) == :ok))
+    check_all(readiness, opts) == :ok
   end
 
   @spec wait(Readiness.t(), keyword()) :: :ok | {:error, term()}
@@ -20,19 +19,15 @@ defmodule HostKit.Readiness do
   end
 
   defp prepare(%Readiness{checks: checks}, opts) do
-    checks
-    |> Enum.reduce_while(:ok, fn
-      %Systemd{restart: true, unit: unit}, :ok ->
-        Ops.cmd(opts, "systemctl", ["reset-failed", unit])
+    restart_units =
+      checks
+      |> Enum.filter(&match?(%Systemd{restart: true}, &1))
+      |> Enum.map(& &1.unit)
 
-        case Ops.cmd(opts, "systemctl", ["restart", unit]) do
-          :ok -> {:cont, :ok}
-          {:error, reason} -> {:halt, {:error, reason}}
-        end
-
-      _check, :ok ->
-        {:cont, :ok}
-    end)
+    case restart_units do
+      [] -> :ok
+      units -> Ops.cmd(opts, "sh", ["-c", restart_script(units)])
+    end
   end
 
   defp wait_until(readiness, opts, deadline, _last_errors) do
@@ -44,46 +39,98 @@ defmodule HostKit.Readiness do
         if System.monotonic_time(:millisecond) >= deadline do
           {:error, {:readiness_timeout, readiness.name, errors}}
         else
-          Process.sleep(readiness.interval)
+          Process.sleep(effective_interval(readiness, opts))
           wait_until(readiness, opts, deadline, errors)
         end
     end
   end
 
-  defp check_all(%Readiness{checks: checks}, opts) do
-    errors =
-      checks
-      |> Enum.map(&{&1, check(&1, opts)})
-      |> Enum.reject(fn {_check, result} -> result == :ok end)
+  defp check_all(%Readiness{checks: []}, _opts), do: :ok
 
-    if errors == [], do: :ok, else: {:error, errors}
-  end
-
-  defp check(%Systemd{unit: unit, state: :active}, opts) do
-    Ops.cmd(opts, "systemctl", ["is-active", unit])
-  end
-
-  defp check(%HTTP{} = http, opts) do
-    format = "%{http_code}"
-
-    case Ops.cmd(opts, "curl", [
-           "-fsS",
-           "-w",
-           format,
-           "-o",
-           "/tmp/hostkit-readiness-body",
-           http.url
-         ]) do
-      :ok -> check_http_body(http, opts)
-      {:error, reason} -> {:error, reason}
+  defp check_all(%Readiness{} = readiness, opts) do
+    case Ops.cmd(opts, "sh", ["-c", check_script(readiness)]) do
+      :ok -> :ok
+      {:error, reason} -> {:error, [{readiness, {:error, reason}}]}
     end
   end
 
-  defp check_http_body(%HTTP{expect_body: nil}, _opts), do: :ok
+  defp restart_script(units) do
+    Enum.map_join(units, "\n", fn unit ->
+      escaped = HostKit.Shell.escape(unit)
+      "systemctl reset-failed #{escaped} || true\nsystemctl restart #{escaped}"
+    end)
+  end
 
-  defp check_http_body(%HTTP{expect_body: body}, opts) do
-    script = "grep -F #{HostKit.Shell.escape(body)} /tmp/hostkit-readiness-body >/dev/null"
+  defp check_script(%Readiness{checks: checks}) do
+    [
+      "set +e",
+      "hostkit_readiness_failed=0",
+      Enum.map_join(checks, "\n", &check_script/1),
+      "exit $hostkit_readiness_failed"
+    ]
+    |> Enum.join("\n")
+  end
 
-    Ops.cmd(opts, "sh", ["-c", script])
+  defp check_script(%Systemd{unit: unit, state: :active}) do
+    escaped = HostKit.Shell.escape(unit)
+
+    """
+    if ! systemctl is-active --quiet #{escaped}; then
+      echo #{HostKit.Shell.escape("systemd #{unit} is not active")}
+      hostkit_readiness_failed=1
+    fi
+    """
+  end
+
+  defp check_script(%HTTP{} = http) do
+    body_check = http_body_check_script(http)
+
+    """
+    hostkit_readiness_body=$(mktemp /tmp/hostkit-readiness-body.XXXXXX)
+    hostkit_readiness_status=$(curl -sS -w '%{http_code}' -o "$hostkit_readiness_body" #{HostKit.Shell.escape(http.url)})
+    hostkit_readiness_curl_status=$?
+
+    if [ "$hostkit_readiness_curl_status" -ne 0 ]; then
+      echo #{HostKit.Shell.escape("http #{http.url} curl failed")} status="$hostkit_readiness_status" exit="$hostkit_readiness_curl_status"
+      hostkit_readiness_failed=1
+    elif [ "$hostkit_readiness_status" != #{HostKit.Shell.escape(to_string(http.expect_status))} ]; then
+      echo #{HostKit.Shell.escape("http #{http.url} unexpected status")} expected=#{HostKit.Shell.escape(to_string(http.expect_status))} actual="$hostkit_readiness_status"
+      hostkit_readiness_failed=1
+    else
+    #{indent(body_check, 2)}
+    fi
+
+    rm -f "$hostkit_readiness_body"
+    """
+  end
+
+  defp http_body_check_script(%HTTP{expect_body: nil}), do: ":"
+
+  defp http_body_check_script(%HTTP{url: url, expect_body: body}) do
+    """
+    if ! grep -F #{HostKit.Shell.escape(body)} "$hostkit_readiness_body" >/dev/null; then
+      echo #{HostKit.Shell.escape("http #{url} body did not contain expected text")}
+      hostkit_readiness_failed=1
+    fi
+    """
+  end
+
+  defp effective_interval(%Readiness{interval: 500}, opts) do
+    if remote_runner?(Keyword.get(opts, :runner, HostKit.Runner.Local)), do: 1_000, else: 500
+  end
+
+  defp effective_interval(%Readiness{interval: interval}, _opts), do: interval
+
+  defp remote_runner?(HostKit.Runner.SSH), do: true
+  defp remote_runner?({HostKit.Runner.SSH, _opts}), do: true
+  defp remote_runner?({HostKit.Runner.SSH.Connection, _opts}), do: true
+  defp remote_runner?(_runner), do: false
+
+  defp indent(text, spaces) do
+    prefix = String.duplicate(" ", spaces)
+
+    text
+    |> String.split("\n")
+    |> Enum.map_join("\n", &(prefix <> &1))
   end
 end

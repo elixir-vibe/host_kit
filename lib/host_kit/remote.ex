@@ -173,7 +173,13 @@ defmodule HostKit.Remote do
 
   defp cmd(%{opts: opts}, command, args) do
     runner = Keyword.get(opts, :runner, HostKit.Runner.Local)
-    Runner.cmd(runner, command, args, stderr_to_stdout: true)
+
+    runner_opts =
+      opts
+      |> Keyword.take([:trace])
+      |> Keyword.merge(stderr_to_stdout: true)
+
+    Runner.cmd(runner, command, args, runner_opts)
   end
 
   defp sudo?(%{opts: opts}), do: Keyword.get(opts, :sudo, false)

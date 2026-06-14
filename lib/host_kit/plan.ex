@@ -68,16 +68,27 @@ defmodule HostKit.Plan do
   defp package_resource?(_resource), do: false
 
   defp resolve_resources(resources, opts) do
-    Enum.reduce_while(resources, {:ok, []}, fn resource, {:ok, resolved} ->
-      case resolve_resource(resource, opts) do
-        {:ok, resource} -> {:cont, {:ok, [resource | resolved]}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
+    resources
+    |> Enum.reduce_while({:ok, []}, &resolve_resource_step(&1, &2, opts))
     |> then(fn
       {:ok, resources} -> {:ok, Enum.reverse(resources)}
       error -> error
     end)
+  end
+
+  defp resolve_resource_step(resource, {:ok, resolved}, opts) do
+    case timed_resource(:resolve, resource, fn -> resolve_resource(resource, opts) end) do
+      {:ok, resource} -> {:cont, {:ok, [resource | resolved]}}
+      {:error, reason} -> {:halt, {:error, reason}}
+    end
+  end
+
+  defp timed_resource(phase, resource, fun) do
+    HostKit.Telemetry.span([:plan, :resource], resource_metadata(phase, resource), fun)
+  end
+
+  defp resource_metadata(phase, resource) do
+    %{phase: phase, resource_id: Resource.id(resource), resource_module: resource.__struct__}
   end
 
   defp resolve_resource(%Package{} = package, opts), do: Resolver.resolve(package, opts)
@@ -117,11 +128,16 @@ defmodule HostKit.Plan do
     if ignored?(resource, opts) do
       build_change(:no_op, resource, nil, :ignored)
     else
-      case Keyword.get(opts, :reader) do
-        nil -> desired_change(resource)
-        reader -> compare_with_actual(resource, reader, %{project: project, opts: opts})
-      end
+      observed_change_for(resource, project, opts, Keyword.get(opts, :reader))
     end
+  end
+
+  defp observed_change_for(resource, _project, _opts, nil), do: desired_change(resource)
+
+  defp observed_change_for(resource, project, opts, reader) do
+    timed_resource(:read, resource, fn ->
+      compare_with_actual(resource, reader, %{project: project, opts: opts})
+    end)
   end
 
   defp ignored?(resource, opts) do

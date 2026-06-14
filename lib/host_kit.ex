@@ -41,11 +41,23 @@ defmodule HostKit do
   """
   @spec plan(Project.t(), keyword()) ::
           {:ok, Plan.t()} | {:error, HostKit.Diagnostics.t() | term()}
-  def plan(%Project{} = project, opts \\ []), do: Plan.build(project, expand_target_opts(opts))
+  def plan(%Project{} = project, opts \\ []) do
+    opts = expand_target_opts(opts)
+
+    HostKit.Telemetry.span([:plan], %{project: project.name}, fn ->
+      Plan.build(project, opts)
+    end)
+  end
 
   @doc "Applies supported changes from a HostKit plan."
   @spec apply(Plan.t(), keyword()) :: {:ok, [Apply.result()]} | {:error, term()}
-  def apply(%Plan{} = plan, opts \\ []), do: Apply.run(plan, expand_target_opts(opts))
+  def apply(%Plan{} = plan, opts \\ []) do
+    opts = expand_target_opts(opts)
+
+    HostKit.Telemetry.span([:apply], %{project: plan.project && plan.project.name}, fn ->
+      Apply.run(plan, opts)
+    end)
+  end
 
   @doc "Applies supported changes from a HostKit plan or raises."
   @spec apply!(Plan.t(), keyword()) :: [Apply.result()]

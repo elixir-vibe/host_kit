@@ -44,13 +44,8 @@ defmodule HostKit.ReadinessTest do
       @behaviour HostKit.Runner
 
       @impl true
-      def cmd("curl", _args, opts) do
-        send(opts[:test_pid], :curl)
-        {"", 0}
-      end
-
-      def cmd("sh", ["-c", _script], opts) do
-        send(opts[:test_pid], :grep)
+      def cmd("sh", ["-c", script], opts) do
+        send(opts[:test_pid], {:readiness_script, script})
         {"", 0}
       end
 
@@ -62,7 +57,8 @@ defmodule HostKit.ReadinessTest do
     end
 
     assert :ok = HostKit.Readiness.wait(readiness, runner: {ReadyRunner, test_pid: self()})
-    assert_received :curl
-    assert_received :grep
+    assert_received {:readiness_script, script}
+    assert script =~ "curl"
+    assert script =~ "grep -F 'ok'"
   end
 end

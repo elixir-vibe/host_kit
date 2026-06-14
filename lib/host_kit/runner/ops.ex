@@ -26,7 +26,7 @@ defmodule HostKit.Runner.Ops do
            runner(opts),
            command,
            args,
-           Keyword.merge([stderr_to_stdout: true], command_opts)
+           command_run_opts(opts, command_opts)
          ) do
       {_output, 0} -> :ok
       {output, status} -> {:error, {:command_failed, command, args, status, output}}
@@ -35,6 +35,13 @@ defmodule HostKit.Runner.Ops do
 
   @spec runner(keyword()) :: module() | {module(), keyword()}
   def runner(opts), do: Keyword.get(opts, :runner, HostKit.Runner.Local)
+
+  defp command_run_opts(opts, command_opts) do
+    opts
+    |> Keyword.take([:trace])
+    |> Keyword.merge(stderr_to_stdout: true)
+    |> Keyword.merge(command_opts)
+  end
 
   defp maybe_sudo(command, args, opts) do
     if Keyword.get(opts, :sudo, false), do: {"sudo", [command | args]}, else: {command, args}
