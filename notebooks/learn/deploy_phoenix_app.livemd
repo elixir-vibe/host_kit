@@ -8,158 +8,135 @@ Mix.install([
 ])
 ```
 
-## Overview
-
-The setup cell above installs this notebook's dependencies: `kino` for friendly inputs, `req` for HTTP verification, and `host_kit` for the deployment DSL and runtime APIs.
-
-Use aliases so the rest of the notebook reads like application code.
+## Setup
 
 ```elixir
 alias Kino.{Control, Frame, Input, Markdown}
 alias HostKit, as: HK
-alias HostKit.{Apply, Host, Ingress, Project}
+alias HostKit.{Apply, Host}
 alias HostKit.Apply.Event, as: ApplyEvent
-alias HostKit.Plan.{Artifact, Format}
 alias HostKit.Providers.Caddy
 alias HostKit.Providers.Elixir, as: ElixirProvider
-alias HostKit.Resources.Source
 alias HostKit.Runner.SSH.Connection
+
+defmodule Demo do
+  def ssh_opts(settings) do
+    identity_file = String.trim(settings.identity_file || "")
+
+    [
+      host: settings.server,
+      user: settings.user,
+      sudo: true,
+      port: settings.ssh_port,
+      silently_accept_hosts: true,
+      retry: [attempts: Map.get(settings, :ssh_retries, 3)],
+      connect_timeout: 5_000
+    ]
+    |> maybe_put(:identity_file, identity_file, &Path.expand/1)
+    |> maybe_put(:password, settings.password)
+  end
+
+  def with_uploaded_key(%{key_file: %{file_ref: file_ref}} = settings) do
+    source = Kino.Input.file_path(file_ref)
+    path = Path.join(System.tmp_dir!(), "hostkit-livebook-ssh-key-#{System.unique_integer([:positive])}")
+    File.cp!(source, path)
+    File.chmod!(path, 0o600)
+    %{settings | identity_file: path}
+  end
+
+  def with_uploaded_key(settings), do: settings
+
+  def check_ssh(settings) do
+    case Connection.open(ssh_opts(settings)) do
+      {:ok, conn} ->
+        Connection.close(conn)
+        Markdown.new("✅ **SSH works** — #{settings.user}@#{settings.server}:#{settings.ssh_port}")
+
+      {:error, reason} ->
+        Markdown.new("⚠️ **SSH failed** — `#{inspect(reason)}`")
+    end
+  end
+
+  defp maybe_put(opts, _key, ""), do: opts
+  defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
+  defp maybe_put(opts, _key, "", _fun), do: opts
+  defp maybe_put(opts, key, value, fun), do: Keyword.put(opts, key, fun.(value))
+end
 ```
 
-This notebook deploys the example Phoenix app from the HostKit repository:
+## Target
 
-1. collect target and app settings,
-2. declare the app source/runtime,
-3. build a release on the target,
-4. run it with systemd,
-5. publish it through semantic ingress rendered by Caddy,
-6. optionally apply and verify.
+Use a password, upload a key, or enter a key path.
 
-The deployment declaration lives directly in the notebook. The integration test extracts the marked DSL cell below.
+<details>
+<summary>SSH key upload</summary>
 
-## Demo settings
+Uploaded keys are copied to a temporary `0600` file in the Livebook runtime and used as the SSH identity file.
 
-Expose a small form for the values people expect to choose during a demo. Evaluate this cell once, edit the fields, then click **Check SSH connection**. The button tests transport immediately and stores the submitted settings for the following cells. It does not apply anything.
+</details>
 
 ```elixir
-settings_form =
+status = Frame.new() |> Kino.render()
+notebook = self()
+
+form =
   Control.form(
     [
       server: Input.text("Server", default: "127.0.0.1"),
       user: Input.text("SSH user", default: "root"),
+      password: Input.password("SSH password", default: ""),
+      key_file: Input.file("Upload SSH key"),
+      identity_file: Input.text("SSH key path on server (optional)", default: ""),
       ssh_port: Input.number("SSH port", default: 22),
-      identity_file: Input.text("SSH identity file (optional when using password)", default: "~/.ssh/id_ed25519"),
-      password: Input.password("SSH password (optional)", default: ""),
-      ssh_retries: Input.number("SSH connect attempts", default: 3),
       public_hostname: Input.text("Public hostname", default: "phoenix.example.com"),
       public_port: Input.number("Public port", default: 18_081),
       app_port: Input.number("Phoenix port", default: 14_000),
-      source_repo: Input.text("Source repository", default: "https://github.com/elixir-vibe/host_kit.git"),
-      source_ref: Input.text("Git ref", default: "master"),
-      package_repo: Input.text("Package repository", default: "ubuntu_24_04"),
-      erlang_version: Input.text("Erlang version", default: "29.0.2"),
-      elixir_version: Input.text("Elixir version", default: "1.20.1"),
       apply?: Input.checkbox("Apply now", default: false),
-      verify?: Input.checkbox("Verify after apply", default: false)
+      verify?: Input.checkbox("Verify", default: false)
     ],
     submit: "Check SSH connection"
   )
 
-ssh_check_result = Frame.new() |> Kino.render()
-notebook = self()
-
-Kino.listen(settings_form, fn %{type: :submit, data: data} ->
-  send(notebook, {:demo_settings, data})
-
-  identity_file = data.identity_file |> String.trim()
-
-  ssh_opts =
-    [
-      host: data.server,
-      user: data.user,
-      sudo: true,
-      port: data.ssh_port,
-      silently_accept_hosts: true,
-      retry: [attempts: data.ssh_retries],
-      connect_timeout: 5_000
-    ]
-    |> then(fn opts ->
-      if identity_file == "", do: opts, else: Keyword.put(opts, :identity_file, Path.expand(identity_file))
-    end)
-    |> then(fn opts ->
-      if data.password == "", do: opts, else: Keyword.put(opts, :password, data.password)
-    end)
-
-  markdown =
-    case Connection.open(ssh_opts) do
-      {:ok, conn} ->
-        Connection.close(conn)
-        Markdown.new("✅ **SSH check passed.** Connected to #{data.user}@#{data.server}:#{data.ssh_port}")
-
-      {:error, reason} ->
-        Markdown.new("⚠️ **SSH check failed.** Could not connect to #{data.user}@#{data.server}:#{data.ssh_port}: `#{inspect(reason)}`")
-    end
-
-  Frame.render(ssh_check_result, markdown)
+Kino.listen(form, fn %{type: :submit, data: settings} ->
+  settings = Demo.with_uploaded_key(settings)
+  send(notebook, {:demo_settings, settings})
+  Frame.render(status, Demo.check_ssh(settings))
 end)
 
-settings_form
+form
 ```
-
-Read the submitted settings. If this cell is waiting, click **Check SSH connection** above.
 
 ```elixir
 settings =
   receive do
-    {:demo_settings, data} -> data
+    {:demo_settings, settings} -> settings
   end
-```
-
-Turn the form values into an explicit HostKit target. The SSH key path can still come from your shell or Livebook deployment environment.
-
-```elixir
-identity_file = String.trim(settings.identity_file)
-
-ssh =
-  [
-    port: settings.ssh_port,
-    silently_accept_hosts: true,
-    retry: [attempts: settings.ssh_retries]
-  ]
-  |> then(fn opts ->
-    if identity_file == "", do: opts, else: Keyword.put(opts, :identity_file, Path.expand(identity_file))
-  end)
-  |> then(fn opts ->
-    if settings.password == "", do: opts, else: Keyword.put(opts, :password, settings.password)
-  end)
 
 target = %{
   host: settings.server,
   user: settings.user,
   sudo: true,
-  ssh: ssh
+  ssh: Demo.ssh_opts(settings)
 }
 ```
-
-Describe the Phoenix app settings separately from the host settings.
 
 ```elixir
 app = %{
   public_hostname: settings.public_hostname,
   app_port: settings.app_port,
   public_port: settings.public_port,
-  source_repo: settings.source_repo,
-  source_ref: settings.source_ref,
-  package_repo: settings.package_repo,
-  erlang_version: settings.erlang_version,
-  elixir_version: settings.elixir_version
+  source_repo: Map.get(settings, :source_repo, "https://github.com/elixir-vibe/host_kit.git"),
+  source_ref: Map.get(settings, :source_ref, "master"),
+  package_repo: Map.get(settings, :package_repo, "ubuntu_24_04"),
+  erlang_version: Map.get(settings, :erlang_version, "29.0.2"),
+  elixir_version: Map.get(settings, :elixir_version, "1.20.1")
 }
 
 apply? = settings.apply?
 verify? = settings.verify?
 ```
 
-Derive app, runtime, and artifact settings in one place.
+## Declare
 
 ```elixir
 public_hostname = app.public_hostname
@@ -173,12 +150,9 @@ app_port = app.app_port
 http_port = app.public_port
 ingress_address = ":#{http_port}"
 public_url = "http://#{target.host}:#{http_port}"
-artifact_path = "/tmp/hostkit-phoenix-demo.plan.json"
 package_lock_path = "/tmp/hostkit-beam.package.lock"
 secret_key_base = Base.encode64(:crypto.strong_rand_bytes(64))
 ```
-
-Write a tiny package lock for the BEAM build dependencies. This keeps the demo deterministic on Ubuntu-style hosts without requiring a separate file next to the notebook.
 
 ```elixir
 package_lock = ~S'''
@@ -206,8 +180,6 @@ package_lock = ~S'''
 File.write!(package_lock_path, package_lock)
 ```
 
-Derive the Caddy wrapper service paths. HostKit will manage these resources rather than asking the notebook to shell out.
-
 ```elixir
 deployment_name = "hostkit-phoenix-demo-#{http_port}"
 app_service_name = "hello-phoenix.service"
@@ -225,9 +197,7 @@ import #{caddy_sites_dir}/*.caddy
 """
 ```
 
-## Deployment declaration
-
-This is the important part: the app recipe expands to ordinary resources—source checkout, mise runtime, build commands, systemd, readiness, endpoint metadata, and ingress.
+The app recipe expands to source checkout, BEAM runtime, systemd, readiness, and Caddy ingress.
 
 ```elixir
 # hostkit:deploy-phoenix-app-dsl
@@ -307,7 +277,7 @@ project
 
 ## Plan
 
-Build an inspectable plan for the selected host. This is still a dry declaration-to-plan step; the target has not changed yet.
+Preview the changes. Nothing has been applied yet.
 
 ```elixir
 host = hd(project.hosts)
@@ -321,43 +291,13 @@ target_opts =
 {:ok, plan} = HK.plan(project, target_opts)
 ```
 
-Render the plan so you can review the exact changes before applying them.
-
 ```elixir
-plan |> inspect(pretty: true, limit: :infinity) |> Markdown.new()
-```
-
-## Inspect what the recipe generated
-
-Recipes still compile to plain resources. Here we focus on source and ingress resources because they explain where the app comes from and how traffic reaches it.
-
-```elixir
-Project.resources(project)
-|> Enum.filter(&(match?(%Source{}, &1) or match?(%Ingress{}, &1)))
-```
-
-## Source provenance
-
-HostKit records source identity so plans and artifacts can explain which Git source/ref produced the deployment.
-
-```elixir
-plan.resources
-|> Enum.filter(&match?(%Source{}, &1))
-|> Enum.map(fn source -> {source.name, Source.identity(source)} end)
-```
-
-## Save an artifact
-
-Plans can be saved for review, CI, or later rollback workflows.
-
-```elixir
-:ok = Artifact.save(artifact_path, plan)
-artifact_path
+plan |> inspect(pretty: true, limit: 50) |> Markdown.new()
 ```
 
 ## Apply
 
-Applying is explicit. Set `Apply now` in the settings form when you are ready.
+Only runs when `Apply now` is checked.
 
 ```elixir
 reporter = self()
@@ -369,8 +309,6 @@ apply_result =
     {:skipped, :set_apply_to_true}
   end
 ```
-
-HostKit sends progress events to the notebook process. Livebook can display them without custom callback code.
 
 ```elixir
 progress =
