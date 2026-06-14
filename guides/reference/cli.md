@@ -40,6 +40,29 @@ mix host_kit.plan --host prod --write-package-lock host_kit.package.lock infra/c
 mix host_kit.plan --host prod --package-lock host_kit.package.lock --out host_kit.plan.json infra/config.exs
 ```
 
+## `mix host_kit.down`
+
+Build a down/rollback plan from an existing plan artifact. Rollback is just another plan: inspect the generated down plan, then apply it.
+
+```sh
+mix host_kit.down [options] [up.plan.json]
+```
+
+Common options:
+
+- `--plan PATH` — read an up plan artifact.
+- `--out PATH` — write the generated down plan artifact.
+- `--only type:name` — include only selected resources.
+- `--except type:name` — exclude selected resources.
+- `--format text|inspect` — output format.
+
+Examples:
+
+```sh
+mix host_kit.down host_kit.plan.json --out host_kit.down.plan.json
+mix host_kit.apply --plan host_kit.down.plan.json --confirm
+```
+
 ## `mix host_kit.apply`
 
 Apply a plan. Requires `--dry-run` or `--confirm`.

@@ -6,6 +6,8 @@ defmodule HostKit.Conventions do
           prefixes: %{optional(atom()) => String.t()}
         }
 
+  @default_state_root "/var/lib/hostkit"
+
   defstruct roots: %{}, prefixes: %{}
 
   @spec new(keyword() | map()) :: t()
@@ -32,6 +34,28 @@ defmodule HostKit.Conventions do
     |> normalize()
     |> Map.fetch!(:roots)
     |> Map.fetch!(name)
+  end
+
+  @doc "Returns the HostKit state root, defaulting to /var/lib/hostkit."
+  @spec state_root(t() | map()) :: String.t()
+  def state_root(conventions), do: root(conventions, :hostkit_state, @default_state_root)
+
+  @doc "Returns the root used for minimal HostKit run records."
+  @spec runs_root(t() | map()) :: String.t()
+  def runs_root(conventions),
+    do: root(conventions, :hostkit_runs, Path.join(state_root(conventions), "runs"))
+
+  @doc "Returns the root used for rollback backup payloads."
+  @spec backups_root(t() | map()) :: String.t()
+  def backups_root(conventions),
+    do: root(conventions, :hostkit_backups, Path.join(state_root(conventions), "backups"))
+
+  @spec root(t() | map(), atom(), String.t()) :: String.t()
+  def root(conventions, name, default) do
+    conventions
+    |> normalize()
+    |> Map.fetch!(:roots)
+    |> Map.get(name, default)
   end
 
   @spec prefixed(t() | map(), atom(), term()) :: String.t()

@@ -47,4 +47,15 @@ Useful helpers:
 - `unit_name()` returns the convention-derived systemd unit name.
 - `path_name "slug"` overrides the path/identity slug for one service.
 
+For HostKit's own host-side tracking, the default roots are:
+
+```elixir
+roots hostkit_state: "/var/lib/hostkit"
+# derived defaults:
+# hostkit_runs: "/var/lib/hostkit/runs"
+# hostkit_backups: "/var/lib/hostkit/backups"
+```
+
+Override `:hostkit_state` to move both derived roots, or override `:hostkit_runs` / `:hostkit_backups` individually.
+
 For larger projects, wrap these conventions in a project-local DSL and load it with `--require`.

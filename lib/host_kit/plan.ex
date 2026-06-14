@@ -2,9 +2,9 @@ defmodule HostKit.Plan do
   @moduledoc "Structural plan generated from a HostKit project."
 
   alias HostKit.Addr
-  alias HostKit.{Change, Project, Resource}
+  alias HostKit.{Change, Diagnostic, Diagnostics, Project, Resource}
   alias HostKit.Package.{Manager, Resolver}
-  alias HostKit.Resources.{Capability, Package, Source}
+  alias HostKit.Resources.{Capability, Directory, EnvFile, File, Package, Source}
 
   @type t :: %__MODULE__{
           project: Project.t(),
@@ -50,6 +50,113 @@ defmodule HostKit.Plan do
         {:error, diagnostics}
       end
     end
+  end
+
+  @doc "Builds a down/rollback plan from an existing plan."
+  @spec down(t(), keyword()) :: {:ok, t()} | {:error, term()}
+  def down(%__MODULE__{} = plan, opts \\ []) do
+    selected = select_changes(plan.changes, opts)
+
+    {changes, warnings} =
+      selected
+      |> Enum.reverse()
+      |> Enum.reduce({[], []}, fn change, {changes, warnings} ->
+        case down_change(change) do
+          {:ok, down} -> {[down | changes], warnings}
+          {:skip, warning} -> {changes, [warning | warnings]}
+        end
+      end)
+
+    changes = Enum.reverse(changes)
+    diagnostics = merge_down_warnings(plan.diagnostics, warnings)
+
+    {:ok,
+     %__MODULE__{
+       plan
+       | resources: Enum.map(changes, & &1.after) |> Enum.reject(&is_nil/1),
+         changes: changes,
+         summary: summarize(changes) |> Map.put(:direction, :down),
+         diagnostics: diagnostics,
+         opts: Keyword.put(plan.opts, :direction, :down)
+     }}
+  end
+
+  defp merge_down_warnings(%Diagnostics{} = diagnostics, warnings),
+    do: %Diagnostics{diagnostics | warnings: diagnostics.warnings ++ warnings}
+
+  defp select_changes(changes, opts) do
+    only = opts |> Keyword.get(:only, []) |> List.wrap()
+    except = opts |> Keyword.get(:except, []) |> List.wrap()
+
+    Enum.filter(changes, fn change ->
+      (only == [] or change.resource_id in only) and change.resource_id not in except
+    end)
+  end
+
+  defp down_change(%Change{action: :update, before: nil} = change),
+    do: {:skip, irreversible(change, :missing_previous_state)}
+
+  defp down_change(%Change{action: :update, before: before} = change) do
+    {:ok,
+     %Change{
+       action: :update,
+       resource_id: change.resource_id,
+       before: change.after,
+       after: before,
+       reason: {:down, change.reason}
+     }}
+  end
+
+  defp down_change(%Change{action: :create, after: resource} = change) do
+    if delete_supported?(resource) do
+      {:ok,
+       %Change{
+         action: :delete,
+         resource_id: change.resource_id,
+         before: resource,
+         after: nil,
+         reason: {:down, change.reason}
+       }}
+    else
+      {:skip, irreversible(change, :delete_not_supported)}
+    end
+  end
+
+  defp down_change(%Change{action: :delete, before: nil} = change),
+    do: {:skip, irreversible(change, :missing_previous_state)}
+
+  defp down_change(%Change{action: :delete, before: before} = change) do
+    {:ok,
+     %Change{
+       action: :create,
+       resource_id: change.resource_id,
+       before: nil,
+       after: before,
+       reason: {:down, change.reason}
+     }}
+  end
+
+  defp down_change(%Change{} = change), do: {:skip, irreversible(change, :not_applied_change)}
+
+  defp delete_supported?(%File{}), do: true
+  defp delete_supported?(%EnvFile{}), do: true
+  defp delete_supported?(%Directory{}), do: true
+  defp delete_supported?(%HostKit.Firewall{}), do: true
+  defp delete_supported?(%HostKit.Proxy{}), do: true
+  defp delete_supported?(%HostKit.Systemd.Service{}), do: true
+  defp delete_supported?(%HostKit.Systemd.Timer{}), do: true
+  defp delete_supported?(_resource), do: false
+
+  defp irreversible(%Change{} = change, reason) do
+    %Diagnostic{
+      severity: :warning,
+      code: :irreversible_change,
+      message: "change cannot be represented in a down plan: #{inspect(reason)}",
+      resource_id: change.resource_id,
+      details: %{reason: reason, action: change.action},
+      hint:
+        "HostKit keeps rollback as a plan; unsupported resources are omitted from the down plan."
+    }
   end
 
   defp maybe_put_package_manager(resources, opts) do

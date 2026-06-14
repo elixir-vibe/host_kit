@@ -195,6 +195,35 @@ defmodule HostKit.Apply do
 
   defp apply_change(%Change{action: :no_op} = change, _opts), do: {:ok, skipped(change)}
   defp apply_change(%Change{action: :read} = change, _opts), do: {:ok, skipped(change)}
+
+  defp apply_change(%Change{action: :delete, before: %Directory{} = directory} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_path(directory.path, [:directory], opts) end)
+  end
+
+  defp apply_change(%Change{action: :delete, before: %File{} = file} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_path(file.path, [:file], opts) end)
+  end
+
+  defp apply_change(%Change{action: :delete, before: %EnvFile{} = env_file} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_path(env_file.path, [:file], opts) end)
+  end
+
+  defp apply_change(%Change{action: :delete, before: %Systemd.Service{} = service} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_systemd_unit(service.name, opts) end)
+  end
+
+  defp apply_change(%Change{action: :delete, before: %Systemd.Timer{} = timer} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_systemd_unit(timer.name, opts) end)
+  end
+
+  defp apply_change(%Change{action: :delete, before: %Firewall{} = firewall} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_path(firewall.path, [:file], opts) end)
+  end
+
+  defp apply_change(%Change{action: :delete, before: %Proxy{} = proxy} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_path(proxy.path, [:file], opts) end)
+  end
+
   defp apply_change(%Change{action: :delete}, _opts), do: {:error, :delete_not_supported}
 
   defp apply_change(%Change{action: :create, after: %Account{} = account} = change, opts) do
@@ -507,7 +536,7 @@ defmodule HostKit.Apply do
   end
 
   defp apply_systemd_unit(name, content, opts) do
-    path = Path.join(Keyword.get(opts, :systemd_unit_dir, "/etc/systemd/system"), name)
+    path = systemd_unit_path(name, opts)
     owner = Keyword.get(opts, :systemd_unit_owner, "root")
     group = Keyword.get(opts, :systemd_unit_group, "root")
 
@@ -517,6 +546,15 @@ defmodule HostKit.Apply do
       Ops.chmod(path, 0o644, opts)
     end
   end
+
+  defp delete_systemd_unit(name, opts),
+    do: delete_path(systemd_unit_path(name, opts), [:file], opts)
+
+  defp systemd_unit_path(name, opts),
+    do: Path.join(Keyword.get(opts, :systemd_unit_dir, "/etc/systemd/system"), name)
+
+  defp delete_path(path, [:directory], opts), do: Ops.cmd(opts, "rmdir", [path])
+  defp delete_path(path, [:file], opts), do: Ops.cmd(opts, "rm", ["-f", path])
 
   defp finish_apply(results, true, opts) do
     if Keyword.get(opts, :dry_run, false) do
@@ -542,7 +580,15 @@ defmodule HostKit.Apply do
        when status in [:applied, :dry_run],
        do: true
 
+  defp systemd_change?(%{status: status, change: %{before: %Systemd.Service{}}})
+       when status in [:applied, :dry_run],
+       do: true
+
   defp systemd_change?(%{status: status, change: %{after: %Systemd.Timer{}}})
+       when status in [:applied, :dry_run],
+       do: true
+
+  defp systemd_change?(%{status: status, change: %{before: %Systemd.Timer{}}})
        when status in [:applied, :dry_run],
        do: true
 

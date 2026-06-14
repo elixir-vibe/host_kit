@@ -52,6 +52,33 @@ project :toys do
 end
 ```
 
+## Plans and down plans
+
+Rollback is represented as another HostKit plan. A plan change already carries `before` and `after` state, so HostKit can derive a down plan from the exact plan that was applied:
+
+```elixir
+{:ok, plan} = HostKit.plan(project, target: prod)
+{:ok, down_plan} = HostKit.down(plan)
+
+HostKit.format_plan(down_plan)
+HostKit.apply(down_plan, confirm: true)
+```
+
+Partial rollback uses the same plan model:
+
+```elixir
+{:ok, down_plan} =
+  HostKit.down(plan, only: [{:file, "/etc/gatehouse/config.exs"}])
+```
+
+CLI usage mirrors this:
+
+```sh
+mix host_kit.plan infra/config.exs --host prod --out up.plan.json
+mix host_kit.down up.plan.json --out down.plan.json
+mix host_kit.apply --plan down.plan.json --confirm
+```
+
 ## Providers
 
 Providers can contribute DSL modules, resource types, renderers, validators, and read/plan/apply lifecycle operations. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.

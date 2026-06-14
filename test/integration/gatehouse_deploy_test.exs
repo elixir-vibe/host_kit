@@ -84,6 +84,21 @@ defmodule HostKit.Integration.GatehouseDeployTest do
       |> Keyword.put_new(:package_lock, "test/fixtures/package_locks/beam_apt.package.lock")
 
     assert {:ok, plan} = HostKit.plan(project, target_opts)
+
+    assert {:ok, down_plan} =
+             HostKit.down(plan,
+               only: [
+                 {:proxy, :web},
+                 {:systemd_service, service_unit}
+               ]
+             )
+
+    assert Enum.map(down_plan.changes, & &1.resource_id) == [
+             {:systemd_service, service_unit},
+             {:proxy, :web}
+           ]
+
+    assert {:ok, _dry_run} = HostKit.apply(down_plan, Keyword.merge(target_opts, dry_run: true))
     assert {:ok, _results} = HostKit.apply(plan, Keyword.merge(target_opts, confirm: true))
 
     runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}

@@ -51,7 +51,7 @@ defmodule Mix.Tasks.HostKit.Plan do
       case HostKit.plan(project, plan_opts(opts, target_opts)) do
         {:ok, plan} ->
           maybe_write_artifact(plan, opts, target_opts)
-          IO.puts(format_plan(plan, opts))
+          IO.puts(Mix.Tasks.HostKit.Output.format_plan(plan, opts))
 
         {:error, %HostKit.Diagnostics{} = diagnostics} ->
           Mix.raise(HostKit.Diagnostics.Format.format(diagnostics))
@@ -131,13 +131,6 @@ defmodule Mix.Tasks.HostKit.Plan do
 
   defp put_metadata(metadata, _key, nil), do: metadata
   defp put_metadata(metadata, key, value), do: Map.put(metadata, key, value)
-
-  defp format_plan(plan, opts) do
-    case Keyword.get(opts, :format, "text") do
-      "text" -> HostKit.Plan.Format.format(plan)
-      "inspect" -> inspect(plan, pretty: true, limit: :infinity, structs: true)
-    end
-  end
 
   defp plan_opts(opts, target_opts) do
     target_opts
