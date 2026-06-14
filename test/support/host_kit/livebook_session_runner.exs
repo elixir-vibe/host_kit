@@ -208,35 +208,48 @@ defmodule HostKit.LivebookSessionRunner do
     )
   end
 
+  defp env(name, default), do: System.get_env(name, default)
+
+  defp env_integer(name, default) do
+    case System.get_env(name) do
+      nil -> default
+      value -> String.to_integer(value)
+    end
+  end
+
+  defp env_flag?(name), do: System.get_env(name) in ["1", "true", "yes"]
+
   defp demo_settings(path) do
     case Path.basename(path) do
       "deploy_caddy_site.livemd" ->
         %{
-          server: "127.0.0.1",
-          user: System.get_env("USER") || "root",
-          ssh_port: 22,
-          identity_file: "~/.ssh/id_ed25519",
-          public_port: 18_080,
+          server: env("HOSTKIT_LIVEBOOK_SERVER", "127.0.0.1"),
+          user: env("HOSTKIT_LIVEBOOK_USER", System.get_env("USER") || "root"),
+          ssh_port: env_integer("HOSTKIT_LIVEBOOK_SSH_PORT", 22),
+          identity_file: env("HOSTKIT_LIVEBOOK_IDENTITY_FILE", "~/.ssh/id_ed25519"),
+          public_port: env_integer("HOSTKIT_LIVEBOOK_CADDY_PORT", 18_080),
           message: "Validated by HostKit Livebook session runner",
-          apply?: false,
-          verify?: false
+          apply?: env_flag?("HOSTKIT_LIVEBOOK_APPLY"),
+          verify?: env_flag?("HOSTKIT_LIVEBOOK_VERIFY")
         }
 
       "deploy_phoenix_app.livemd" ->
         %{
-          server: "127.0.0.1",
-          user: System.get_env("USER") || "root",
-          ssh_port: 22,
-          identity_file: "~/.ssh/id_ed25519",
-          public_hostname: "phoenix.example.com",
-          public_port: 18_081,
-          app_port: 14_000,
-          source_repo: "https://github.com/elixir-vibe/host_kit.git",
-          source_ref: "master",
-          erlang_version: "29.0.2",
-          elixir_version: "1.20.1",
-          apply?: false,
-          verify?: false
+          server: env("HOSTKIT_LIVEBOOK_SERVER", "127.0.0.1"),
+          user: env("HOSTKIT_LIVEBOOK_USER", System.get_env("USER") || "root"),
+          ssh_port: env_integer("HOSTKIT_LIVEBOOK_SSH_PORT", 22),
+          identity_file: env("HOSTKIT_LIVEBOOK_IDENTITY_FILE", "~/.ssh/id_ed25519"),
+          public_hostname: env("HOSTKIT_LIVEBOOK_PHOENIX_HOSTNAME", "phoenix.example.com"),
+          public_port: env_integer("HOSTKIT_LIVEBOOK_PHOENIX_PORT", 18_081),
+          app_port: env_integer("HOSTKIT_LIVEBOOK_PHOENIX_APP_PORT", 14_000),
+          source_repo:
+            env("HOSTKIT_LIVEBOOK_SOURCE_REPO", "https://github.com/elixir-vibe/host_kit.git"),
+          source_ref: env("HOSTKIT_LIVEBOOK_SOURCE_REF", "master"),
+          package_repo: env("HOSTKIT_LIVEBOOK_PACKAGE_REPO", "ubuntu_24_04"),
+          erlang_version: env("HOSTKIT_LIVEBOOK_ERLANG", "29.0.2"),
+          elixir_version: env("HOSTKIT_LIVEBOOK_ELIXIR", "1.20.1"),
+          apply?: env_flag?("HOSTKIT_LIVEBOOK_APPLY"),
+          verify?: env_flag?("HOSTKIT_LIVEBOOK_VERIFY")
         }
 
       other ->

@@ -51,6 +51,7 @@ settings_form =
       app_port: Input.number("Phoenix port", default: 14_000),
       source_repo: Input.text("Source repository", default: "https://github.com/elixir-vibe/host_kit.git"),
       source_ref: Input.text("Git ref", default: "master"),
+      package_repo: Input.text("Package repository", default: "ubuntu_24_04"),
       erlang_version: Input.text("Erlang version", default: "29.0.2"),
       elixir_version: Input.text("Elixir version", default: "1.20.1"),
       apply?: Input.checkbox("Apply now", default: false),
@@ -96,6 +97,7 @@ app = %{
   public_port: settings.public_port,
   source_repo: settings.source_repo,
   source_ref: settings.source_ref,
+  package_repo: settings.package_repo,
   erlang_version: settings.erlang_version,
   elixir_version: settings.elixir_version
 }
@@ -110,6 +112,7 @@ Derive app, runtime, and artifact settings in one place.
 public_hostname = app.public_hostname
 source_repo = app.source_repo
 source_ref = app.source_ref
+package_repo = app.package_repo
 erlang_version = app.erlang_version
 elixir_version = app.elixir_version
 app_name = :hello_phoenix
@@ -118,7 +121,36 @@ http_port = app.public_port
 ingress_address = ":#{http_port}"
 public_url = "http://#{target.host}:#{http_port}"
 artifact_path = "/tmp/hostkit-phoenix-demo.plan.json"
+package_lock_path = "/tmp/hostkit-beam.package.lock"
 secret_key_base = Base.encode64(:crypto.strong_rand_bytes(64))
+```
+
+Write a tiny package lock for the BEAM build dependencies. This keeps the demo deterministic on Ubuntu-style hosts without requiring a separate file next to the notebook.
+
+```elixir
+package_lock = ~S'''
+{
+  "version": 1,
+  "target": null,
+  "packages": {
+    "autoconf": "autoconf",
+    "ca_certificates": "ca-certificates",
+    "curl": "curl",
+    "cxx_compiler": "g++",
+    "gcc": "gcc",
+    "git": "git",
+    "m4": "m4",
+    "make": "make",
+    "ncurses_dev": "libncurses-dev",
+    "openssl_dev": "libssl-dev",
+    "perl": "perl",
+    "unzip": "unzip",
+    "xsltproc": "xsltproc"
+  }
+}
+'''
+
+File.write!(package_lock_path, package_lock)
 ```
 
 Derive the Caddy wrapper service paths. HostKit will manage these resources rather than asking the notebook to shell out.
@@ -187,7 +219,6 @@ project =
 
       ready :phoenix_caddy do
         systemd caddy_service_name, restart: true
-        http public_url
       end
     end
 
@@ -209,6 +240,13 @@ project =
       caddy: [
         host: ingress_address
       ]
+
+    service :phoenix_public do
+      ready :phoenix_public do
+        systemd caddy_service_name, restart: true
+        http public_url
+      end
+    end
   end
 
 project
@@ -220,7 +258,13 @@ Build an inspectable plan for the selected host. This is still a dry declaration
 
 ```elixir
 host = hd(project.hosts)
-target_opts = Host.target_opts(host)
+
+target_opts =
+  host
+  |> Host.target_opts()
+  |> Keyword.put(:package_repo, package_repo)
+  |> Keyword.put(:package_lock, package_lock_path)
+
 {:ok, plan} = HK.plan(project, target_opts)
 ```
 
