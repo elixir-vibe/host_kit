@@ -1,5 +1,7 @@
 # Deploy a Phoenix app with HostKit
 
+Start with the notebook dependencies. `kino` provides friendly inputs, `req` verifies the deployed endpoint, and `host_kit` provides the deployment DSL and runtime APIs.
+
 ```elixir
 Mix.install([
   {:kino, "~> 0.14"},
@@ -8,7 +10,7 @@ Mix.install([
 ])
 ```
 
-This notebook deploys the example Phoenix app from the HostKit repository:
+Use aliases so the rest of the notebook reads like application code.
 
 ```elixir
 alias HostKit, as: HK
@@ -19,17 +21,20 @@ alias HostKit.Providers.{Caddy, Elixir}
 alias HostKit.Resources.Source
 ```
 
-1. declare the app source/runtime,
-2. build a release on the target,
-3. run it with systemd,
-4. publish it through semantic ingress rendered by Caddy,
-5. optionally apply and verify.
+This notebook deploys the example Phoenix app from the HostKit repository:
+
+1. collect target and app settings,
+2. declare the app source/runtime,
+3. build a release on the target,
+4. run it with systemd,
+5. publish it through semantic ingress rendered by Caddy,
+6. optionally apply and verify.
 
 The deployment declaration lives directly in the notebook. The integration test extracts the marked DSL cell below.
 
 ## Demo settings
 
-A small target picker keeps notebook input separate from the HostKit declaration. Advanced SSH values come from ordinary environment variables.
+Expose a small form for the values people expect to choose during a demo. Advanced SSH values come from environment variables so they are easy to automate in tests and CI.
 
 ```elixir
 settings_form =
@@ -47,8 +52,17 @@ settings_form =
   )
 
 Kino.render(settings_form)
-settings = Kino.Control.await(settings_form)
+```
 
+Read the submitted form once. Every later cell works with ordinary Elixir data.
+
+```elixir
+settings = Kino.Control.await(settings_form)
+```
+
+Turn the form values into an explicit HostKit target. The SSH key path can still come from your shell or Livebook deployment environment.
+
+```elixir
 target = %{
   host: settings.server,
   user: settings.user,
@@ -59,7 +73,11 @@ target = %{
     silently_accept_hosts: true
   ]
 }
+```
 
+Describe the Phoenix app settings separately from the host settings.
+
+```elixir
 app = %{
   public_hostname: "phoenix.example.com",
   app_port: settings.app_port,
@@ -71,12 +89,18 @@ apply? = settings.apply?
 verify? = settings.verify?
 ```
 
+Derive target variables that the declaration can use directly.
+
 ```elixir
 target_host = target.host
 target_user = target.user
 target_sudo = target.sudo
 ssh_opts = target.ssh
+```
 
+Derive app, runtime, and artifact settings in one place.
+
+```elixir
 public_hostname = app.public_hostname
 source_repo = System.get_env("HOSTKIT_PHOENIX_SOURCE_GIT", "https://github.com/elixir-vibe/host_kit.git")
 source_ref = app.source_ref
@@ -89,7 +113,11 @@ ingress_address = ":#{http_port}"
 public_url = "http://#{target_host}:#{http_port}"
 artifact_path = "/tmp/hostkit-phoenix-demo.plan.json"
 secret_key_base = Base.encode64(:crypto.strong_rand_bytes(64))
+```
 
+Derive the Caddy wrapper service paths. HostKit will manage these resources rather than asking the notebook to shell out.
+
+```elixir
 deployment_name = "hostkit-phoenix-demo-#{http_port}"
 app_service_name = "hello-phoenix.service"
 caddy_config_path = "/etc/#{deployment_name}/Caddyfile"
@@ -178,15 +206,23 @@ project
 
 ## Plan
 
+Build an inspectable plan for the selected host. This is still a dry declaration-to-plan step; the target has not changed yet.
+
 ```elixir
 host = hd(project.hosts)
 target_opts = Host.target_opts(host)
 {:ok, plan} = HK.plan(project, target_opts)
+```
 
+Render the plan so you can review the exact changes before applying them.
+
+```elixir
 plan |> Format.format() |> Kino.Markdown.new()
 ```
 
 ## Inspect what the recipe generated
+
+Recipes still compile to plain resources. Here we focus on source and ingress resources because they explain where the app comes from and how traffic reaches it.
 
 ```elixir
 Project.resources(project)
@@ -194,6 +230,8 @@ Project.resources(project)
 ```
 
 ## Source provenance
+
+HostKit records source identity so plans and artifacts can explain which Git source/ref produced the deployment.
 
 ```elixir
 plan.resources
@@ -203,6 +241,8 @@ plan.resources
 
 ## Save an artifact
 
+Plans can be saved for review, CI, or later rollback workflows.
+
 ```elixir
 :ok = Artifact.save(artifact_path, plan)
 artifact_path
@@ -210,7 +250,7 @@ artifact_path
 
 ## Apply
 
-Applying is explicit. Set `apply? = true` in the settings cell.
+Applying is explicit. Set `Apply now` in the settings form when you are ready.
 
 ```elixir
 reporter = self()
@@ -221,7 +261,11 @@ apply_result =
   else
     {:skipped, :set_apply_to_true}
   end
+```
 
+HostKit sends progress events to the notebook process. Livebook can display them without custom callback code.
+
+```elixir
 progress =
   Stream.repeatedly(fn ->
     receive do
@@ -236,6 +280,8 @@ progress =
 ```
 
 ## Verify
+
+Readiness checks in the declaration already restart and wait for systemd services during apply. Verification can stay focused on the app URL.
 
 ```elixir
 if verify? do

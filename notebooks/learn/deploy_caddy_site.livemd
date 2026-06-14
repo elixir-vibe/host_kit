@@ -1,5 +1,7 @@
 # Deploy a Caddy static site with HostKit
 
+Start with the small set of notebook dependencies. `kino` gives us friendly inputs, `req` verifies the deployed site, and `host_kit` provides the deployment DSL and runtime APIs.
+
 ```elixir
 Mix.install([
   {:kino, "~> 0.14"},
@@ -8,7 +10,7 @@ Mix.install([
 ])
 ```
 
-This notebook is a small, readable HostKit demo:
+Use short aliases in the rest of the notebook so the code reads like a walkthrough instead of a wall of module names.
 
 ```elixir
 alias HostKit, as: HK
@@ -18,16 +20,19 @@ alias HostKit.Plan.{Artifact, Format}
 alias HostKit.Providers.Caddy
 ```
 
-1. declare a target and a static site,
-2. inspect the plan,
-3. optionally apply it,
-4. verify the site.
+This notebook is a small, readable HostKit demo:
+
+1. collect target and site settings,
+2. declare a target and a static site,
+3. inspect the plan,
+4. optionally apply it,
+5. verify the site.
 
 The deployment declaration lives directly in the notebook. The integration test extracts the marked DSL cell below.
 
 ## Demo settings
 
-A small target picker keeps notebook input separate from the HostKit declaration. Advanced SSH values come from ordinary environment variables.
+First, expose the values someone actually cares about. Advanced SSH values still come from ordinary environment variables so the demo form stays approachable.
 
 ```elixir
 settings_form =
@@ -44,8 +49,17 @@ settings_form =
   )
 
 Kino.render(settings_form)
-settings = Kino.Control.await(settings_form)
+```
 
+Read the submitted form. From here on, everything is plain Elixir data that the HostKit declaration can reference.
+
+```elixir
+settings = Kino.Control.await(settings_form)
+```
+
+Turn the UI fields into explicit target settings. This keeps credentials and transport details visible without mixing them into the deployment declaration.
+
+```elixir
 target = %{
   host: settings.server,
   user: settings.user,
@@ -56,7 +70,11 @@ target = %{
     silently_accept_hosts: true
   ]
 }
+```
 
+Describe the tiny site we want to publish.
+
+```elixir
 site = %{
   address: ":#{settings.public_port}",
   message: settings.message
@@ -65,6 +83,8 @@ site = %{
 apply? = settings.apply?
 verify? = settings.verify?
 ```
+
+Derive stable names and paths once. The declaration below can now focus on resources instead of string building.
 
 ```elixir
 deployment_name = "hostkit-caddy-demo"
@@ -89,7 +109,7 @@ public_url = "http://#{target_host}#{site_address}"
 
 ## Deployment declaration
 
-This is the important part: ordinary HostKit DSL, not a generated script.
+This is the important part: ordinary HostKit DSL, not a generated script. The same declaration works in tests, scripts, Mix tasks, and this Livebook.
 
 ```elixir
 # hostkit:deploy-caddy-site-dsl
@@ -173,21 +193,31 @@ project
 
 ## Plan
 
+Build an inspectable plan for the selected host. Nothing has been changed on the target yet.
+
 ```elixir
 host = hd(project.hosts)
 target_opts = Host.target_opts(host)
 {:ok, plan} = HK.plan(project, target_opts)
+```
 
+Render the plan as a human-readable checklist.
+
+```elixir
 plan |> Format.format() |> Kino.Markdown.new()
 ```
 
 ## Inspect generated resources
+
+The DSL compiles to plain structs. You can inspect the resources before applying them.
 
 ```elixir
 Project.resources(project)
 ```
 
 ## Save an artifact
+
+Plans can be saved as artifacts for review, CI, or later rollback workflows.
 
 ```elixir
 :ok = Artifact.save(artifact_path, plan)
@@ -196,7 +226,7 @@ artifact_path
 
 ## Apply
 
-Applying is explicit. Set `apply? = true` in the settings cell.
+Applying is explicit. Set `Apply now` in the settings form when you are ready.
 
 ```elixir
 reporter = self()
@@ -207,7 +237,11 @@ apply_result =
   else
     {:skipped, :set_apply_to_true}
   end
+```
 
+HostKit sends progress events to the notebook process, so the UI does not need callback plumbing.
+
+```elixir
 progress =
   Stream.repeatedly(fn ->
     receive do
@@ -222,6 +256,8 @@ progress =
 ```
 
 ## Verify
+
+Readiness checks in the declaration already restart and wait for the service during apply. Verification can stay simple: fetch the public URL.
 
 ```elixir
 if verify? do
