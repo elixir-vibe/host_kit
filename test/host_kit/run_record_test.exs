@@ -82,6 +82,63 @@ defmodule HostKit.RunRecordTest do
            ] = restored_plan.changes
   end
 
+  test "backup refs are applied to file-like resource metadata" do
+    backup_path =
+      Path.join(System.tmp_dir!(), "hostkit-backup-#{System.unique_integer([:positive])}")
+
+    before = %HostKit.Proxy{
+      name: :edge,
+      provider: :gatehouse,
+      path: "/tmp/gatehouse.exs",
+      meta: %{content: "old proxy"}
+    }
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :tracked},
+      changes: [
+        %Change{action: :update, resource_id: {:proxy, :edge}, before: before, after: before}
+      ]
+    }
+
+    record = %HostKit.RunRecord{backups: %{inspect({:proxy, :edge}) => backup_path}}
+
+    restored_plan = HostKit.RunRecord.apply_backups(plan, record)
+
+    assert [
+             %HostKit.Change{
+               before: %HostKit.Proxy{meta: %{content: %HostKit.BackupRef{path: ^backup_path}}}
+             }
+           ] = restored_plan.changes
+  end
+
+  test "backup-backed proxy resources restore captured content" do
+    root =
+      Path.join(System.tmp_dir!(), "hostkit-proxy-backup-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf(root) end)
+
+    proxy_path = Path.join(root, "gatehouse.exs")
+    backup_path = Path.join(root, "backup.exs")
+    File.write!(proxy_path, "new proxy")
+    File.write!(backup_path, "old proxy")
+
+    proxy = %HostKit.Proxy{
+      name: :edge,
+      provider: :gatehouse,
+      path: proxy_path,
+      meta: %{content: %HostKit.BackupRef{path: backup_path}}
+    }
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :tracked},
+      changes: [%Change{action: :update, resource_id: {:proxy, :edge}, after: proxy}]
+    }
+
+    assert {:ok, _results} = HostKit.apply(plan, confirm: true)
+    assert File.read!(proxy_path) == "old proxy"
+  end
+
   test "tracked apply records plan artifact references" do
     root =
       Path.join(System.tmp_dir!(), "hostkit-runs-artifacts-#{System.unique_integer([:positive])}")

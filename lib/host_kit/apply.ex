@@ -273,14 +273,18 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %Systemd.Service{} = service} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn ->
-      apply_systemd_unit(service.name, Systemd.Service.render(service), opts)
+      with {:ok, content} <- rendered_content(service, Systemd.Service.render(service), opts) do
+        apply_systemd_unit(service.name, content, opts)
+      end
     end)
   end
 
   defp apply_change(%Change{action: action, after: %Systemd.Timer{} = timer} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn ->
-      apply_systemd_unit(timer.name, Systemd.Timer.render(timer), opts)
+      with {:ok, content} <- rendered_content(timer, Systemd.Timer.render(timer), opts) do
+        apply_systemd_unit(timer.name, content, opts)
+      end
     end)
   end
 
@@ -378,6 +382,11 @@ defmodule HostKit.Apply do
       Ops.chmod(path, file.mode, opts)
     end
   end
+
+  defp rendered_content(%{meta: %{content: %HostKit.BackupRef{} = ref}}, _default, opts),
+    do: file_content(ref, opts)
+
+  defp rendered_content(_resource, default, _opts), do: {:ok, IO.iodata_to_binary(default)}
 
   defp file_content(%HostKit.BackupRef{path: path}, opts), do: read_file(path, opts)
   defp file_content(nil, _opts), do: {:ok, ""}
@@ -538,8 +547,9 @@ defmodule HostKit.Apply do
   end
 
   defp apply_proxy(%Proxy{path: path} = proxy, opts) do
-    with :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, Proxy.render(proxy), opts),
+    with {:ok, content} <- rendered_content(proxy, Proxy.render(proxy), opts),
+         :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, content, opts),
          :ok <- Ops.chown(path, proxy.meta[:owner], proxy.meta[:group], opts) do
       Ops.chmod(path, Map.get(proxy.meta, :mode, 0o644), opts)
     end
@@ -548,8 +558,9 @@ defmodule HostKit.Apply do
   defp apply_mise(%Mise{} = mise, opts), do: HostKit.Mise.install(mise, opts)
 
   defp apply_firewall(%Firewall{path: path} = firewall, opts) do
-    with :ok <- mkdir_p(Path.dirname(path), opts),
-         :ok <- write_file(path, Firewall.render(firewall), opts),
+    with {:ok, content} <- rendered_content(firewall, Firewall.render(firewall), opts),
+         :ok <- mkdir_p(Path.dirname(path), opts),
+         :ok <- write_file(path, content, opts),
          :ok <- Ops.chown(path, "root", "root", opts),
          :ok <- Ops.chmod(path, 0o644, opts),
          :ok <- validate_firewall(path, opts) do

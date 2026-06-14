@@ -116,23 +116,22 @@ defmodule HostKit.RunRecord do
   end
 
   defp apply_change_backup(
-         %HostKit.Change{resource_id: resource_id, before: %HostKit.Resources.File{} = file} =
-           change,
+         %HostKit.Change{resource_id: resource_id, before: before} = change,
          backups
        ) do
     case Map.get(backups, inspect(resource_id)) do
-      path when is_binary(path) ->
-        %HostKit.Change{
-          change
-          | before: %HostKit.Resources.File{file | content: %HostKit.BackupRef{path: path}}
-        }
-
-      _missing ->
-        change
+      path when is_binary(path) -> %HostKit.Change{change | before: put_backup_ref(before, path)}
+      _missing -> change
     end
   end
 
-  defp apply_change_backup(change, _backups), do: change
+  defp put_backup_ref(%HostKit.Resources.File{} = file, path),
+    do: %HostKit.Resources.File{file | content: %HostKit.BackupRef{path: path}}
+
+  defp put_backup_ref(%{meta: meta} = resource, path),
+    do: %{resource | meta: Map.put(meta, :content, %HostKit.BackupRef{path: path})}
+
+  defp put_backup_ref(resource, _path), do: resource
 
   def validate_version!(@version), do: @version
 

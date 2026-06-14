@@ -114,7 +114,7 @@ mix host_kit.runs --host prod infra/config.exs
 
 Run records are intentionally compact: they identify the run, project, direction, timestamp, and applied change statuses. They do not replace plan artifacts; use plan artifacts for inspectable up/down plan contents. When a tracked apply is started from `--plan`, HostKit copies that up-plan artifact under the runs root and records the copied path so `mix host_kit.down --last` can work from the tracked run.
 
-Tracked applies also write backup payloads for previous file-like state when that state was captured in the plan. Backup payloads live under `hostkit_backups/<run-id>/` or the `--backups-root` override.
+Tracked applies also write backup payloads for previous file-like state when that state was captured in the plan. Backup payloads live under `hostkit_backups/<run-id>/` or the `--backups-root` override. `mix host_kit.down --last` rewrites supported previous file-like state to `%HostKit.BackupRef{}` entries so generated down plans restore from backup payloads instead of embedding prior content. Backup-backed restore currently covers ordinary files plus rendered file resources such as proxy, firewall, and systemd unit files when their previous rendered content was captured.
 
 ## Elixir app lifecycle helpers
 
