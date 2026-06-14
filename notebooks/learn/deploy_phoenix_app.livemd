@@ -10,6 +10,15 @@ Mix.install([
 
 This notebook deploys the example Phoenix app from the HostKit repository:
 
+```elixir
+alias HostKit, as: HK
+alias HostKit.{Apply, Host, Ingress, Project, Runner}
+alias HostKit.Apply.Event, as: ApplyEvent
+alias HostKit.Plan.{Artifact, Format}
+alias HostKit.Providers.{Caddy, Elixir}
+alias HostKit.Resources.Source
+```
+
 1. declare the app source/runtime,
 2. build a release on the target,
 3. run it with systemd,
@@ -103,8 +112,10 @@ This is the important part: the app recipe expands to ordinary resources—sourc
 
 ```elixir
 # hostkit:deploy-phoenix-app-dsl
+alias HostKit.Providers.{Caddy, Elixir}
+
 use HostKit,
-  providers: [HostKit.Providers.Caddy, HostKit.Providers.Elixir]
+  providers: [Caddy, Elixir]
 
 project =
   project :deploy_phoenix_app do
@@ -115,7 +126,7 @@ project =
       ssh ssh_opts
     end
 
-    provider :caddy, HostKit.Providers.Caddy do
+    provider :caddy, Caddy do
       set :sites_dir, caddy_sites_dir
     end
 
@@ -164,31 +175,31 @@ project
 
 ```elixir
 host = hd(project.hosts)
-target_opts = HostKit.Host.target_opts(host)
-{:ok, plan} = HostKit.plan(project, target_opts)
+target_opts = Host.target_opts(host)
+{:ok, plan} = HK.plan(project, target_opts)
 
-plan |> HostKit.Plan.Format.format() |> Kino.Markdown.new()
+plan |> Format.format() |> Kino.Markdown.new()
 ```
 
 ## Inspect what the recipe generated
 
 ```elixir
-HostKit.Project.resources(project)
-|> Enum.filter(&(match?(%HostKit.Resources.Source{}, &1) or match?(%HostKit.Ingress{}, &1)))
+Project.resources(project)
+|> Enum.filter(&(match?(%Source{}, &1) or match?(%Ingress{}, &1)))
 ```
 
 ## Source provenance
 
 ```elixir
 plan.resources
-|> Enum.filter(&match?(%HostKit.Resources.Source{}, &1))
-|> Enum.map(fn source -> {source.name, HostKit.Resources.Source.identity(source)} end)
+|> Enum.filter(&match?(%Source{}, &1))
+|> Enum.map(fn source -> {source.name, Source.identity(source)} end)
 ```
 
 ## Save an artifact
 
 ```elixir
-:ok = HostKit.Plan.Artifact.save(artifact_path, plan)
+:ok = Artifact.save(artifact_path, plan)
 artifact_path
 ```
 
@@ -201,7 +212,7 @@ reporter = self()
 
 apply_result =
   if apply? do
-    HostKit.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
+    HK.apply(plan, Keyword.merge(target_opts, confirm: true, reporter: reporter))
   else
     {:skipped, :set_apply_to_true}
   end
@@ -209,7 +220,7 @@ apply_result =
 progress =
   Stream.repeatedly(fn ->
     receive do
-      {HostKit.Apply, event} -> HostKit.Apply.Event.format(event)
+      {Apply, event} -> ApplyEvent.format(event)
     after
       0 -> nil
     end
@@ -223,23 +234,23 @@ progress =
 
 ```elixir
 if verify? do
-  runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
+  runner = {Runner.SSH, Host.ssh_options(host)}
 
   restart_app =
     if host.sudo do
-      HostKit.Runner.cmd(runner, "sudo", ["systemctl", "restart", app_service_name], stderr_to_stdout: true)
+      Runner.cmd(runner, "sudo", ["systemctl", "restart", app_service_name], stderr_to_stdout: true)
     else
-      HostKit.Runner.cmd(runner, "systemctl", ["restart", app_service_name], stderr_to_stdout: true)
+      Runner.cmd(runner, "systemctl", ["restart", app_service_name], stderr_to_stdout: true)
     end
 
   restart_caddy =
     if host.sudo do
-      HostKit.Runner.cmd(runner, "sudo", ["systemctl", "restart", caddy_service_name], stderr_to_stdout: true)
+      Runner.cmd(runner, "sudo", ["systemctl", "restart", caddy_service_name], stderr_to_stdout: true)
     else
-      HostKit.Runner.cmd(runner, "systemctl", ["restart", caddy_service_name], stderr_to_stdout: true)
+      Runner.cmd(runner, "systemctl", ["restart", caddy_service_name], stderr_to_stdout: true)
     end
 
-  response = HostKit.Runner.cmd(runner, "curl", ["-fsS", "http://127.0.0.1:#{http_port}"], stderr_to_stdout: true)
+  response = Runner.cmd(runner, "curl", ["-fsS", "http://127.0.0.1:#{http_port}"], stderr_to_stdout: true)
   {restart_app, restart_caddy, response, public_url}
 else
   {:skipped, public_url}
