@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.0-beta.1
+
+- Included Livebook demos and internal architecture guide in Hex package docs.
+
 ## v0.1.0-beta.0
 
 Initial beta release.

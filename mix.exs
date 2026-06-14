@@ -4,7 +4,7 @@ defmodule HostKit.MixProject do
   def project do
     [
       app: :host_kit,
-      version: "0.1.0-beta.0",
+      version: "0.1.0-beta.1",
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -61,7 +61,7 @@ defmodule HostKit.MixProject do
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/elixir-vibe/host_kit"},
       files:
-        ~w(lib guides examples scripts .formatter.exs mix.exs README.md CHANGELOG.md LICENSE*)
+        ~w(lib guides examples notebooks scripts .formatter.exs mix.exs README.md CHANGELOG.md LICENSE*)
     ]
   end
 
@@ -82,7 +82,10 @@ defmodule HostKit.MixProject do
         "guides/operations/observability-and-monitors.md",
         "guides/operations/timers-and-jobs.md",
         "guides/reference/cli.md",
-        "guides/reference/full-reference.md"
+        "guides/reference/full-reference.md",
+        "guides/reference/internal-architecture.md",
+        "notebooks/learn/deploy_caddy_site.livemd",
+        "notebooks/learn/deploy_phoenix_app.livemd"
       ],
       groups_for_extras: [
         Introduction: ~r/guides\/introduction\//,
