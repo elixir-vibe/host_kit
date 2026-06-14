@@ -29,7 +29,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     runner = {HostKit.Runner.SSH, HostKit.Host.ssh_options(host)}
 
     source_repo =
-      if mode == "source", do: create_unpublished_gatehouse_fixture_repo!(host, unique), else: nil
+      if mode == "source", do: create_gatehouse_fixture_repo!(host, unique), else: nil
 
     cleanup.(root)
 
@@ -192,12 +192,10 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     end
   end
 
-  # Temporary fixture until Gatehouse's remaining sibling dependency (`systemdkit`)
-  # is published as a Hex package. End-user deployments should point Gatehouse at a
-  # normal Git source and let Mix resolve Hex dependencies; this helper only builds a
-  # target-readable Git repository for integration coverage while that dependency is
-  # still a local sibling project.
-  defp create_unpublished_gatehouse_fixture_repo!(host, unique) do
+  # Fixture for exercising source deploys from the current Gatehouse checkout while
+  # the upstream repository is private to the target. End-user deployments should
+  # point Gatehouse at a normal reachable Git source and let Mix resolve Hex deps.
+  defp create_gatehouse_fixture_repo!(host, unique) do
     workspace = Path.expand("..", File.cwd!())
     archive = Path.join(System.tmp_dir!(), "hostkit-gatehouse-source-#{unique}.tgz")
     remote_archive = "/tmp/hostkit-gatehouse-source-#{unique}.tgz"
@@ -223,8 +221,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
                  "--exclude=.git",
                  "--exclude=_build",
                  "--exclude=deps",
-                 "gatehouse",
-                 "systemdkit"
+                 "gatehouse"
                ],
                stderr_to_stdout: true
              )
@@ -234,8 +231,8 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     git!(work, ["init", "--initial-branch=main"])
     git!(work, ["config", "user.email", "hostkit@example.invalid"])
     git!(work, ["config", "user.name", "HostKit Test"])
-    git!(work, ["add", "gatehouse", "systemdkit"])
-    git!(work, ["commit", "-m", "gatehouse source"])
+    git!(work, ["add", "gatehouse"])
+    git!(work, ["commit", "-m", "gatehouse source fixture"])
     git!(Path.dirname(work), ["clone", "--bare", work, repo])
 
     assert {_, 0} =
