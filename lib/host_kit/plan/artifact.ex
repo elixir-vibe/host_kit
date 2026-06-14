@@ -57,17 +57,32 @@ defmodule HostKit.Plan.Artifact do
     error in [ArgumentError] -> {:error, error}
   end
 
-  @spec load(Path.t()) :: {:ok, Plan.t()} | {:error, term()}
-  def load(path) do
-    with {:ok, artifact} <- load_artifact(path) do
+  @spec load(Path.t(), keyword()) :: {:ok, Plan.t()} | {:error, term()}
+  def load(path, opts \\ []) do
+    with {:ok, artifact} <- load_artifact(path, opts) do
       to_plan(artifact)
     end
   end
 
-  @spec load_artifact(Path.t()) :: {:ok, t()} | {:error, term()}
-  def load_artifact(path) do
-    with {:ok, content} <- File.read(path) do
+  @spec load_artifact(Path.t(), keyword()) :: {:ok, t()} | {:error, term()}
+  def load_artifact(path, opts \\ []) do
+    with {:ok, content} <- read_artifact(path, opts) do
       decode(content)
+    end
+  end
+
+  defp read_artifact(path, opts) do
+    case Keyword.get(opts, :runner, HostKit.Runner.Local) do
+      HostKit.Runner.Local ->
+        File.read(path)
+
+      runner ->
+        case HostKit.Runner.cmd(runner, "sh", ["-c", "cat #{HostKit.Shell.escape(path)}"],
+               stderr_to_stdout: true
+             ) do
+          {content, 0} -> {:ok, content}
+          {output, status} -> {:error, {:command_failed, "cat", status, output}}
+        end
     end
   end
 

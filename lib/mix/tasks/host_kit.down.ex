@@ -67,7 +67,7 @@ defmodule Mix.Tasks.HostKit.Down do
           Mix.raise("expected a plan artifact")
       end
 
-    case HostKit.Plan.Artifact.load(path) do
+    case HostKit.Plan.Artifact.load(path, target_opts) do
       {:ok, plan} -> plan
       {:error, reason} -> Mix.raise("could not load HostKit plan artifact: #{inspect(reason)}")
     end

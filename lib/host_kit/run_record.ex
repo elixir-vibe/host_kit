@@ -12,9 +12,12 @@ defmodule HostKit.RunRecord do
     if Keyword.get(opts, :track, false) do
       id = run_id(plan)
       path = record_path(plan, opts, id)
-      content = Jason.encode_to_iodata!(record(plan, results, id, opts), pretty: true)
 
-      with :ok <- Runner.mkdir_p(runner(opts), Path.dirname(path), opts) do
+      with {:ok, artifacts} <- write_artifacts(plan, id, opts),
+           :ok <- Runner.mkdir_p(runner(opts), Path.dirname(path), opts) do
+        content =
+          Jason.encode_to_iodata!(record(plan, results, id, opts, artifacts), pretty: true)
+
         Runner.write_file(runner(opts), path, content, opts)
       end
     else
@@ -114,7 +117,7 @@ defmodule HostKit.RunRecord do
     end
   end
 
-  defp record(%Plan{} = plan, results, id, opts) do
+  defp record(%Plan{} = plan, results, id, _opts, artifacts) do
     %{
       version: @version,
       id: id,
@@ -122,18 +125,39 @@ defmodule HostKit.RunRecord do
       direction: plan.opts |> Keyword.get(:direction, :up) |> to_string(),
       applied_at: DateTime.utc_now() |> DateTime.to_iso8601(),
       changes: Enum.map(results, &change_record/1),
-      artifacts: artifacts(opts)
+      artifacts: artifacts
     }
   end
 
-  defp artifacts(opts) do
+  defp write_artifacts(plan, id, opts) do
+    artifacts_root = Path.join([runs_root(plan, opts), "artifacts", id])
+
     %{}
-    |> put_artifact("up_plan", Keyword.get(opts, :up_plan_artifact))
-    |> put_artifact("down_plan", Keyword.get(opts, :down_plan_artifact))
+    |> maybe_write_artifact("up_plan", Keyword.get(opts, :up_plan_artifact), artifacts_root, opts)
+    |> maybe_write_artifact(
+      "down_plan",
+      Keyword.get(opts, :down_plan_artifact),
+      artifacts_root,
+      opts
+    )
   end
 
-  defp put_artifact(artifacts, _key, nil), do: artifacts
-  defp put_artifact(artifacts, key, path), do: Map.put(artifacts, key, path)
+  defp maybe_write_artifact({:error, reason}, _key, _source, _root, _opts), do: {:error, reason}
+
+  defp maybe_write_artifact({:ok, artifacts}, key, source, root, opts),
+    do: maybe_write_artifact(artifacts, key, source, root, opts)
+
+  defp maybe_write_artifact(artifacts, _key, nil, _root, _opts), do: {:ok, artifacts}
+
+  defp maybe_write_artifact(artifacts, key, source, root, opts) do
+    target = Path.join(root, Path.basename(source))
+
+    with {:ok, content} <- File.read(source),
+         :ok <- Runner.mkdir_p(runner(opts), root, opts),
+         :ok <- Runner.write_file(runner(opts), target, content, opts) do
+      {:ok, Map.put(artifacts, key, target)}
+    end
+  end
 
   defp change_record(%{change: change, status: status}) do
     %{

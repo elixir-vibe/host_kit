@@ -103,7 +103,7 @@ mix host_kit.apply --track --plan up.plan.json --confirm
 mix host_kit.runs --host prod infra/config.exs
 ```
 
-Run records are intentionally compact: they identify the run, project, direction, timestamp, and applied change statuses. They do not replace plan artifacts; use plan artifacts for inspectable up/down plan contents.
+Run records are intentionally compact: they identify the run, project, direction, timestamp, and applied change statuses. They do not replace plan artifacts; use plan artifacts for inspectable up/down plan contents. When a tracked apply is started from `--plan`, HostKit copies that up-plan artifact under the runs root and records the copied path so `mix host_kit.down --last` can work from the tracked run.
 
 ## Elixir app lifecycle helpers
 

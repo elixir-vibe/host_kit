@@ -66,6 +66,8 @@ defmodule HostKit.RunRecordTest do
              )
 
     assert {:ok, record} = HostKit.RunRecord.latest(hostkit_runs_root: runs_root)
-    assert record["artifacts"]["up_plan"] == up_plan
+    copied = record["artifacts"]["up_plan"]
+    assert copied == Path.join([runs_root, "artifacts", record["id"], "up.plan.json"])
+    assert File.read!(copied) == File.read!(up_plan)
   end
 end
