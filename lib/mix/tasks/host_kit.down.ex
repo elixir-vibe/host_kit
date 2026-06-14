@@ -8,6 +8,8 @@ defmodule Mix.Tasks.HostKit.Down do
 
   use Mix.Task
 
+  alias Mix.Tasks.HostKit.Options
+
   @shortdoc "Build a HostKit down plan"
 
   @impl true
@@ -21,19 +23,70 @@ defmodule Mix.Tasks.HostKit.Down do
           out: :string,
           format: :string,
           only: :keep,
-          except: :keep
+          except: :keep,
+          last: :boolean,
+          local: :boolean,
+          host: :string,
+          remote: :string,
+          user: :string,
+          port: :integer,
+          identity_file: :string,
+          password: :string,
+          password_env: :string,
+          silently_accept_hosts: :boolean,
+          sudo: :boolean,
+          require: :keep,
+          runs_root: :string
         ]
       )
 
-    path =
-      Keyword.get(opts, :plan) || List.first(positional) || Mix.raise("expected a plan artifact")
+    project = load_project(opts, positional)
 
-    with {:ok, plan} <- HostKit.Plan.Artifact.load(path),
-         {:ok, down_plan} <- HostKit.down(plan, down_opts(opts)) do
+    Options.with_target_opts(opts, project, fn target_opts ->
+      plan = load_up_plan!(opts, positional, target_opts)
+
+      {:ok, down_plan} = HostKit.down(plan, down_opts(opts))
       maybe_write_artifact(down_plan, opts)
       IO.puts(Mix.Tasks.HostKit.Output.format_plan(down_plan, opts))
-    else
-      {:error, reason} -> Mix.raise("could not build HostKit down plan: #{inspect(reason)}")
+    end)
+  end
+
+  defp load_project(opts, positional) do
+    if Keyword.has_key?(opts, :host) do
+      path = List.first(positional) || "infra/config.exs"
+      HostKit.load!(path, require: Keyword.get_values(opts, :require))
+    end
+  end
+
+  defp load_up_plan!(opts, positional, target_opts) do
+    path =
+      if Keyword.get(opts, :last, false) do
+        latest_plan_artifact!(opts, target_opts)
+      else
+        Keyword.get(opts, :plan) || List.first(positional) ||
+          Mix.raise("expected a plan artifact")
+      end
+
+    case HostKit.Plan.Artifact.load(path) do
+      {:ok, plan} -> plan
+      {:error, reason} -> Mix.raise("could not load HostKit plan artifact: #{inspect(reason)}")
+    end
+  end
+
+  defp latest_plan_artifact!(opts, target_opts) do
+    run_opts = put_present(target_opts, :hostkit_runs_root, Keyword.get(opts, :runs_root))
+
+    case HostKit.RunRecord.latest(run_opts) do
+      {:ok, %{"artifacts" => %{"up_plan" => path}}} when is_binary(path) ->
+        path
+
+      {:ok, record} ->
+        Mix.raise(
+          "latest HostKit run #{inspect(record["id"])} does not reference an up plan artifact"
+        )
+
+      {:error, reason} ->
+        Mix.raise("could not load latest HostKit run: #{inspect(reason)}")
     end
   end
 
@@ -76,4 +129,7 @@ defmodule Mix.Tasks.HostKit.Down do
         end
     end
   end
+
+  defp put_present(opts, _key, nil), do: opts
+  defp put_present(opts, key, value), do: Keyword.put(opts, key, value)
 end

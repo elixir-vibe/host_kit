@@ -12,7 +12,7 @@ defmodule HostKit.RunRecord do
     if Keyword.get(opts, :track, false) do
       id = run_id(plan)
       path = record_path(plan, opts, id)
-      content = Jason.encode_to_iodata!(record(plan, results, id), pretty: true)
+      content = Jason.encode_to_iodata!(record(plan, results, id, opts), pretty: true)
 
       with :ok <- Runner.mkdir_p(runner(opts), Path.dirname(path), opts) do
         Runner.write_file(runner(opts), path, content, opts)
@@ -114,16 +114,26 @@ defmodule HostKit.RunRecord do
     end
   end
 
-  defp record(%Plan{} = plan, results, id) do
+  defp record(%Plan{} = plan, results, id, opts) do
     %{
       version: @version,
       id: id,
       project: project_name(plan.project),
       direction: plan.opts |> Keyword.get(:direction, :up) |> to_string(),
       applied_at: DateTime.utc_now() |> DateTime.to_iso8601(),
-      changes: Enum.map(results, &change_record/1)
+      changes: Enum.map(results, &change_record/1),
+      artifacts: artifacts(opts)
     }
   end
+
+  defp artifacts(opts) do
+    %{}
+    |> put_artifact("up_plan", Keyword.get(opts, :up_plan_artifact))
+    |> put_artifact("down_plan", Keyword.get(opts, :down_plan_artifact))
+  end
+
+  defp put_artifact(artifacts, _key, nil), do: artifacts
+  defp put_artifact(artifacts, key, path), do: Map.put(artifacts, key, path)
 
   defp change_record(%{change: change, status: status}) do
     %{

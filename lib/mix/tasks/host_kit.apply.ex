@@ -197,6 +197,7 @@ defmodule Mix.Tasks.HostKit.Apply do
       track: Keyword.get(opts, :track, false)
     )
     |> put_present(:hostkit_runs_root, Keyword.get(opts, :runs_root))
+    |> put_present(:up_plan_artifact, Keyword.get(opts, :plan))
   end
 
   defp put_present(opts, _key, nil), do: opts

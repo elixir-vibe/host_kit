@@ -51,6 +51,8 @@ mix host_kit.down [options] [up.plan.json]
 Common options:
 
 - `--plan PATH` — read an up plan artifact.
+- `--last` — read the latest tracked run and use its referenced up plan artifact.
+- `--runs-root PATH` — override the HostKit runs root for `--last`.
 - `--out PATH` — write the generated down plan artifact.
 - `--only type:name` — include only selected resources.
 - `--except type:name` — exclude selected resources.
@@ -60,6 +62,7 @@ Examples:
 
 ```sh
 mix host_kit.down host_kit.plan.json --out host_kit.down.plan.json
+mix host_kit.down --last --runs-root /var/lib/hostkit/runs --out host_kit.down.plan.json
 mix host_kit.apply --plan host_kit.down.plan.json --confirm
 ```
 
