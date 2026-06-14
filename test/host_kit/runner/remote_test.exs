@@ -42,7 +42,7 @@ defmodule HostKit.RemoteTest do
     def write_file(_path, _content, _opts), do: :ok
   end
 
-  test "reads users through a runner" do
+  test "reads accounts through a runner" do
     context = context()
 
     assert {:ok, %Account{home: "/var/lib/app", shell: "/usr/sbin/nologin"}} =

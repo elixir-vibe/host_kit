@@ -243,7 +243,7 @@ prod = HostKit.Target.ssh(:prod, host: "elixir.toys", user: "dannote", sudo: tru
 HostKit.format_plan(plan)
 {:ok, results} = HostKit.apply(plan, dry_run: true)
 
-# Supported apply resources: users, directories, files, systemd services, and systemd timers.
+# Supported apply resources: accounts, directories, files, systemd services, and systemd timers.
 {:ok, results} = HostKit.apply(plan, confirm: true, sudo: true)
 
 # Command and filesystem operations are routed through a runner boundary.
@@ -463,7 +463,7 @@ workspace :blog, owner: :alice do
 end
 ```
 
-This expands to a service with a system user, workspace directory, systemd daemon, loopback listener, logs, telemetry, systemd monitor, and loopback-only network policy.
+This expands to a service with an account, workspace directory, systemd daemon, loopback listener, logs, telemetry, systemd monitor, and loopback-only network policy.
 
 ## Workspace scope
 

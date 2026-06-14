@@ -49,13 +49,17 @@ defmodule HostKit.DSL.Systemd do
 
   defmacro service(opts) do
     quote do
-      HostKit.DSL.Systemd.Scope.put_service(unquote(opts))
+      HostKit.DSL.Systemd.Scope.put_service(
+        HostKit.DSL.Systemd.normalize_account_refs(unquote(opts))
+      )
     end
   end
 
   defmacro run(opts) do
     quote do
-      HostKit.DSL.Systemd.Scope.put_service(unquote(opts))
+      HostKit.DSL.Systemd.Scope.put_service(
+        HostKit.DSL.Systemd.normalize_account_refs(unquote(opts))
+      )
     end
   end
 
@@ -189,5 +193,12 @@ defmodule HostKit.DSL.Systemd do
     quote do
       HostKit.DSL.Systemd.Scope.put_service(:read_write_paths, unquote(paths))
     end
+  end
+
+  def normalize_account_refs(opts) when is_list(opts) do
+    opts
+    |> Keyword.update(:user, nil, &HostKit.Account.name!/1)
+    |> Keyword.update(:group, nil, &HostKit.Account.name!/1)
+    |> Enum.reject(&match?({_key, nil}, &1))
   end
 end

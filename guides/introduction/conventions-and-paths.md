@@ -1,6 +1,6 @@
 # Conventions and paths
 
-HostKit projects can declare path roots and naming prefixes once, then derive service paths, users, and unit names from those conventions.
+HostKit projects can declare path roots and naming prefixes once, then derive service paths, account names, and unit names from those conventions.
 
 This keeps host declarations DRY while still compiling to plain structs.
 
@@ -43,7 +43,7 @@ Useful helpers:
 - `root_path(:data)` resolves the current service's data path.
 - `root_path(:data, "repositories")` resolves a child path.
 - `service_name()` returns the current service name.
-- `service_user()` returns the convention-derived service user.
+- `service_user()` returns the convention-derived service account name.
 - `unit_name()` returns the convention-derived systemd unit name.
 - `path_name "slug"` overrides the path/identity slug for one service.
 

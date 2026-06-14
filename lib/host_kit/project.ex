@@ -105,8 +105,8 @@ defmodule HostKit.Project do
   @spec resources(t()) :: [struct()]
   def resources(%__MODULE__{} = project) do
     project.resources
-    |> Kernel.++(project.services |> Enum.flat_map(&expand_resources(&1.resources)))
     |> Kernel.++(project.proxies)
+    |> Kernel.++(project.services |> Enum.flat_map(&expand_resources(&1.resources)))
     |> Kernel.++(Firewall.policies(project))
     |> Kernel.++(workspace_egress(project))
   end

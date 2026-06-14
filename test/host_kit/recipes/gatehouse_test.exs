@@ -1,6 +1,41 @@
 defmodule HostKit.GatehouseRecipeTest do
   use ExUnit.Case, async: true
 
+  test "gatehouse_release recipe emits source, mise, build, and install resources" do
+    project =
+      Code.eval_string("""
+      use HostKit.DSL, providers: [HostKit.Providers.Gatehouse]
+
+      project :edge do
+        gatehouse_release :edge,
+          source: [git: "https://github.com/dannote/gatehouse.git", ref: "main"],
+          release_path: "/opt/gatehouse",
+          runtime: [erlang: "29.0.2", elixir: "1.20.1"]
+      end
+      """)
+      |> elem(0)
+
+    resources = HostKit.Project.resources(project)
+
+    assert Enum.any?(
+             resources,
+             &match?(%HostKit.Resources.Source{name: "gatehouse_edge_source"}, &1)
+           )
+
+    assert Enum.any?(resources, &match?(%HostKit.Resources.Mise{name: :gatehouse_beam}, &1))
+
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Command{
+               name: "gatehouse_edge_install",
+               creates: "/opt/gatehouse/bin/gatehouse"
+             } ->
+               true
+
+             _resource ->
+               false
+           end)
+  end
+
   test "gatehouse recipe emits systemd/env/readiness resources for an existing release" do
     project =
       Code.eval_string("""

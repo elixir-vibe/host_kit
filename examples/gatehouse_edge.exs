@@ -3,6 +3,11 @@ use HostKit.DSL, providers: [HostKit.Providers.Gatehouse]
 project :gatehouse_edge do
   account(:gatehouse, system: true, home: "/var/lib/gatehouse")
 
+  gatehouse_release(:edge,
+    source: [github: "dannote/gatehouse", ref: "main"],
+    release_path: "/opt/gatehouse"
+  )
+
   service :hello_phoenix do
     endpoint(:http, port: 4000, protocol: :http, health: "/health")
   end

@@ -6,6 +6,9 @@ defmodule HostKit.Workspace.Egress do
   def id(%__MODULE__{user: user}), do: {:workspace_egress, user}
 
   def new(opts) do
-    struct!(__MODULE__, Map.new(opts))
+    opts
+    |> Keyword.update(:user, nil, &HostKit.Account.name!/1)
+    |> Map.new()
+    |> then(&struct!(__MODULE__, &1))
   end
 end

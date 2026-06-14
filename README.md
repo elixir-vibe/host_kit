@@ -10,7 +10,7 @@ Infrastructure code should be boring Elixir, not an opaque pile of shell scripts
 
 HostKit gives you:
 
-- **Declarative host bootstrap** — OS packages, users, directories, files, env files, systemd units, firewall rules, and `mise` runtimes.
+- **Declarative host bootstrap** — OS packages, accounts, directories, files, env files, systemd units, firewall rules, and `mise` runtimes.
 - **Docker-less service isolation** — systemd sandboxing, resource limits, network policy, read/write path allowlists, loopback listeners, and managed env files.
 - **Plan before apply** — read current state, produce a diff, write an inspectable JSON artifact, then apply exactly what was reviewed.
 - **Distribution-aware packages** — semantic package names resolve through Repology and can be locked for deterministic applies.
@@ -71,7 +71,7 @@ project :prod do
 end
 ```
 
-This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, env files, system users, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits.
+This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, env files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits.
 
 Plan, review, apply:
 

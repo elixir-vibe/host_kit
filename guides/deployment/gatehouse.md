@@ -12,6 +12,10 @@ project :edge do
     endpoint :http, port: 4000, protocol: :http, health: "/health"
   end
 
+  gatehouse_release :edge,
+    source: [github: "dannote/gatehouse", ref: "main"],
+    release_path: "/opt/gatehouse"
+
   proxy :edge, provider: :gatehouse, path: "/etc/gatehouse/config.exs" do
     service :app do
       host "app.example.com"
@@ -27,11 +31,11 @@ project :edge do
 end
 ```
 
-The `proxy` block remains the source of Gatehouse routing config. The `gatehouse` recipe manages runtime scaffolding around that config:
+The `gatehouse_release` recipe builds and installs the Gatehouse release. The `proxy` block remains the source of Gatehouse routing config. The `gatehouse` recipe manages runtime scaffolding around that config:
 
 - config/state/env directories
 - `/etc/gatehouse/env`
 - `gatehouse.service`
 - readiness check for systemd active state
 
-Declare the runtime account explicitly with `account`; the recipe consumes it with `run_as: account(:gatehouse)`. For now the recipe assumes the Gatehouse release already exists at `release_path`. Building and deploying the Gatehouse release itself is intentionally separate so routing config can stabilize first.
+Declare the runtime account explicitly with `account`; the runtime recipe consumes it with `run_as: account(:gatehouse)`.
