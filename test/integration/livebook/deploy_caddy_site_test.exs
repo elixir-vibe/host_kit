@@ -89,10 +89,12 @@ defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
          unique
        ) do
     binding = [
-      target_host: host.hostname,
-      target_user: host.user,
-      target_sudo: host.sudo,
-      ssh_opts: host.meta[:ssh] || [],
+      target: %{
+        host: host.hostname,
+        user: host.user,
+        sudo: host.sudo,
+        ssh: host.meta[:ssh] || []
+      },
       site_address: ":#{port}",
       acme_email: "admin@example.test",
       site_root: site_root,
@@ -100,6 +102,7 @@ defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
       caddy_config_dir: Path.dirname(caddy_config_path),
       caddy_sites_dir: caddy_sites_dir,
       caddy_service_name: caddy_service_name,
+      verify_url: "http://127.0.0.1:#{port}",
       message: "Integration #{unique}"
     ]
 

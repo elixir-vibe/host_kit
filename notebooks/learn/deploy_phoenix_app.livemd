@@ -6,7 +6,7 @@ Start with the notebook dependencies. `kino` provides friendly inputs, `req` ver
 Mix.install([
   {:kino, "~> 0.14"},
   {:req, "~> 0.5"},
-  {:host_kit, github: "elixir-vibe/host_kit"}
+  {:host_kit, "== 0.1.0-beta.1"}
 ])
 ```
 
@@ -17,7 +17,8 @@ alias HostKit, as: HK
 alias HostKit.{Apply, Host, Ingress, Project}
 alias HostKit.Apply.Event, as: ApplyEvent
 alias HostKit.Plan.{Artifact, Format}
-alias HostKit.Providers.{Caddy, Elixir}
+alias HostKit.Providers.Caddy
+alias HostKit.Providers.Elixir, as: ElixirProvider
 alias HostKit.Resources.Source
 ```
 
@@ -51,7 +52,7 @@ settings_form =
     submit: "Plan deployment"
   )
 
-Kino.render(settings_form)
+settings_form
 ```
 
 Read the submitted form once. Every later cell works with ordinary Elixir data.
@@ -89,15 +90,6 @@ apply? = settings.apply?
 verify? = settings.verify?
 ```
 
-Derive target variables that the declaration can use directly.
-
-```elixir
-target_host = target.host
-target_user = target.user
-target_sudo = target.sudo
-ssh_opts = target.ssh
-```
-
 Derive app, runtime, and artifact settings in one place.
 
 ```elixir
@@ -110,7 +102,7 @@ app_name = :hello_phoenix
 app_port = app.app_port
 http_port = app.public_port
 ingress_address = ":#{http_port}"
-public_url = "http://#{target_host}:#{http_port}"
+public_url = "http://#{target.host}:#{http_port}"
 artifact_path = "/tmp/hostkit-phoenix-demo.plan.json"
 secret_key_base = Base.encode64(:crypto.strong_rand_bytes(64))
 ```
@@ -140,18 +132,20 @@ This is the important part: the app recipe expands to ordinary resources—sourc
 
 ```elixir
 # hostkit:deploy-phoenix-app-dsl
-alias HostKit.Providers.{Caddy, Elixir}
+alias HostKit, as: HK
+alias HostKit.Providers.Caddy
+alias HostKit.Providers.Elixir, as: ElixirProvider
 
-use HostKit,
-  providers: [Caddy, Elixir]
+use HK,
+  providers: [Caddy, ElixirProvider]
 
 project =
   project :deploy_phoenix_app do
     host :target do
-      hostname target_host
-      user target_user
-      sudo target_sudo
-      ssh ssh_opts
+      hostname target.host
+      user target.user
+      sudo target.sudo
+      ssh target.ssh
     end
 
     provider :caddy, Caddy do

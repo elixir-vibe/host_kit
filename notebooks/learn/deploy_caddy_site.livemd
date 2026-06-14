@@ -6,7 +6,7 @@ Start with the small set of notebook dependencies. `kino` gives us friendly inpu
 Mix.install([
   {:kino, "~> 0.14"},
   {:req, "~> 0.5"},
-  {:host_kit, github: "elixir-vibe/host_kit"}
+  {:host_kit, "== 0.1.0-beta.1"}
 ])
 ```
 
@@ -20,15 +20,15 @@ alias HostKit.Plan.{Artifact, Format}
 alias HostKit.Providers.Caddy
 ```
 
-This notebook is a small, readable HostKit demo:
+We will walk through a normal HostKit deployment flow:
 
-1. collect target and site settings,
+1. choose target and site settings,
 2. declare a target and a static site,
 3. inspect the plan,
 4. optionally apply it,
 5. verify the site.
 
-The deployment declaration lives directly in the notebook. The integration test extracts the marked DSL cell below.
+The deployment declaration lives directly in the notebook.
 
 ## Demo settings
 
@@ -48,7 +48,7 @@ settings_form =
     submit: "Plan deployment"
   )
 
-Kino.render(settings_form)
+settings_form
 ```
 
 Read the submitted form. From here on, everything is plain Elixir data that the HostKit declaration can reference.
@@ -89,11 +89,6 @@ Derive stable names and paths once. The declaration below can now focus on resou
 ```elixir
 deployment_name = "hostkit-caddy-demo"
 
-target_host = target.host
-target_user = target.user
-target_sudo = target.sudo
-ssh_opts = target.ssh
-
 site_address = site.address
 message = site.message
 acme_email = "admin@example.com"
@@ -104,7 +99,7 @@ caddy_sites_dir = "/etc/#{deployment_name}/sites"
 caddy_service_name = "#{deployment_name}.service"
 artifact_path = "/tmp/#{deployment_name}.plan.json"
 verify_url = "http://127.0.0.1#{site_address}"
-public_url = "http://#{target_host}#{site_address}"
+public_url = "http://#{target.host}#{site_address}"
 ```
 
 ## Deployment declaration
@@ -133,17 +128,18 @@ caddyfile = """
 import #{caddy_sites_dir}/*.caddy
 """
 
+alias HostKit, as: HK
 alias HostKit.Providers.Caddy
 
-use HostKit.DSL, providers: [Caddy]
+use HK.DSL, providers: [Caddy]
 
 project =
   project :deploy_caddy_site do
     host :target do
-      hostname target_host
-      user target_user
-      sudo target_sudo
-      ssh ssh_opts
+      hostname target.host
+      user target.user
+      sudo target.sudo
+      ssh target.ssh
     end
 
     provider :caddy, Caddy do

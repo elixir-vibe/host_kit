@@ -175,10 +175,12 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
 
   defp eval_notebook_dsl(%{host: host} = opts) do
     binding = [
-      target_host: host.hostname,
-      target_user: host.user,
-      target_sudo: host.sudo,
-      ssh_opts: host.meta[:ssh] || [],
+      target: %{
+        host: host.hostname,
+        user: host.user,
+        sudo: host.sudo,
+        ssh: host.meta[:ssh] || []
+      },
       public_hostname: "phoenix.example.test",
       source_repo: opts.source_repo,
       source_ref: "main",
@@ -187,6 +189,7 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
       app_name: opts.app_name,
       app_port: opts.app_port,
       http_port: opts.http_port,
+      public_url: "http://#{host.hostname}:#{opts.http_port}",
       app_service_name: "hello-phoenix.service",
       ingress_address: ":#{opts.http_port}",
       caddy_config_path: opts.caddy_config_path,
