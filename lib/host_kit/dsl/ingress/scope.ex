@@ -6,7 +6,8 @@ defmodule HostKit.DSL.Ingress.Scope do
   @route_key {__MODULE__, :route}
 
   def start_ingress(name, opts) do
-    Process.put(@ingress_key, %HostKit.Ingress{name: name, meta: Keyword.get(opts, :meta, %{})})
+    meta = opts |> Keyword.drop([:meta]) |> Map.new() |> Map.merge(Keyword.get(opts, :meta, %{}))
+    Process.put(@ingress_key, %HostKit.Ingress{name: name, meta: meta})
   end
 
   def finish_ingress do

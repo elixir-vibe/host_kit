@@ -1,6 +1,12 @@
 # Gatehouse edge proxy
 
-Gatehouse is the BEAM-native edge proxy/runtime for HostKit-managed hosts. HostKit writes the `Gatehouse.Config` file, installs a systemd service for an already-built Gatehouse release, and waits for the service to become active.
+Gatehouse is the BEAM-native edge proxy/runtime for HostKit-managed hosts. HostKit can now build the Gatehouse release, render semantic ingress into `Gatehouse.Config`, install the systemd service, and wait until it is active.
+
+The deployment has three pieces:
+
+1. `gatehouse_release` builds and installs the Gatehouse release.
+2. `ingress` declares routing in provider-neutral HostKit terms.
+3. `gatehouse` installs the runtime env/systemd scaffolding around the rendered config.
 
 ```elixir
 use HostKit.DSL, providers: [HostKit.Providers.Gatehouse]
@@ -16,13 +22,15 @@ project :edge do
     source: [github: "dannote/gatehouse", ref: "main"],
     release_path: "/opt/gatehouse"
 
-  proxy :edge, provider: :gatehouse, path: "/etc/gatehouse/config.exs" do
-    state "/var/lib/gatehouse/state.etf"
-    http port: 80
-
-    service :app do
-      host "app.example.com"
-      target :main, to: endpoint(:hello_phoenix, :http), active: true
+  service :edge do
+    ingress :web,
+      path: "/etc/gatehouse/config.exs",
+      state: "/var/lib/gatehouse/state.etf" do
+      server ":80" do
+        route host: "app.example.com" do
+          proxy to: endpoint(:hello_phoenix, :http)
+        end
+      end
     end
   end
 
@@ -34,11 +42,16 @@ project :edge do
 end
 ```
 
-The `gatehouse_release` recipe builds and installs the Gatehouse release. The `proxy` block remains the source of Gatehouse routing config. The `gatehouse` recipe manages runtime scaffolding around that config:
+The same `ingress` declaration can also be consumed by the Caddy provider. HostKit resolves endpoint references at plan time, then renders Gatehouse targets as ordinary URLs.
 
-- config/state/env directories
-- `/etc/gatehouse/env`
-- `gatehouse.service`
-- readiness check for systemd active state
+The full source-build deployment path is covered by an opt-in Incus integration test:
 
-Declare the runtime account explicitly with `account`; the runtime recipe consumes it with `run_as: account(:gatehouse)`.
+```sh
+HOSTKIT_INTEGRATION=1 \
+HOSTKIT_GATEHOUSE_DEPLOY_INTEGRATION=1 \
+HOSTKIT_INTEGRATION_TOOL=incus \
+HOSTKIT_INCUS_INTEGRATION=1 \
+mix test test/integration/gatehouse_deploy_test.exs
+```
+
+That test builds Gatehouse from source on a Linux target, writes the generated config, starts `gatehouse.service`, and verifies systemd reports it active.

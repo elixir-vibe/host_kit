@@ -86,17 +86,32 @@ defmodule HostKit.Plan do
   end
 
   defp expand_ingress(resources, project) do
-    if HostKit.Providers.Caddy in project.providers do
-      {:ok, Enum.flat_map(resources, &expand_ingress_resource/1)}
-    else
-      {:ok, resources}
+    {:ok, Enum.flat_map(resources, &expand_ingress_resource(&1, project))}
+  end
+
+  defp expand_ingress_resource(%HostKit.Ingress{} = ingress, project) do
+    []
+    |> maybe_expand_caddy_ingress(ingress, project)
+    |> maybe_expand_gatehouse_ingress(ingress, project)
+    |> case do
+      [] -> [ingress]
+      resources -> resources
     end
   end
 
-  defp expand_ingress_resource(%HostKit.Ingress{} = ingress),
-    do: HostKit.Ingress.Caddy.to_sites(ingress)
+  defp expand_ingress_resource(resource, _project), do: [resource]
 
-  defp expand_ingress_resource(resource), do: [resource]
+  defp maybe_expand_caddy_ingress(resources, ingress, project) do
+    if HostKit.Providers.Caddy in project.providers,
+      do: resources ++ HostKit.Ingress.Caddy.to_sites(ingress),
+      else: resources
+  end
+
+  defp maybe_expand_gatehouse_ingress(resources, ingress, project) do
+    if HostKit.Providers.Gatehouse in project.providers,
+      do: resources ++ [HostKit.Ingress.Gatehouse.to_proxy(ingress)],
+      else: resources
+  end
 
   defp timed_resource(phase, resource, fun) do
     HostKit.Telemetry.span([:plan, :resource], resource_metadata(phase, resource), fun)

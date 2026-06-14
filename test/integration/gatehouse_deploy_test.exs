@@ -53,13 +53,13 @@ defmodule HostKit.Integration.GatehouseDeployTest do
           source: [git: #{inspect(source_repo)}, path: "gatehouse", ref: "main"],
           release_path: #{inspect(release_path)}
 
-        proxy :edge, provider: :gatehouse, path: #{inspect(config_path)} do
-          state #{inspect(state_path)}
-          http port: #{http_port}
-
-          service :app do
-            host "gatehouse.example.test"
-            target :main, url: "http://127.0.0.1:9", active: true
+        service :edge do
+          ingress :web, path: #{inspect(config_path)}, state: #{inspect(state_path)} do
+            server ":#{http_port}" do
+              route host: "gatehouse.example.test" do
+                proxy to: "http://127.0.0.1:9"
+              end
+            end
           end
         end
 
@@ -97,6 +97,7 @@ defmodule HostKit.Integration.GatehouseDeployTest do
     repo = "/tmp/hostkit-gatehouse-source-#{unique}.git"
 
     File.rm_rf!(work)
+    File.rm_rf!(repo)
     File.rm(archive)
     File.mkdir_p!(work)
 

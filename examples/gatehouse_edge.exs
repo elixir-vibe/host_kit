@@ -12,13 +12,13 @@ project :gatehouse_edge do
     endpoint(:http, port: 4000, protocol: :http, health: "/health")
   end
 
-  proxy :edge, provider: :gatehouse, path: "/etc/gatehouse/config.exs" do
-    state("/var/lib/gatehouse/state.etf")
-    http(port: 80)
-
-    service :app do
-      host("app.example.com")
-      target(:main, to: endpoint(:hello_phoenix, :http), active: true)
+  service :edge do
+    ingress :web, path: "/etc/gatehouse/config.exs", state: "/var/lib/gatehouse/state.etf" do
+      server ":80" do
+        route host: "app.example.com" do
+          proxy(to: endpoint(:hello_phoenix, :http))
+        end
+      end
     end
   end
 
