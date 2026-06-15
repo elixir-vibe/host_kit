@@ -847,7 +847,7 @@ Resources store normalized integer modes, so plan/apply remains simple.
 
 ## Env files and secrets
 
-HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries; secret entry values are not read into plan artifacts for comparison. Use `secret KEY, env: :redacted` for existing/generated env-file secrets that should be modeled but never rendered by HostKit.
+HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries; secret entry values are not read into plan artifacts for comparison. Use `secret KEY, env: :redacted` for existing/generated env-file secrets that should be modeled but never rendered by HostKit. Secret sources support `env: "NAME"`, `file: "/run/secrets/name"`, and `command: ["pass", "show", "name"]`.
 
 ```elixir
 service :web do
@@ -855,6 +855,7 @@ service :web do
     set :MIX_ENV, :prod
     set :PORT, 4000
     secret :SECRET_KEY_BASE, env: "SECRET_KEY_BASE"
+    secret :API_TOKEN, file: "/run/secrets/api-token"
     secret :GENERATED_TOKEN, env: :redacted
   end
 
@@ -893,6 +894,8 @@ Secret or redacted INI/YAML values are omitted from public drift comparison. Hos
 
 ```elixir
 secret "TOKEN", env: "APP_TOKEN"
+secret "TOKEN", file: "/run/secrets/app-token"
+secret "TOKEN", command: ["pass", "show", "app/token"]
 ```
 
 YAML configs use Elixir keyword data for stable order and may contain redacted secret leaves:

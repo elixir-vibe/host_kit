@@ -144,7 +144,7 @@ template path(:config, "app.ini"),
   mode: 0o640
 ```
 
-`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates, env files, and structured config resources are first-class resources in plans and render to ordinary managed files during read/apply. Secret/redacted env/config values compare only public env entries, INI keys, or YAML paths during plan reads; `:redacted` values are intentionally not renderable for apply. Template assigns containing secrets or `:redacted` are rejected until redacted template diffs exist.
+`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates, env files, and structured config resources are first-class resources in plans and render to ordinary managed files during read/apply. Secret/redacted env/config values compare only public env entries, INI keys, or YAML paths during plan reads; `:redacted` values are intentionally not renderable for apply. Secret sources support `env:`, `file:`, and `command:`. Template assigns containing secrets or `:redacted` are rejected until redacted template diffs exist.
 
 Keep templates inspectable and deterministic. Do not hide runtime behavior or shell workflows in templates. Do not commit secrets; use `content: :redacted` for existing secret-bearing files managed elsewhere, and avoid passing raw secrets as template assigns until redacted template diffs are explicitly supported.
 

@@ -51,6 +51,8 @@ defmodule HostKit.ConfigFileTest do
             section "server" do
               set "DOMAIN", "git.elixir.toys"
               set "HTTP_PORT", 3000
+              secret "LFS_JWT_SECRET", env: :redacted
+              secret "FILE_SECRET", file: "/run/forgejo/secret"
             end
           end
         end
@@ -61,7 +63,12 @@ defmodule HostKit.ConfigFileTest do
     assert [%ConfigFile{format: :ini, content: %{"server" => server}, group: "forgejo"}] =
              HostKit.Project.resources(project)
 
-    assert server == %{"DOMAIN" => "git.elixir.toys", "HTTP_PORT" => 3000}
+    assert server == %{
+             "DOMAIN" => "git.elixir.toys",
+             "HTTP_PORT" => 3000,
+             "LFS_JWT_SECRET" => :redacted,
+             "FILE_SECRET" => HostKit.Secret.file("/run/forgejo/secret")
+           }
   end
 
   test "INI config supports top-level keys" do

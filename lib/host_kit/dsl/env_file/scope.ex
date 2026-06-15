@@ -21,22 +21,12 @@ defmodule HostKit.DSL.EnvFile.Scope do
   end
 
   def put_secret(key, opts) do
-    source =
-      case Keyword.fetch(opts, :env) do
-        {:ok, :redacted} ->
-          :redacted
-
-        {:ok, env} when is_binary(env) ->
-          HostKit.Secret.env(env)
-
-        {:ok, env} ->
-          raise ArgumentError, "secret :env expects a string or :redacted, got: #{inspect(env)}"
-
-        :error ->
-          raise ArgumentError, "secret requires :env source"
-      end
-
-    update(&%{&1 | entries: &1.entries ++ [{:secret, normalize_key(key), source}]})
+    update(
+      &%{
+        &1
+        | entries: &1.entries ++ [{:secret, normalize_key(key), HostKit.Secret.from_opts!(opts)}]
+      }
+    )
   end
 
   defp update(fun) do

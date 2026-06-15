@@ -12,6 +12,7 @@ defmodule HostKit.EnvFileTest do
           set :PORT, 4000
           secret :SECRET_KEY_BASE, env: "HOST_KIT_TEST_SECRET"
           secret :GENERATED_TOKEN, env: :redacted
+          secret :FILE_TOKEN, file: "/run/app/token"
         end
       end
     end
@@ -29,7 +30,8 @@ defmodule HostKit.EnvFileTest do
              {:set, "MIX_ENV", "prod"},
              {:set, "PORT", "4000"},
              {:secret, "SECRET_KEY_BASE", HostKit.Secret.env("HOST_KIT_TEST_SECRET")},
-             {:secret, "GENERATED_TOKEN", :redacted}
+             {:secret, "GENERATED_TOKEN", :redacted},
+             {:secret, "FILE_TOKEN", HostKit.Secret.file("/run/app/token")}
            ]
   end
 

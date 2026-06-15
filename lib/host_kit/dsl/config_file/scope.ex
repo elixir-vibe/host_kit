@@ -30,13 +30,7 @@ defmodule HostKit.DSL.ConfigFile.Scope do
   def put_set(key, value), do: put_value(:set, key, value)
 
   def put_secret(key, opts) do
-    value =
-      case Keyword.fetch!(opts, :env) do
-        :redacted -> :redacted
-        env when is_binary(env) -> HostKit.Secret.env(env)
-      end
-
-    put_value(:secret, key, value)
+    put_value(:secret, key, HostKit.Secret.from_opts!(opts))
   end
 
   defp put_value(_kind, key, value) do
