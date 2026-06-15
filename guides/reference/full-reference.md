@@ -195,6 +195,32 @@ project :demo do
 end
 ```
 
+Providers should keep generated resources inspectable. For example, the Gatus provider is a thin structured-config helper: it emits an ordinary `yaml/2` config resource rather than hiding a daemon or runtime lifecycle.
+
+```elixir
+use HostKit.DSL, providers: [HostKit.Providers.Gatus]
+
+project :demo, providers: [HostKit.Providers.Gatus] do
+  service :monitoring do
+    gatus_config path(:config, "gatus.yaml"), owner: "root", group: service_user(), mode: 0o640 do
+      web address: "127.0.0.1", port: 8080
+      gatus_storage :sqlite, path: path(:state, "gatus.db")
+
+      telegram_alerting token: "${MONITORING_TELEGRAM_BOT_TOKEN}", id: "${MONITORING_TELEGRAM_CHAT_ID}" do
+        default_alert enabled: true, "failure-threshold": 3, "success-threshold": 2
+      end
+
+      gatus_endpoint "API",
+        group: "demo",
+        url: "https://api.example.com/health",
+        interval: "1m",
+        conditions: ["[STATUS] == 200"],
+        alerts: [:telegram]
+    end
+  end
+end
+```
+
 ## Instances and nested hosts
 
 Top-level `host` declarations describe existing connection targets. `instance` declarations describe lifecycle-managed compute boundaries with backend-selected lifecycle and normal HostKit contents nested inside.

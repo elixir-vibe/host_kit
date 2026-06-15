@@ -474,6 +474,17 @@ Legend:
 | `root` | Reference | Add Caddy root directive. |
 | `file_server` | Reference | Add Caddy file server directive. |
 
+### Gatus provider
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `gatus_config` | Reference | Declare a structured Gatus YAML config resource. |
+| `web` | Reference | Set Gatus web listener config inside `gatus_config`. |
+| `gatus_storage` | Reference | Set Gatus storage config without conflicting with core `storage`. |
+| `telegram_alerting` | Reference | Set Gatus Telegram alerting config. |
+| `default_alert` | Reference | Set Telegram default alert options. |
+| `gatus_endpoint` | Reference | Add a Gatus endpoint without conflicting with core `endpoint`. |
+
 ### Elixir app recipe
 
 | Directive | Level | Purpose |

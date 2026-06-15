@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added structured, JSON Patch-backed plan diffs for `dotenv/2`, `ini/2`, `yaml/2`, and template assign metadata, with human-readable public changes and separate redacted paths/assigns in plan output/artifacts.
+- Added a thin Gatus provider DSL that emits ordinary structured YAML config resources.
 - Added down-plan coverage summaries to generated down plans and `mix host_kit.down` output.
 
 ## v0.1.0-beta.4 - 2026-06-15
