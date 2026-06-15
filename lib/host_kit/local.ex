@@ -14,7 +14,8 @@ defmodule HostKit.Local do
     Package,
     Readiness,
     Shell,
-    Source
+    Source,
+    Symlink
   }
 
   alias HostKit.Systemd
@@ -64,6 +65,20 @@ defmodule HostKit.Local do
 
   def read(%EnvFile{} = desired) do
     Helpers.read_env_file(desired, &read/1)
+  end
+
+  def read(%Symlink{path: path} = desired) do
+    with {:stat, {:ok, %Elixir.File.Stat{type: :symlink}}} <- {:stat, Elixir.File.lstat(path)},
+         {:metadata, {:ok, metadata}} <- {:metadata, stat_metadata(path)},
+         {:target, {:ok, target}} <- {:target, Elixir.File.read_link(path)} do
+      {:ok, %Symlink{desired | to: target, owner: metadata.owner, group: metadata.group}}
+    else
+      {:stat, {:ok, %Elixir.File.Stat{type: type}}} -> {:error, {:not_symlink, path, type}}
+      {:stat, {:error, :enoent}} -> {:ok, nil}
+      {:stat, {:error, reason}} -> {:error, reason}
+      {:metadata, {:error, reason}} -> {:error, reason}
+      {:target, {:error, reason}} -> {:error, reason}
+    end
   end
 
   def read(%Firewall{} = desired) do
@@ -160,6 +175,10 @@ defmodule HostKit.Local do
     Helpers.read_env_file(desired, &read(&1, context))
   end
 
+  def read(%Symlink{} = desired, context) do
+    Helpers.read_symlink(desired, &stat_metadata(&1, context), &read_link(&1, context))
+  end
+
   def read(%Firewall{} = desired, context) do
     Helpers.read_firewall(desired, &read(&1, context))
   end
@@ -204,6 +223,13 @@ defmodule HostKit.Local do
     end
   end
 
+  defp read_link(path, context) do
+    case Elixir.File.read_link(path) do
+      {:error, :eacces} -> sudo_read_link(path, context)
+      result -> result
+    end
+  end
+
   defp sudo_read_file(path, %{opts: opts}) do
     if Keyword.get(opts, :sudo, false) do
       case System.cmd("sudo", ["cat", path], stderr_to_stdout: true) do
@@ -216,6 +242,19 @@ defmodule HostKit.Local do
   end
 
   defp sudo_read_file(_path, _context), do: {:error, :eacces}
+
+  defp sudo_read_link(path, %{opts: opts}) do
+    if Keyword.get(opts, :sudo, false) do
+      case System.cmd("sudo", ["readlink", path], stderr_to_stdout: true) do
+        {target, 0} -> {:ok, String.trim_trailing(target, "\n")}
+        {output, status} -> {:error, {:sudo_readlink_failed, status, output}}
+      end
+    else
+      {:error, :eacces}
+    end
+  end
+
+  defp sudo_read_link(_path, _context), do: {:error, :eacces}
 
   defp read_proxy(%Proxy{path: path} = desired, context) do
     Helpers.read_content_resource(desired, path, &read_file(&1, context))

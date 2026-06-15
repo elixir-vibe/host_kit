@@ -935,6 +935,12 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro symlink(path, opts) do
+    quote do
+      HostKit.DSL.Scope.add_resource(HostKit.Resources.Symlink.new(unquote(path), unquote(opts)))
+    end
+  end
+
   defmacro command(name, opts) do
     source = HostKit.SourceLocation.from_caller(__CALLER__)
 

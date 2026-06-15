@@ -336,6 +336,7 @@ Legend:
 | `tool` | Canonical | Declare a mise-managed tool version. |
 | `directory` | Reference | Declare an explicit directory resource. Prefer `storage` for service data. |
 | `file` | Reference | Declare an explicit file resource. |
+| `symlink` | Reference | Declare an explicit symbolic link resource. |
 | `source` | Reference | Declare a source artifact/repository. |
 | `source_ref` | Reference | Reference a declared source. |
 | `command` | Escape hatch | Low-level command resource. |

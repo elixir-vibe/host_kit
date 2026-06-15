@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added `symlink PATH, to: TARGET` resources with local/remote read support, apply support, rollback deletion, and documentation.
 - Added `target_host` for selecting a nested instance host when an instance has multiple connection endpoints.
 - Documented instance backend authoring callbacks and clarified instance down-plan ordering.
 - Added semantic tests for persistent/ephemeral instance rollback behavior and nested content target selection.

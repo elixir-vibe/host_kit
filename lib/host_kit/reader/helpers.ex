@@ -6,7 +6,7 @@ defmodule HostKit.Reader.Helpers do
   end
 
   alias HostKit.Caddy
-  alias HostKit.Resources.{Account, Directory, File}
+  alias HostKit.Resources.{Account, Directory, File, Symlink}
   alias HostKit.Systemd
 
   def read_directory(%Directory{path: path} = desired, stat_fun) do
@@ -67,6 +67,18 @@ defmodule HostKit.Reader.Helpers do
       {:ok, content} -> {:ok, %{desired | meta: Map.put(desired.meta, :content, content)}}
       {:error, :enoent} -> {:ok, nil}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def read_symlink(%Symlink{path: path} = desired, stat_fun, read_link_fun) do
+    with {:metadata, {:ok, %{type: :symlink} = metadata}} <- {:metadata, stat_fun.(path)},
+         {:target, {:ok, target}} <- {:target, read_link_fun.(path)} do
+      {:ok, %Symlink{desired | to: target, owner: metadata.owner, group: metadata.group}}
+    else
+      {:metadata, {:ok, %{type: type}}} -> {:error, {:not_symlink, path, type}}
+      {:metadata, {:error, :enoent}} -> {:ok, nil}
+      {:metadata, {:error, reason}} -> {:error, reason}
+      {:target, {:error, reason}} -> {:error, reason}
     end
   end
 
@@ -139,5 +151,6 @@ defmodule HostKit.Reader.Helpers do
 
   defp normalize_type(type) when type in ["directory", "Directory"], do: :directory
   defp normalize_type(type) when type in ["regular file", "Regular File"], do: :regular
+  defp normalize_type(type) when type in ["symbolic link", "Symbolic Link"], do: :symlink
   defp normalize_type(type), do: type
 end

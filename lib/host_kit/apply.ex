@@ -15,7 +15,8 @@ defmodule HostKit.Apply do
     Package,
     Readiness,
     Shell,
-    Source
+    Source,
+    Symlink
   }
 
   alias Runner.Ops
@@ -231,6 +232,10 @@ defmodule HostKit.Apply do
     apply_or_dry_run(change, opts, fn -> delete_path(file.path, [:file], opts) end)
   end
 
+  defp apply_change(%Change{action: :delete, before: %Symlink{} = symlink} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_path(symlink.path, [:file], opts) end)
+  end
+
   defp apply_change(%Change{action: :delete, before: %EnvFile{} = env_file} = change, opts) do
     apply_or_dry_run(change, opts, fn -> delete_path(env_file.path, [:file], opts) end)
   end
@@ -272,6 +277,11 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %File{} = file} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn -> apply_file(file, opts) end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Symlink{} = symlink} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> apply_symlink(symlink, opts) end)
   end
 
   defp apply_change(%Change{action: action, after: %Command{} = command} = change, opts)
@@ -412,6 +422,20 @@ defmodule HostKit.Apply do
          :ok <- Ops.chown(path, file.owner, file.group, opts) do
       Ops.chmod(path, file.mode, opts)
     end
+  end
+
+  defp apply_symlink(%Symlink{path: path, to: target} = symlink, opts) do
+    with :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
+         :ok <- Ops.cmd(opts, "ln", ["-sfnT", target, path]) do
+      symlink_chown(path, symlink.owner, symlink.group, opts)
+    end
+  end
+
+  defp symlink_chown(_path, nil, nil, _opts), do: :ok
+
+  defp symlink_chown(path, owner, group, opts) do
+    spec = [owner || "", group || ""] |> Enum.join(":") |> String.trim_trailing(":")
+    Ops.cmd(opts, "chown", ["-h", spec, path])
   end
 
   defp rendered_content(%{meta: %{content: %HostKit.BackupRef{} = ref}}, _default, opts),

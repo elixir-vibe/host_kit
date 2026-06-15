@@ -14,7 +14,8 @@ defmodule HostKit.Remote do
     Package,
     Readiness,
     Shell,
-    Source
+    Source,
+    Symlink
   }
 
   @spec read(struct(), map()) :: {:ok, struct() | nil} | {:error, term()}
@@ -36,6 +37,10 @@ defmodule HostKit.Remote do
 
   def read(%EnvFile{} = desired, context) do
     Helpers.read_env_file(desired, &read(&1, context))
+  end
+
+  def read(%Symlink{} = desired, context) do
+    Helpers.read_symlink(desired, &stat_metadata(&1, context), &read_link(&1, context))
   end
 
   def read(%Firewall{} = desired, context) do
@@ -138,6 +143,16 @@ defmodule HostKit.Remote do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  defp read_link(path, context) do
+    command = if sudo?(context), do: "sudo", else: "readlink"
+    args = if sudo?(context), do: ["readlink", path], else: [path]
+
+    case cmd(context, command, args) do
+      {target, 0} -> {:ok, String.trim_trailing(target, "\n")}
+      {output, _status} -> {:error, stat_error(output)}
     end
   end
 

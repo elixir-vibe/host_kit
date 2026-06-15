@@ -122,6 +122,7 @@ Top-level hosts describe existing connection endpoints. Instances describe lifec
 Resources describe desired state or an operational step. Examples:
 
 - `%HostKit.Resources.File{}`
+- `%HostKit.Resources.Symlink{}`
 - `%HostKit.Resources.EnvFile{}`
 - `%HostKit.Systemd.Service{}`
 - `%HostKit.Resources.Command{}`

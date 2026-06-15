@@ -42,5 +42,6 @@ Doc quality rules:
 
 - Test structure should mirror code structure where practical, e.g. `lib/host_kit/plan.ex` -> `test/host_kit/plan/` and `lib/mix/tasks/*.ex` -> `test/mix/tasks/`.
 - Prefer exercising public APIs in integration tests. For rollback/down behavior, use down plans and `HostKit.IntegrationCase.on_exit_rollback/3` rather than only hand-rolled cleanup.
+- In tests and helpers, do not build HostKit DSL snippets with interpolated strings. Use quoted AST (`quote`/`unquote` with `Code.eval_quoted/1`) or plain runtime structs/APIs so dynamic values remain syntax-safe and refactorable.
 - Keep fallback cleanup for resources that are intentionally not reversible yet.
 - Livebook integration tests belong under `test/integration/livebook/`.

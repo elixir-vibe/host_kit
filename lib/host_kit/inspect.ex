@@ -14,6 +14,14 @@ defimpl Inspect, for: HostKit.Resources.File do
   end
 end
 
+defimpl Inspect, for: HostKit.Resources.Symlink do
+  import Inspect.Algebra
+
+  def inspect(%HostKit.Resources.Symlink{path: path, to: target}, _opts) do
+    concat(["#HostKit.Symlink<", path || "", " -> ", target || "", ">"])
+  end
+end
+
 defimpl Inspect, for: HostKit.Resources.Package do
   import Inspect.Algebra
 

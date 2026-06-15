@@ -92,9 +92,11 @@ command :warm_cache,
 
 The down command is emitted as an ordinary command change in the down plan. `down: :irreversible` records an explicit warning and omits the command from the down plan.
 
-Created resources use conservative rollback policies. File-like resources can be deleted by a down plan, but directories are kept unless explicitly opted in:
+Created resources use conservative rollback policies. File-like resources and symlinks can be deleted by a down plan, but directories are kept unless explicitly opted in:
 
 ```elixir
+file "/etc/app/config", content: "..."
+symlink "/opt/app/current", to: "/opt/app/releases/20260615"
 directory "/tmp/demo", rollback: :delete_if_created
 directory "/srv/app", rollback: :keep
 account :app, system: true, rollback: :keep
@@ -123,7 +125,7 @@ mix host_kit.down --host prod --run 20260614-101148-demo-up --out down.plan.json
 
 Run records are intentionally compact: they identify the run, project, direction, timestamp, and applied change statuses. They do not replace plan artifacts; use plan artifacts for inspectable up/down plan contents. When a tracked apply is started from `--plan`, HostKit copies that up-plan artifact under the runs root and records the copied path so `mix host_kit.down --last` can work from the tracked run.
 
-Tracked applies also write backup payloads for previous file-like state when that state was captured in the plan. Backup payloads live under `hostkit_backups/<run-id>/` or the `--backups-root` override. `mix host_kit.down --last` and `mix host_kit.down --run RUN_ID` rewrite supported previous file-like state to `%HostKit.BackupRef{}` entries so generated down plans restore from backup payloads instead of embedding prior content. Backup-backed restore currently covers ordinary files plus rendered file resources such as env files, Caddy sites, proxy config, firewall/egress files, and systemd unit files when their previous rendered content was captured. Use `mix host_kit.runs --verbose`, `--latest`, or `--id RUN_ID` to inspect copied plan artifacts and backup payload paths.
+Tracked applies also write backup payloads for previous file-like state when that state was captured in the plan. Backup payloads live under `hostkit_backups/<run-id>/` or the `--backups-root` override. `mix host_kit.down --last` and `mix host_kit.down --run RUN_ID` rewrite supported previous file-like state to `%HostKit.BackupRef{}` entries so generated down plans restore from backup payloads instead of embedding prior content. Backup-backed restore currently covers ordinary files plus rendered file resources such as env files, Caddy sites, proxy config, firewall/egress files, and systemd unit files when their previous rendered content was captured. Symlink rollback restores the previous link target directly in the plan. Use `mix host_kit.runs --verbose`, `--latest`, or `--id RUN_ID` to inspect copied plan artifacts and backup payload paths.
 
 Source updates are intentionally not inferred as reversible by default: a previous Git remote/ref may no longer be reachable. Treat source rollback as an explicit lifecycle operation or pair it with a backup/source-bundle strategy.
 

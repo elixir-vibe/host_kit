@@ -4,7 +4,17 @@ defmodule HostKit.Plan do
   alias HostKit.Addr
   alias HostKit.{Change, Diagnostic, Diagnostics, Project, Resource}
   alias HostKit.Package.{Manager, Resolver}
-  alias HostKit.Resources.{Capability, Command, Directory, EnvFile, File, Package, Source}
+
+  alias HostKit.Resources.{
+    Capability,
+    Command,
+    Directory,
+    EnvFile,
+    File,
+    Package,
+    Source,
+    Symlink
+  }
 
   @type t :: %__MODULE__{
           project: Project.t(),
@@ -197,6 +207,7 @@ defmodule HostKit.Plan do
   defp delete_supported?(%EnvFile{}), do: true
   defp delete_supported?(%Directory{rollback: :delete_if_created}), do: true
   defp delete_supported?(%Directory{}), do: false
+  defp delete_supported?(%Symlink{}), do: true
   defp delete_supported?(%HostKit.Firewall{}), do: true
   defp delete_supported?(%HostKit.Proxy{}), do: true
   defp delete_supported?(%HostKit.Instance{lifecycle: :ephemeral}), do: true
@@ -471,6 +482,9 @@ defmodule HostKit.Plan do
 
   defp equivalent?(%HostKit.Resources.File{} = desired, actual),
     do: comparable(desired, actual, [:path, :content, :owner, :group, :mode])
+
+  defp equivalent?(%Symlink{} = desired, actual),
+    do: comparable(desired, actual, [:path, :to, :owner, :group])
 
   defp equivalent?(%HostKit.Resources.EnvFile{} = desired, actual) do
     comparable(desired, actual, [:path, :owner, :group, :mode]) and
