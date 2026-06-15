@@ -175,6 +175,26 @@ Demo.plan_summary(plan)
 Demo.plan_table(plan)
 ```
 
+## Audit and facts
+
+The runtime API can audit the desired state and collect bounded host facts without applying changes.
+
+```elixir
+{:ok, audit_plan} = HostKit.Project.audit(project, target_opts)
+{:ok, facts} = HostKit.Facts.collect(target_opts, only: [:os, :systemd, :ports])
+
+[
+  Kino.Markdown.new("""
+  **Audit:** #{length(audit_plan.resources)} managed resources, #{Enum.count(audit_plan.changes, &(&1.action != :no_op))} drifted changes
+
+  **OS:** #{get_in(facts, [:os, :os_release, "PRETTY_NAME"]) || get_in(facts, [:os, :os_release, "NAME"]) || "unknown"}
+
+  **Systemd:** #{get_in(facts, [:systemd, :version]) || "unknown"}
+  """),
+  Demo.plan_table(audit_plan)
+]
+```
+
 ## Inspect structured config resources
 
 HostKit can model natural data files directly as INI/YAML resources. Public keys are compared during drift detection, while redacted/generated secrets stay out of plans.
