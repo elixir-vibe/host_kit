@@ -27,14 +27,31 @@ defmodule HostKit.DSL.ConfigFile.Scope do
     :ok
   end
 
-  def put_set(key, value) do
+  def put_set(key, value), do: put_value(:set, key, value)
+
+  def put_secret(key, opts) do
+    value =
+      case Keyword.fetch!(opts, :env) do
+        :redacted -> :redacted
+        env when is_binary(env) -> HostKit.Secret.env(env)
+      end
+
+    put_value(:secret, key, value)
+  end
+
+  defp put_value(_kind, key, value) do
     config = Process.get(@key) || raise "set/2 used outside HostKit config file scope"
-    section = Process.get(@section_key) || raise "set/2 used outside section/2 block"
 
     content =
-      Map.update(config.content, section, %{key => value}, fn values ->
-        Map.put(values, key, value)
-      end)
+      case Process.get(@section_key) do
+        nil ->
+          Map.put(config.content, key, value)
+
+        section ->
+          Map.update(config.content, section, %{key => value}, fn values ->
+            Map.put(values, key, value)
+          end)
+      end
 
     Process.put(@key, %{config | content: content})
   end

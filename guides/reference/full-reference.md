@@ -871,10 +871,13 @@ Use `ini/2` and `yaml/2` when a managed file is naturally data. Structured confi
 ```elixir
 service :forgejo, path: "forgejo" do
   ini path(:config, "app.ini"), owner: "root", group: service_user(), mode: 0o640 do
+    set "APP_NAME", "elixir.toys git"
+
     section "server" do
       set "DOMAIN", "git.elixir.toys"
       set "ROOT_URL", "https://git.elixir.toys/"
       set "HTTP_PORT", 3000
+      secret "LFS_JWT_SECRET", env: :redacted
     end
 
     section "database" do
@@ -885,7 +888,13 @@ service :forgejo, path: "forgejo" do
 end
 ```
 
-YAML configs use Elixir data:
+Secret or redacted INI values are omitted from public drift comparison. `env: :redacted` is useful for modeling existing generated secrets without storing or rendering them. Use an env-backed secret when HostKit should render the file during apply:
+
+```elixir
+secret "TOKEN", env: "APP_TOKEN"
+```
+
+YAML configs use Elixir keyword data for stable order:
 
 ```elixir
 yaml path(:config, "gatus.yaml"),

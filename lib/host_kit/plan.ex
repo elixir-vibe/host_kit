@@ -495,10 +495,15 @@ defmodule HostKit.Plan do
     do: comparable(desired, actual, [:path, :content, :owner, :group, :mode])
 
   defp equivalent?(%ConfigFile{} = desired, actual) do
-    {:ok, content} = ConfigFile.render(desired)
+    if ConfigFile.secret?(desired) do
+      comparable(desired, actual, [:path, :format, :owner, :group, :mode]) and
+        ConfigFile.public_entries(desired) == Map.get(actual.meta, :actual_public_entries, %{})
+    else
+      {:ok, content} = ConfigFile.render(desired)
 
-    comparable(desired, actual, [:path, :format, :owner, :group, :mode]) and
-      Map.get(actual.meta, :content) == content
+      comparable(desired, actual, [:path, :format, :owner, :group, :mode]) and
+        Map.get(actual.meta, :content) == content
+    end
   end
 
   defp equivalent?(%Template{} = desired, actual) do

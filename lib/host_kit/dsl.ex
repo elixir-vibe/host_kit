@@ -264,7 +264,11 @@ defmodule HostKit.DSL do
 
   defmacro secret(key, opts) do
     quote do
-      HostKit.DSL.EnvFile.Scope.put_secret(unquote(key), unquote(opts))
+      if HostKit.DSL.ConfigFile.Scope.active?() do
+        HostKit.DSL.ConfigFile.Scope.put_secret(unquote(key), unquote(opts))
+      else
+        HostKit.DSL.EnvFile.Scope.put_secret(unquote(key), unquote(opts))
+      end
     end
   end
 

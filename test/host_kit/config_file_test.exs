@@ -64,6 +64,53 @@ defmodule HostKit.ConfigFileTest do
     assert server == %{"DOMAIN" => "git.elixir.toys", "HTTP_PORT" => 3000}
   end
 
+  test "INI config supports top-level keys" do
+    config =
+      ConfigFile.new("/etc/app.ini", :ini,
+        content: [APP_NAME: "demo", server: [DOMAIN: "example.com"]]
+      )
+
+    assert ConfigFile.render(config) == {:ok, "APP_NAME=demo\n\n[server]\nDOMAIN=example.com\n"}
+  end
+
+  test "secret INI config compares only public entries" do
+    path = Path.join(tmp_dir("config-file-secret-plan"), "app.ini")
+
+    File.write!(path, """
+    APP_NAME = elixir.toys git
+
+    [server]
+    DOMAIN=git.elixir.toys
+    LFS_JWT_SECRET=actual-secret
+    """)
+
+    project =
+      project_with_config(path, :ini,
+        APP_NAME: "elixir.toys git",
+        server: [DOMAIN: "git.elixir.toys", LFS_JWT_SECRET: :redacted]
+      )
+
+    assert {:ok, plan} = HostKit.plan(project, reader: HostKit.Local)
+    assert [%Change{action: :no_op, resource_id: {:ini, ^path}}] = plan.changes
+  after
+    cleanup_tmp("config-file-secret-plan")
+  end
+
+  test "secret config rendering resolves env-backed secrets" do
+    env = "HOSTKIT_CONFIG_FILE_SECRET"
+    System.put_env(env, "actual-secret")
+
+    config =
+      ConfigFile.new("/etc/app.ini", :ini,
+        content: [server: [DOMAIN: "git.elixir.toys", LFS_JWT_SECRET: HostKit.Secret.env(env)]]
+      )
+
+    assert ConfigFile.render(config) ==
+             {:ok, "[server]\nDOMAIN=git.elixir.toys\nLFS_JWT_SECRET=actual-secret\n"}
+  after
+    System.delete_env("HOSTKIT_CONFIG_FILE_SECRET")
+  end
+
   test "plan compares rendered config content with managed file on disk" do
     path = Path.join(tmp_dir("config-file-plan"), "app.ini")
     File.write!(path, "[server]\nDOMAIN=git.elixir.toys\n")

@@ -90,7 +90,7 @@ defmodule HostKit.Reader.Helpers do
            | owner: actual.owner,
              group: actual.group,
              mode: actual.mode,
-             meta: Map.put(desired.meta, :content, actual.content)
+             meta: put_config_file_public_entries(desired, actual.content)
          }}
 
       {:error, reason} ->
@@ -154,6 +154,26 @@ defmodule HostKit.Reader.Helpers do
       {:metadata, {:error, :enoent}} -> {:ok, nil}
       {:metadata, {:error, reason}} -> {:error, reason}
       {:content, {:error, reason}} -> {:error, reason}
+    end
+  end
+
+  defp put_config_file_public_entries(desired, content) do
+    if HostKit.Resources.ConfigFile.secret?(desired) do
+      public_entries = HostKit.Resources.ConfigFile.public_entries(desired)
+
+      case HostKit.Resources.ConfigFile.public_entries_from_content(desired, content) do
+        {:ok, actual_entries} ->
+          desired.meta
+          |> Map.put(:public_entries, public_entries)
+          |> Map.put(:actual_public_entries, actual_entries)
+
+        {:error, _reason} ->
+          desired.meta
+          |> Map.put(:public_entries, public_entries)
+          |> Map.put(:actual_public_entries, :invalid)
+      end
+    else
+      Map.put(desired.meta, :content, content)
     end
   end
 
