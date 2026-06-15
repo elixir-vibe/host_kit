@@ -373,7 +373,7 @@ flowchart TD
   Graph -. future .-> Scheduler[parallel apply scheduler]
 ```
 
-The graph is intentionally graph-only today: it improves diagnostics and establishes deterministic layering before any parallel executor is introduced. Machine-readable graph output uses explicit JSON-safe maps with display labels and `HostKit.Resource.dump/1` resource-id terms; it must not rely on Jason struct encoders or embed full before/after resources.
+The graph is intentionally graph-only today: it improves diagnostics and establishes deterministic layering before any parallel executor is introduced. Machine-readable graph output uses explicit JSON-safe maps with display labels and `HostKit.Resource.dump/1` resource-id terms; it must not rely on Jason struct encoders or embed full before/after resources. See [Parallel apply design](parallel-apply-design.md) for the intended scheduler direction.
 
 ## Design constraints
 

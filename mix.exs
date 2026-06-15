@@ -88,6 +88,7 @@ defmodule HostKit.MixProject do
         "guides/reference/dsl-guidelines.md",
         "guides/reference/full-reference.md",
         "guides/reference/internal-architecture.md",
+        "guides/reference/parallel-apply-design.md",
         "notebooks/learn/deploy_caddy_site.livemd",
         "notebooks/learn/deploy_phoenix_app.livemd"
       ],

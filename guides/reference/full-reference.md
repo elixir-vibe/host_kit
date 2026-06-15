@@ -513,7 +513,7 @@ mix host_kit.plan infra/config.exs --host prod --show-graph
 mix host_kit.plan infra/config.exs --host prod --graph-format json
 ```
 
-The JSON graph output is a JSON-safe map with display labels and `HostKit.Resource.dump/1` terms for resource ids; it does not encode raw Elixir structs or embed full before/after resource payloads.
+The JSON graph output is a JSON-safe map with display labels and `HostKit.Resource.dump/1` terms for resource ids; it does not encode raw Elixir structs or embed full before/after resource payloads. See [Parallel apply design](parallel-apply-design.md) for how this graph may later feed a bounded scheduler.
 
 ## Storage volumes
 
