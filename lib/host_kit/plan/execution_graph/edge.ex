@@ -8,6 +8,11 @@ defmodule HostKit.Plan.ExecutionGraph.Edge do
           | :group_account
           | :source_input
           | :readiness_systemd
+          | :symlink_target_path
+          | :systemd_timer_service
+          | :systemd_environment_file
+          | :systemd_exec_path
+          | :systemd_read_write_path
 
   @type source :: :declared | :derived
 

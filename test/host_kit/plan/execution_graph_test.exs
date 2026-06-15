@@ -102,6 +102,69 @@ defmodule HostKit.Plan.ExecutionGraphTest do
            )
   end
 
+  test "derives release symlink, systemd timer, and service path edges" do
+    releases = %Directory{path: "/opt/app/releases/gatus"}
+    current = %Symlink{path: "/opt/app/current/gatus", to: "/opt/app/releases/gatus/1.0.0"}
+    env = %HostKit.Resources.EnvFile{path: "/etc/app/env"}
+    config = %File{path: "/etc/app/config.yaml"}
+
+    service = %Service{
+      name: "app.service",
+      service: [
+        environment_file: "/etc/app/env",
+        exec_start: "/opt/app/current/gatus/gatus",
+        read_write_paths: "/etc/app/config.yaml"
+      ]
+    }
+
+    timer = %HostKit.Systemd.Timer{name: "app.timer"}
+
+    graph =
+      graph_for([
+        create({:directory, "/opt/app/releases/gatus"}, releases),
+        create({:symlink, "/opt/app/current/gatus"}, current),
+        create({:env_file, "/etc/app/env"}, env),
+        create({:file, "/etc/app/config.yaml"}, config),
+        create({:systemd_service, "app.service"}, service),
+        create({:systemd_timer, "app.timer"}, timer)
+      ])
+
+    assert edge?(
+             graph,
+             {:directory, "/opt/app/releases/gatus"},
+             {:symlink, "/opt/app/current/gatus"},
+             :symlink_target_path
+           )
+
+    assert edge?(
+             graph,
+             {:env_file, "/etc/app/env"},
+             {:systemd_service, "app.service"},
+             :systemd_environment_file
+           )
+
+    assert edge?(
+             graph,
+             {:symlink, "/opt/app/current/gatus"},
+             {:systemd_service, "app.service"},
+             :systemd_exec_path
+           )
+
+    assert edge?(
+             graph,
+             {:file, "/etc/app/config.yaml"},
+             {:systemd_service, "app.service"},
+             :systemd_read_write_path
+           )
+
+    assert edge?(
+             graph,
+             {:systemd_service, "app.service"},
+             {:systemd_timer, "app.timer"},
+             :systemd_timer_service
+           )
+  end
+
   test "reports cycles without hiding graph data" do
     one = %File{path: "/tmp/one", depends_on: [{:symlink, "/tmp/two"}]}
     two = %Symlink{path: "/tmp/two", to: "/tmp/one", depends_on: [{:file, "/tmp/one"}]}

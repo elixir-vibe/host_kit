@@ -360,7 +360,7 @@ Structured config resources render through explicit format modules but remain or
 
 ## Execution dependency graph
 
-`HostKit.Plan.ExecutionGraph.build/2` derives an inspectable graph from active plan changes. Nodes wrap `%HostKit.Change{}` values and edges carry stable reasons instead of flattening everything into anonymous ordering. The first derived reasons are declared `depends_on`, parent directory, owner/group account, command source input, and systemd readiness dependencies. Delete changes reverse dependency direction so children are removed before parents.
+`HostKit.Plan.ExecutionGraph.build/2` derives an inspectable graph from active plan changes. Nodes wrap `%HostKit.Change{}` values and edges carry stable reasons instead of flattening everything into anonymous ordering. Derived reasons include declared `depends_on`, parent directory, owner/group account, command source input, symlink target path, systemd timer/service, systemd service file/path references, and systemd readiness dependencies. Delete changes reverse dependency direction so children are removed before parents.
 
 ```mermaid
 flowchart TD

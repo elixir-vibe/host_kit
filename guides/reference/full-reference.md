@@ -506,7 +506,7 @@ end
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
 ```
 
-Plans can also be inspected as an execution dependency graph. The graph is derived from active create/update/delete changes and records why ordering exists: declared `depends_on`, parent directories, owner/group accounts, command source inputs, and systemd readiness checks. It is currently an inspection/debug artifact; future parallel apply can consume the same graph without changing the plan format.
+Plans can also be inspected as an execution dependency graph. The graph is derived from active create/update/delete changes and records why ordering exists: declared `depends_on`, parent directories, owner/group accounts, command source inputs, symlink target paths, systemd timer/service relationships, systemd service file/path references, and systemd readiness checks. It is currently an inspection/debug artifact; future parallel apply can consume the same graph without changing the plan format.
 
 ```sh
 mix host_kit.plan infra/config.exs --host prod --show-graph

@@ -24,12 +24,16 @@ defmodule HostKit.Plan.ExecutionGraph do
       |> Enum.filter(&(&1.action in @active_actions))
       |> Enum.map(&graph_node/1)
 
-    by_id = Map.new(nodes, &{&1.id, &1})
-    resource_to_node = resource_index(nodes)
+    indexes = %{
+      by_id: Map.new(nodes, &{&1.id, &1}),
+      resource_to_node: resource_index(nodes),
+      path_to_node: path_index(nodes),
+      directory_paths: directory_paths(nodes)
+    }
 
     edges =
       nodes
-      |> Enum.flat_map(&edges_for(&1, by_id, resource_to_node))
+      |> Enum.flat_map(&edges_for(&1, indexes))
       |> Enum.uniq_by(&{&1.from, &1.to, &1.reason, &1.detail, &1.source})
       |> Enum.sort_by(
         &{format_id(&1.from), format_id(&1.to), to_string(&1.reason), inspect(&1.detail)}
@@ -88,6 +92,28 @@ defmodule HostKit.Plan.ExecutionGraph do
     |> Map.merge(Map.new(nodes, fn node -> {normalize_dependency(node.resource_id), node.id} end))
   end
 
+  defp path_index(nodes) do
+    nodes
+    |> Enum.flat_map(fn node ->
+      case node.change.after || node.change.before do
+        %{path: path} when is_binary(path) -> [{path, node.id}]
+        _resource -> []
+      end
+    end)
+    |> Map.new()
+  end
+
+  defp directory_paths(nodes) do
+    nodes
+    |> Enum.flat_map(fn node ->
+      case node.change.after || node.change.before do
+        %HostKit.Resources.Directory{path: path} when is_binary(path) -> [{path, node.id}]
+        _resource -> []
+      end
+    end)
+    |> Map.new()
+  end
+
   defp graph_node(%Change{} = change) do
     resource = change.after || change.before
 
@@ -100,15 +126,18 @@ defmodule HostKit.Plan.ExecutionGraph do
     }
   end
 
-  defp edges_for(%Node{} = node, by_id, resource_to_node) do
+  defp edges_for(%Node{} = node, indexes) do
     resource = node.change.after || node.change.before
 
     []
-    |> add_declared_dependencies(node, resource, resource_to_node)
-    |> add_parent_directory(node, resource, by_id)
-    |> add_account_edges(node, resource, resource_to_node)
-    |> add_command_input_edges(node, resource, resource_to_node)
-    |> add_readiness_edges(node, resource, resource_to_node)
+    |> add_declared_dependencies(node, resource, indexes.resource_to_node)
+    |> add_parent_directory(node, resource, indexes.path_to_node)
+    |> add_account_edges(node, resource, indexes.resource_to_node)
+    |> add_command_input_edges(node, resource, indexes.resource_to_node)
+    |> add_readiness_edges(node, resource, indexes.resource_to_node)
+    |> add_symlink_target_edges(node, resource, indexes)
+    |> add_systemd_timer_edges(node, resource, indexes.resource_to_node)
+    |> add_systemd_service_path_edges(node, resource, indexes.path_to_node)
   end
 
   defp add_declared_dependencies(edges, _node, nil, _resource_to_node), do: edges
@@ -140,21 +169,22 @@ defmodule HostKit.Plan.ExecutionGraph do
     end)
   end
 
-  defp add_parent_directory(edges, node, %{path: path}, by_id) when is_binary(path) do
+  defp add_parent_directory(edges, node, %{path: path}, path_to_node) when is_binary(path) do
     parent = Path.dirname(path)
-    parent_id = {:directory, parent}
 
-    if parent not in [".", path] and Map.has_key?(by_id, parent_id) do
-      [
-        dependency_edge(parent_id, node.id, node.action, :parent_directory, parent, :derived)
-        | edges
-      ]
-    else
-      edges
+    case Map.fetch(path_to_node, parent) do
+      {:ok, parent_node} when parent not in [".", path] ->
+        [
+          dependency_edge(parent_node, node.id, node.action, :parent_directory, parent, :derived)
+          | edges
+        ]
+
+      _other ->
+        edges
     end
   end
 
-  defp add_parent_directory(edges, _node, _resource, _by_id), do: edges
+  defp add_parent_directory(edges, _node, _resource, _path_to_node), do: edges
 
   defp add_account_edges(edges, _node, nil, _resource_to_node), do: edges
 
@@ -242,6 +272,155 @@ defmodule HostKit.Plan.ExecutionGraph do
   end
 
   defp add_readiness_edges(edges, _node, _resource, _resource_to_node), do: edges
+
+  defp add_symlink_target_edges(edges, node, %HostKit.Resources.Symlink{to: target}, indexes)
+       when is_binary(target) do
+    target
+    |> nearest_path_node(indexes.directory_paths, node.id)
+    |> case do
+      nil ->
+        edges
+
+      target_node ->
+        [
+          dependency_edge(
+            target_node,
+            node.id,
+            node.action,
+            :symlink_target_path,
+            target,
+            :derived
+          )
+          | edges
+        ]
+    end
+  end
+
+  defp add_symlink_target_edges(edges, _node, _resource, _indexes), do: edges
+
+  defp add_systemd_timer_edges(edges, node, %HostKit.Systemd.Timer{name: name}, resource_to_node) do
+    name
+    |> String.replace_suffix(".timer", ".service")
+    |> systemd_service_ids()
+    |> Enum.find_value(&Map.get(resource_to_node, &1))
+    |> case do
+      nil ->
+        edges
+
+      service_node ->
+        [
+          dependency_edge(
+            service_node,
+            node.id,
+            node.action,
+            :systemd_timer_service,
+            name,
+            :derived
+          )
+          | edges
+        ]
+    end
+  end
+
+  defp add_systemd_timer_edges(edges, _node, _resource, _resource_to_node), do: edges
+
+  defp add_systemd_service_path_edges(
+         edges,
+         node,
+         %HostKit.Systemd.Service{service: service},
+         path_to_node
+       ) do
+    edges
+    |> add_paths(
+      node,
+      directive_paths(service, :environment_file),
+      path_to_node,
+      :systemd_environment_file
+    )
+    |> add_paths(
+      node,
+      directive_paths(service, :read_write_paths),
+      path_to_node,
+      :systemd_read_write_path
+    )
+    |> add_exec_path(node, Keyword.get(service, :exec_start), path_to_node)
+  end
+
+  defp add_systemd_service_path_edges(edges, _node, _resource, _path_to_node), do: edges
+
+  defp add_paths(edges, node, paths, path_to_node, reason) do
+    Enum.reduce(paths, edges, fn path, acc ->
+      case Map.fetch(path_to_node, path) do
+        {:ok, path_node} ->
+          [dependency_edge(path_node, node.id, node.action, reason, path, :derived) | acc]
+
+        :error ->
+          acc
+      end
+    end)
+  end
+
+  defp add_exec_path(edges, _node, nil, _path_to_node), do: edges
+
+  defp add_exec_path(edges, node, exec_start, path_to_node) when is_binary(exec_start) do
+    exec = exec_start |> String.split(~r/\s+/, parts: 2) |> List.first()
+
+    exec
+    |> nearest_path_node(path_to_node, node.id)
+    |> case do
+      nil ->
+        edges
+
+      exec_node ->
+        [
+          dependency_edge(exec_node, node.id, node.action, :systemd_exec_path, exec, :derived)
+          | edges
+        ]
+    end
+  end
+
+  defp add_exec_path(edges, _node, _exec_start, _path_to_node), do: edges
+
+  defp directive_paths(service, key) do
+    service
+    |> Keyword.get_values(key)
+    |> Enum.flat_map(&List.wrap/1)
+    |> Enum.flat_map(&split_systemd_paths/1)
+  end
+
+  defp split_systemd_paths(value) when is_binary(value) do
+    value
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.map(&String.trim_leading(&1, "-"))
+    |> Enum.filter(&String.starts_with?(&1, "/"))
+  end
+
+  defp split_systemd_paths(value),
+    do: value |> List.wrap() |> Enum.flat_map(&split_systemd_paths/1)
+
+  defp nearest_path_node(path, path_to_node, excluded_node) do
+    path
+    |> path_candidates()
+    |> Enum.find_value(fn candidate ->
+      case Map.get(path_to_node, candidate) do
+        ^excluded_node -> nil
+        nil -> nil
+        node -> node
+      end
+    end)
+  end
+
+  defp path_candidates(path) do
+    path
+    |> Path.expand()
+    |> Stream.iterate(&Path.dirname/1)
+    |> Enum.reduce_while([], fn
+      ".", acc -> {:halt, acc}
+      "/", acc -> {:halt, ["/" | acc]}
+      path, acc -> if path in acc, do: {:halt, acc}, else: {:cont, [path | acc]}
+    end)
+    |> Enum.reverse()
+  end
 
   defp systemd_service_ids(unit) do
     stripped = String.replace_suffix(unit, ".service", "")
