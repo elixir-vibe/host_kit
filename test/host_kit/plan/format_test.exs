@@ -88,6 +88,31 @@ defmodule HostKit.PlanFormatTest do
              """)
   end
 
+  test "formats resource and change type summaries when resources are available" do
+    package = %Package{name: :curl, system_name: "curl"}
+
+    plan = %HostKit.Plan{
+      resources: [package],
+      changes: [
+        %Change{
+          action: :create,
+          resource_id: {:package, :curl},
+          after: package,
+          reason: :missing
+        }
+      ]
+    }
+
+    assert Format.format(plan) ==
+             String.trim_trailing("""
+             Plan: 1 to create, 0 to update, 0 to delete, 0 read errors, 0 unchanged
+             Resources: package=1
+             Changes by type: package(create=1)
+             + package.curl
+               create missing
+             """)
+  end
+
   test "formats source details" do
     plan = %HostKit.Plan{
       changes: [

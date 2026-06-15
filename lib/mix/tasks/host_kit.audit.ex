@@ -63,7 +63,7 @@ defmodule Mix.Tasks.HostKit.Audit do
   end
 
   defp format_audit(plan, opts) do
-    report = audit_report(plan)
+    report = HostKit.Plan.Summary.audit_report(plan)
 
     case Keyword.get(opts, :format, "text") do
       "json" ->
@@ -85,31 +85,6 @@ defmodule Mix.Tasks.HostKit.Audit do
     end
   end
 
-  defp audit_report(plan) do
-    counts = Enum.frequencies_by(plan.changes, & &1.action)
-
-    %{
-      managed_resources: length(plan.resources),
-      drift:
-        Map.get(counts, :create, 0) + Map.get(counts, :update, 0) + Map.get(counts, :delete, 0),
-      read_errors: Map.get(counts, :read, 0),
-      unchanged: Map.get(counts, :no_op, 0),
-      redacted_keys: redacted_key_count(plan.resources)
-    }
-  end
-
-  defp redacted_key_count(resources) do
-    resources
-    |> Enum.flat_map(fn
-      %HostKit.Resources.ConfigFile{} = config ->
-        HostKit.Resources.ConfigFile.secret_paths(config)
-
-      _resource ->
-        []
-    end)
-    |> length()
-  end
-
   defp format_report(report) do
     [
       "Audit: ",
@@ -119,12 +94,31 @@ defmodule Mix.Tasks.HostKit.Audit do
       " drift, ",
       to_string(report.read_errors),
       " read errors, ",
-      to_string(report.redacted_keys),
-      " redacted keys, ",
+      to_string(report.redacted_config_entries),
+      " redacted config entries, ",
       to_string(report.unchanged),
-      " unchanged"
+      " unchanged",
+      "\nResources: ",
+      Mix.Tasks.HostKit.Output.format_counts(report.resources_by_type),
+      "\nDrift: ",
+      Mix.Tasks.HostKit.Output.format_counts(report.drift_by_type),
+      format_redacted_config(report.redacted_config_paths)
     ]
   end
+
+  defp format_redacted_config([]), do: []
+
+  defp format_redacted_config(entries) do
+    [
+      "\nRedacted config: ",
+      Enum.map_join(entries, "; ", fn entry ->
+        "#{format_resource_id(HostKit.Resource.load(entry.resource_id))}: #{Enum.join(entry.paths, ", ")}"
+      end)
+    ]
+  end
+
+  defp format_resource_id({type, name}), do: "#{type}.#{name}"
+  defp format_resource_id(resource_id), do: inspect(resource_id)
 
   defp put_present(opts, _key, nil), do: opts
   defp put_present(opts, key, value), do: Keyword.put(opts, key, value)

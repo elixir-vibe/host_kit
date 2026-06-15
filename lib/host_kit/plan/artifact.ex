@@ -8,22 +8,26 @@ defmodule HostKit.Plan.Artifact do
   @version 1
 
   defstruct version: @version,
+            generated_at: nil,
             target: nil,
             project: nil,
             resources: [],
             sources: %{},
             changes: [],
             summary: %{},
+            stats: %{},
             diagnostics: Resource.dump(%HostKit.Diagnostics{})
 
   @type t :: %__MODULE__{
           version: pos_integer(),
+          generated_at: String.t() | nil,
           target: map() | nil,
           project: term(),
           resources: [term()],
           sources: map(),
           changes: [term()],
           summary: term(),
+          stats: map(),
           diagnostics: term()
         }
 
@@ -32,12 +36,15 @@ defmodule HostKit.Plan.Artifact do
   @spec from_plan(Plan.t(), keyword()) :: t()
   def from_plan(%Plan{} = plan, opts \\ []) do
     %__MODULE__{
+      generated_at:
+        Keyword.get_lazy(opts, :generated_at, &DateTime.utc_now/0) |> DateTime.to_iso8601(),
       target: Keyword.get(opts, :target_metadata, %{}),
       project: Resource.dump(plan.project),
       resources: Resource.dump(plan.resources),
       sources: source_identities(plan.resources),
       changes: Enum.map(plan.changes, &dump_change/1),
       summary: Resource.dump(plan.summary),
+      stats: HostKit.Plan.Summary.artifact_stats(plan),
       diagnostics: Resource.dump(plan.diagnostics)
     }
   end
@@ -107,9 +114,14 @@ defmodule HostKit.Plan.Artifact do
       "resource_id" => Resource.dump(change.resource_id),
       "before" => Resource.dump(change.before),
       "after" => Resource.dump(change.after),
-      "reason" => Resource.dump(change.reason)
+      "reason" => Resource.dump(change.reason),
+      "source" => change_source(change)
     }
   end
+
+  defp change_source(%Change{after: %{meta: %{source: source}}}) when is_map(source), do: source
+  defp change_source(%Change{before: %{meta: %{source: source}}}) when is_map(source), do: source
+  defp change_source(_change), do: nil
 
   defp load_change(%{} = change) do
     %Change{

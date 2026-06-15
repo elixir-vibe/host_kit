@@ -4,7 +4,11 @@ defmodule HostKit.Plan.ArtifactTest do
   alias HostKit.Plan.Artifact
 
   test "saves and loads resolved plans" do
-    package = HostKit.Resources.Package.new(:curl, as: "curl")
+    package =
+      HostKit.Resources.Package.new(:curl,
+        as: "curl",
+        meta: %{source: %{file: "infra.exs", line: 12}}
+      )
 
     plan = %HostKit.Plan{
       project: %HostKit.Project{name: :demo},
@@ -30,7 +34,14 @@ defmodule HostKit.Plan.ArtifactTest do
              )
 
     assert {:ok, json} = path |> File.read!() |> Jason.decode()
+    assert json["version"] == 1
+    assert json["generated_at"]
     assert json["target"] == %{"kind" => "local", "package_repo" => "debian_13"}
+    assert json["stats"]["actions"]["create"] == 1
+    assert json["stats"]["resources"] == %{"package" => 1}
+    assert json["stats"]["changes_by_type"]["package"]["create"] == 1
+    assert [change] = json["changes"]
+    assert change["source"] == %{"file" => "infra.exs", "line" => 12}
     refute Map.has_key?(json, "plan")
 
     assert [%{"$type" => "struct", "module" => "Elixir.HostKit.Resources.Package"}] =

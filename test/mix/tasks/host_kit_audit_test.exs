@@ -18,6 +18,8 @@ defmodule Mix.Tasks.HostKit.AuditTest do
     output = capture_io(fn -> Mix.Task.run("host_kit.audit", ["--local", config]) end)
 
     assert output =~ "Audit: 1 managed resources, 1 drift"
+    assert output =~ "Resources: file=1"
+    assert output =~ "Drift: file=1"
     assert output =~ "Plan: 0 to create, 1 to update"
   after
     cleanup_tmp("host-kit-audit-task")

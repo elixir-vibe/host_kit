@@ -2,6 +2,20 @@
 
 HostKit DSL is for humans first. It should read like a declaration of the host, not a transcription of systemd, SSH, Caddy, or file paths. The implementation must still compile to plain inspectable structs.
 
+## Public DSL stability
+
+HostKit is still beta, but public examples should already follow the stable direction:
+
+- use `path/2` for configured roots and service-scoped conventional paths;
+- use `template/2`, `dotenv/2`, `ini/2`, and `yaml/2` for managed text/config files;
+- use `symlink/2` for links instead of shell commands;
+- use suffixless `daemon` / `schedule` names and let HostKit normalize unit names;
+- use `argv/2` or `~SH` for simple commands, and reserve `~BASH` for real shell scripts;
+- use atoms for logical references declared in the same project, and strings for generated external names/paths;
+- keep provider/recipe DSLs compiling to ordinary inspectable resources.
+
+Avoid new public docs or examples that reintroduce removed/legacy forms such as `root_path`, `path_name`, hand-written `.service` / `.timer` suffixes in high-level service DSL, or raw heredoc config files when a structured config resource fits.
+
 ## Core principles
 
 1. **One human concept, one DSL concept.** Do not split one idea across unrelated macros. A managed runtime env file is `env`; it should not require users to pair `env_file` with `environment_file` in normal code.

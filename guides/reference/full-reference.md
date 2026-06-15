@@ -328,7 +328,7 @@ mix host_kit.apply --host prod \
 
 `ssh retry: ...` is an SSH transport policy. It retries connection establishment for transient SSH startup/network failures; it does not blindly rerun arbitrary deployment commands after a command has been sent to the remote host. Use `retry: 3` as shorthand for three attempts, `retry: false` to disable, or keyword options with `:attempts`, `:base_delay`/`:base_delay_ms`, and `:max_delay`/`:max_delay_ms`. Retry progress is emitted as apply events and mirrored to Logger for collection.
 
-Plan artifacts are JSON and intended to be inspectable. Secret references are stored as references, not values, for example:
+Plan artifacts are JSON and intended to be inspectable. They include an artifact version, target metadata, dumped project/resources/changes, source identities, diagnostics, aggregate resource/action statistics, and source-location metadata on changes where available. Secret references are stored as references, not values, for example:
 
 ```json
 {

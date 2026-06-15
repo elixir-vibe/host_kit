@@ -100,7 +100,7 @@ mix host_kit.apply --host prod --package-lock host_kit.package.lock --dry-run in
 
 ## `mix host_kit.read`
 
-Read current target state for resources declared by a config. This is a read-only introspection wrapper around `HostKit.Project.read/2` / audit planning.
+Read current target state for resources declared by a config. Text output starts with a present/missing/read-error summary and resource counts, then lists each declared resource. This is a read-only introspection wrapper around `HostKit.Project.read/2` / audit planning.
 
 ```sh
 mix host_kit.read [options] [config.exs]
@@ -122,7 +122,7 @@ mix host_kit.read --host prod --format json infra/config.exs
 
 ## `mix host_kit.audit`
 
-Print a compact audit report followed by the normal plan diff. This is intended for drift/no-op review without applying anything.
+Print an audit report followed by the normal plan diff. The report includes managed resource counts, counts by resource type, drift by type, read errors, unchanged resources, and redacted structured-config entries. This is intended for drift/no-op review without applying anything.
 
 ```sh
 mix host_kit.audit [options] [config.exs]

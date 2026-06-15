@@ -17,6 +17,8 @@ defmodule Mix.Tasks.HostKit.ReadTest do
 
     output = capture_io(fn -> Mix.Task.run("host_kit.read", ["--local", config]) end)
 
+    assert output =~ "Read: 1 present, 0 missing, 0 read errors across 1 managed resources"
+    assert output =~ "Resources: file=1"
     assert output =~ "file.#{managed} present"
   after
     cleanup_tmp("host-kit-read-task")

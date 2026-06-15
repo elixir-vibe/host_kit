@@ -9,7 +9,13 @@ defmodule HostKit.Plan.Format do
 
   @spec format(Plan.t()) :: String.t()
   def format(%Plan{} = plan) do
-    [diagnostics(plan.diagnostics), summary(plan), "\n", changes(plan.changes)]
+    [
+      diagnostics(plan.diagnostics),
+      summary(plan),
+      type_summary(plan),
+      "\n",
+      changes(plan.changes)
+    ]
     |> IO.iodata_to_binary()
     |> String.trim_trailing()
   end
@@ -58,6 +64,37 @@ defmodule HostKit.Plan.Format do
   end
 
   defp count(counts, action, label), do: "#{Map.get(counts, action, 0)} #{label}"
+
+  defp type_summary(%Plan{resources: []}), do: []
+
+  defp type_summary(%Plan{} = plan) do
+    [
+      "\nResources: ",
+      format_counts(HostKit.Plan.Summary.resource_counts(plan)),
+      "\nChanges by type: ",
+      format_change_counts(HostKit.Plan.Summary.change_counts_by_type(plan))
+    ]
+  end
+
+  defp format_counts(counts) when map_size(counts) == 0, do: "none"
+
+  defp format_counts(counts) do
+    Enum.map_join(counts, ", ", fn {type, count} -> "#{type}=#{count}" end)
+  end
+
+  defp format_change_counts(counts) when map_size(counts) == 0, do: "none"
+
+  defp format_change_counts(counts) do
+    counts
+    |> Enum.map_join(", ", fn {type, actions} ->
+      active =
+        actions
+        |> Enum.reject(fn {_action, count} -> count == 0 end)
+        |> Enum.map_join("/", fn {action, count} -> "#{action}=#{count}" end)
+
+      "#{type}(#{active})"
+    end)
+  end
 
   defp changes(changes) do
     changes
