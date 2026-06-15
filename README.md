@@ -101,7 +101,7 @@ project :prod do
 end
 ```
 
-This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, templates, dotenv/INI/YAML config files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits. Secret/redacted structured config entries are omitted from public drift comparison by dotenv key, INI key, or YAML path, so generated values can be modeled without leaking them into plans. See the [DSL design guidelines](guides/reference/dsl-guidelines.md) for naming, block shape, defaults, and reference style.
+This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, templates, dotenv/INI/YAML config files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits. Secret/redacted structured config entries are omitted from public drift comparison by dotenv key, INI key, or YAML path, so generated values can be modeled without leaking them into plans. Unit names and command argv can be built from structured declarations instead of hand-written strings. See the [DSL design guidelines](guides/reference/dsl-guidelines.md) for naming, block shape, defaults, and reference style.
 
 Plan, review, apply:
 

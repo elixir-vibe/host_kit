@@ -36,7 +36,7 @@ defmodule HostKit.DSL.Systemd do
 
   defmacro daemon(name, opts \\ [], do: block) do
     quote do
-      systemd_service unquote(name), unquote(opts) do
+      systemd_service HostKit.DSL.Systemd.service_unit_name(unquote(name)), unquote(opts) do
         unquote(block)
       end
     end
@@ -44,7 +44,7 @@ defmodule HostKit.DSL.Systemd do
 
   defmacro job(name, opts \\ [], do: block) do
     quote do
-      systemd_service unquote(name), unquote(opts) do
+      systemd_service HostKit.DSL.Systemd.service_unit_name(unquote(name)), unquote(opts) do
         unquote(block)
       end
     end
@@ -52,7 +52,7 @@ defmodule HostKit.DSL.Systemd do
 
   defmacro schedule(name, opts \\ [], do: block) do
     quote do
-      systemd_timer unquote(name), unquote(opts) do
+      systemd_timer HostKit.DSL.Systemd.timer_unit_name(unquote(name)), unquote(opts) do
         unquote(block)
       end
     end
@@ -217,6 +217,19 @@ defmodule HostKit.DSL.Systemd do
       HostKit.DSL.Systemd.Scope.put_service(:read_write_paths, unquote(paths))
     end
   end
+
+  def service_unit_name(name), do: unit_name(name, ".service")
+  def timer_unit_name(name), do: unit_name(name, ".timer")
+
+  defp unit_name(name, suffix) when is_atom(name) do
+    identity = HostKit.Naming.identity_segment(name)
+
+    :unit
+    |> HostKit.DSL.Scope.prefixed(identity)
+    |> HostKit.Naming.systemd_unit(suffix)
+  end
+
+  defp unit_name(name, suffix), do: HostKit.Naming.systemd_unit(name, suffix)
 
   def normalize_account_refs(opts) when is_list(opts) do
     opts

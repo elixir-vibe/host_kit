@@ -27,6 +27,68 @@ defmodule HostKit.SystemdAliasesTest do
     assert unit.service[:restart] == "on-failure"
   end
 
+  test "daemon and schedule normalize unit names" do
+    source = """
+    use HostKit.DSL
+
+    project :prod do
+      prefixes unit: "toys-"
+
+      service :health_alert do
+        daemon :health_alert do
+          exec ["/usr/bin/env", "true"]
+        end
+
+        schedule :health_alert do
+          every "1h"
+        end
+
+        daemon "custom" do
+          exec ["/usr/bin/env", "true"]
+        end
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    assert [service] = project.services
+
+    assert Enum.any?(
+             service.resources,
+             &match?(%HostKit.Systemd.Service{name: "toys-health-alert.service"}, &1)
+           )
+
+    assert Enum.any?(
+             service.resources,
+             &match?(%HostKit.Systemd.Timer{name: "toys-health-alert.timer"}, &1)
+           )
+
+    assert Enum.any?(
+             service.resources,
+             &match?(%HostKit.Systemd.Service{name: "custom.service"}, &1)
+           )
+  end
+
+  test "exec accepts built argv command lines" do
+    source = """
+    use HostKit.DSL
+
+    project :prod do
+      service :search do
+        daemon do
+          exec argv("mix", args: ["exograph.web"], opts: [backend: "duckdb", port: 4200])
+        end
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    [service] = project.services
+    [%HostKit.Systemd.Service{} = unit] = service.resources
+
+    assert unit.service[:exec_start] == "mix exograph.web --backend duckdb --port 4200"
+  end
+
   test "job and schedule alias service and timer units" do
     source = """
     use HostKit.DSL

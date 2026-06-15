@@ -23,6 +23,8 @@ defmodule HostKit.NamingTest do
     assert Naming.workspace_identity(:alice, "blog/preview", :agent) == "alice-blog-preview-agent"
     assert Naming.prefixed("hk-", :blog_agent) == "hk-blog-agent"
     assert Naming.systemd_unit("hk-blog-agent") == "hk-blog-agent.service"
+    assert Naming.systemd_unit("hk-blog-agent.service") == "hk-blog-agent.service"
+    assert Naming.systemd_unit("hk-blog-agent.timer") == "hk-blog-agent.timer"
     assert Naming.systemd_unit("hk-blog-agent", "-sync.timer") == "hk-blog-agent-sync.timer"
   end
 

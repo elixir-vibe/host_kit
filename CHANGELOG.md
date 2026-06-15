@@ -5,6 +5,8 @@
 - Added `mix host_kit.read`, `mix host_kit.audit`, and `mix host_kit.facts` wrappers for runtime introspection APIs.
 - Expanded `HostKit.Facts.collect/2` to return structured users, systemd failed units, and listening ports.
 - Added `dotenv PATH do ... end` as the format-style explicit env-file DSL, plus redacted env-file secrets via `secret KEY, env: :redacted`, file/command secret sources, and richer safe public-value config diff output.
+- Added `argv/2` for structured command-line construction with configurable CLI option styles.
+- Normalized `daemon`/`job`/`schedule` unit names so suffixless names get `.service`/`.timer` and atom names use the configured unit prefix.
 
 ## v0.1.0-beta.3 - 2026-06-15
 

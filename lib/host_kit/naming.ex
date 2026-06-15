@@ -22,7 +22,13 @@ defmodule HostKit.Naming do
 
   @spec systemd_unit(name_part(), name_part()) :: String.t()
   def systemd_unit(identity, suffix \\ ".service") do
-    identity_segment(identity) <> to_string(suffix)
+    identity = identity_segment(identity)
+
+    if String.ends_with?(identity, [".service", ".timer"]) do
+      identity
+    else
+      identity <> to_string(suffix)
+    end
   end
 
   @spec service_user(name_part()) :: String.t()

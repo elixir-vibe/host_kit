@@ -970,6 +970,50 @@ Runtime APIs are primary; Mix tasks wrap them. Besides `HostKit.plan/2`, project
 
 `read/2` returns the current snapshots captured for each desired resource. `audit/2` returns the same plan shape as `HostKit.plan/2`, so callers can inspect creates, updates, deletes, read errors, and no-ops without going through Mix tasks. CLI wrappers are available as `mix host_kit.read`, `mix host_kit.audit`, and `mix host_kit.facts`.
 
+## Command argv builder
+
+Use `argv/2` when a service command has many CLI options. It keeps argv inspectable without hand-writing long flag lists.
+
+```elixir
+daemon :search do
+  exec argv(path(:bin, "mix"),
+    args: ["exograph.web"],
+    opts: [
+      backend: "duckdb",
+      manifest_path: path(:data, "hex-manifest.json"),
+      duckdb_memory_limit: "2GB",
+      port: 4200
+    ]
+  )
+end
+```
+
+Option styles are configurable:
+
+```elixir
+argv("cmd", opts: [foo_bar: "baz"], style: :gnu)         # --foo-bar baz
+argv("cmd", opts: [foo_bar: "baz"], style: :equals)      # --foo-bar=baz
+argv("cmd", opts: [foo_bar: "baz"], style: :single_dash) # -foo-bar baz
+argv("cmd", opts: [f: "baz", v: true], style: :short)    # -f baz -v
+argv("cmd", opts: [foo_bar: "baz"], style: :underscore)  # --foo_bar baz
+```
+
+Booleans with `true` emit flags, `false`/`nil` are omitted, and list values repeat the option.
+
+## Systemd unit names
+
+`daemon`, `job`, and `schedule` normalize systemd suffixes. Strings without a suffix get the right suffix; strings with `.service`/`.timer` are preserved. Atom names use the configured `:unit` prefix.
+
+```elixir
+daemon "custom" do ... end      # custom.service
+schedule "custom" do ... end    # custom.timer
+
+daemon :health_alert do ... end  # e.g. toys-health-alert.service
+schedule :health_alert do ... end
+```
+
+Use raw `systemd_service`/`systemd_timer` only when you intentionally want the low-level resource constructor.
+
 ## Runtime isolation
 
 HostKit uses shared runtime isolation structs for persistent systemd units and future transient Unitctl workloads:

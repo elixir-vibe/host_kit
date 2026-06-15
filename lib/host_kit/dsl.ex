@@ -1036,6 +1036,12 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro argv(command, opts \\ []) do
+    quote do
+      HostKit.CommandLine.argv(unquote(command), unquote(opts))
+    end
+  end
+
   def git_exec(%HostKit.CommandLine{} = command), do: {"git", [command.command | command.args]}
 
   def git_exec(command) when is_binary(command),

@@ -258,7 +258,7 @@ These should not appear in README/getting-started/tutorial happy paths unless th
 - root SSH plus `sudo true`; root does not need sudo
 - `service :bootstrap`; use `bootstrap do`
 - paired `env_file` and `environment_file`; use contextual `env`
-- raw `exec_start`; use `exec`
+- raw `exec_start`; use `exec`, and use `argv(...)` when the command has structured CLI options
 - raw `wanted_by :multi_user`; `daemon do` defaults it
 - raw `read_write_paths`; use `writable :storage`
 - raw sandbox keyword lists; use `isolate do`
@@ -397,6 +397,7 @@ Legend:
 | `service_group` | Reference | Set systemd service group. |
 | `working_directory` | Reference | Set service working directory. |
 | `environment_file` | Escape hatch | Set raw systemd env file path. Prefer `env :name`. |
+| `argv` | Reference | Build inspectable argv from positional args and CLI options. |
 | `exec_start` | Escape hatch | Raw systemd spelling. Prefer `exec`. |
 | `exec_stop` | Reference | Set stop command. |
 | `restart` | Reference | Set restart policy. |

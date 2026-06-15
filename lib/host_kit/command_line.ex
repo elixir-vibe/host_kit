@@ -1,9 +1,25 @@
 defmodule HostKit.CommandLine do
-  @moduledoc "A parsed, shell-like simple command line stored as argv."
+  @moduledoc "A parsed or built simple command line stored as argv."
 
   defstruct source: nil, command: nil, args: [], ast: nil
 
-  @type t :: %__MODULE__{source: String.t(), command: String.t(), args: [String.t()], ast: term()}
+  @type option_style :: :gnu | :equals | :single_dash | :short | :underscore
+  @type t :: %__MODULE__{
+          source: String.t() | nil,
+          command: String.t(),
+          args: [String.t()],
+          ast: term()
+        }
+
+  @doc "Builds a command line from a command, positional args, and structured CLI options."
+  @spec argv(String.t(), keyword()) :: t()
+  def argv(command, opts \\ []) when is_binary(command) do
+    args = Keyword.get(opts, :args, [])
+    option_style = Keyword.get(opts, :style, Keyword.get(opts, :opts_style, :gnu))
+    option_args = opts |> Keyword.get(:opts, []) |> option_args(option_style)
+
+    %__MODULE__{command: command, args: Enum.map(args ++ option_args, &to_string/1)}
+  end
 
   @spec parse(String.t()) :: {:ok, t()} | {:error, term()}
   def parse(source) when is_binary(source) do
@@ -26,6 +42,28 @@ defmodule HostKit.CommandLine do
         raise ArgumentError, "invalid HostKit ~SH command: #{format_error(reason)}"
     end
   end
+
+  defp option_args(opts, style) do
+    Enum.flat_map(opts, fn {name, value} -> option_arg(name, value, style) end)
+  end
+
+  defp option_arg(_name, value, _style) when value in [false, nil], do: []
+  defp option_arg(name, true, style), do: [flag_name(name, style)]
+
+  defp option_arg(name, values, style) when is_list(values) do
+    Enum.flat_map(values, &option_arg(name, &1, style))
+  end
+
+  defp option_arg(name, value, :equals), do: ["#{flag_name(name, :gnu)}=#{value}"]
+  defp option_arg(name, value, style), do: [flag_name(name, style), to_string(value)]
+
+  defp flag_name(name, :gnu), do: "--" <> dashed_name(name)
+  defp flag_name(name, :equals), do: flag_name(name, :gnu)
+  defp flag_name(name, :single_dash), do: "-" <> dashed_name(name)
+  defp flag_name(name, :short), do: "-" <> to_string(name)
+  defp flag_name(name, :underscore), do: "--" <> to_string(name)
+
+  defp dashed_name(name), do: name |> to_string() |> String.replace("_", "-")
 
   defp parse_bash(source) do
     case Bash.Parser.parse(source) do

@@ -86,7 +86,7 @@ end
 
 Use logical service names for readability. Use `path:` only when an existing external path/unit/user convention requires a different path segment. Do not add a separate directive for this concept.
 
-When adding recipes, providers, workspace helpers, readiness checks, ingress renderers, or generated resource names, use `HostKit.Naming` instead of hand-rolled string replacement/interpolation for path, identity, unit, user, readiness, route, or command names.
+When adding recipes, providers, workspace helpers, readiness checks, ingress renderers, or generated resource names, use `HostKit.Naming` instead of hand-rolled string replacement/interpolation for path, identity, unit, user, readiness, route, or command names. Prefer suffixless `daemon`/`schedule` names; HostKit normalizes `.service` and `.timer`.
 
 ## Files and templates
 
@@ -149,7 +149,7 @@ template path(:config, "app.ini"),
   mode: 0o640
 ```
 
-`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates, dotenv files, and structured config resources are first-class resources in plans and render to ordinary managed files during read/apply. Secret/redacted env/config values compare only public dotenv entries, INI keys, or YAML paths during plan reads; `:redacted` values are intentionally not renderable for apply. Secret sources support `env:`, `file:`, and `command:`. Template assigns containing secrets or `:redacted` are rejected until redacted template diffs exist.
+`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates, dotenv files, and structured config resources are first-class resources in plans and render to ordinary managed files during read/apply. Secret/redacted env/config values compare only public dotenv entries, INI keys, or YAML paths during plan reads; `:redacted` values are intentionally not renderable for apply. Secret sources support `env:`, `file:`, and `command:`. Template assigns containing secrets or `:redacted` are rejected until redacted template diffs exist. Use `argv/2` for long structured CLI commands instead of raw flag lists.
 
 Keep templates inspectable and deterministic. Do not hide runtime behavior or shell workflows in templates. Do not commit secrets; use `content: :redacted` for existing secret-bearing files managed elsewhere, and avoid passing raw secrets as template assigns until redacted template diffs are explicitly supported.
 

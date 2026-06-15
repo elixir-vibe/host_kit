@@ -10,6 +10,9 @@ defmodule HostKit.Systemd.Directives do
   def coerce_value(key, values) when key in [:after, :wants, :requires, :wanted_by],
     do: HostKit.Systemd.Target.names(values)
 
+  def coerce_value(:exec_start, %HostKit.CommandLine{command: command, args: args}),
+    do: Enum.join([command | args], " ")
+
   def coerce_value(:exec_start, argv) when is_list(argv), do: Enum.join(argv, " ")
   def coerce_value(:restart, :on_failure), do: "on-failure"
   def coerce_value(:on_calendar, value), do: HostKit.Systemd.Calendar.name(value)
