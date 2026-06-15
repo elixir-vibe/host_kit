@@ -368,7 +368,7 @@ Legend:
 | --- | --- | --- |
 | `service` | Canonical | Declare an application/service boundary. |
 | `account` | Canonical | Declare/ref service account; `account system: true` derives the service user. |
-| `release_layout` | Reference | Emit an inspectable binary-release layout: releases directory plus current symlink. |
+| `release` | Reference | Emit an inspectable binary-release layout: versions directory plus current symlink. |
 | `storage` | Canonical | Declare named service storage and its directory resource. |
 | `env` | Canonical | Declare a managed env file in service scope; attach it in daemon scope. |
 | `secret` | Canonical | Add a secret entry inside env/dotenv or structured INI config. Use `env: :redacted` for existing generated secrets that must not render. |

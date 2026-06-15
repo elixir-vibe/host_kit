@@ -442,9 +442,9 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro release_layout(name, version, opts \\ []) do
+  defmacro release(name, opts) do
     quote do
-      HostKit.DSL.Scope.put_release_layout(unquote(name), unquote(version), unquote(opts))
+      HostKit.DSL.Scope.put_release(unquote(name), unquote(opts))
     end
   end
 

@@ -471,8 +471,9 @@ defmodule HostKit.DSL.Scope do
 
   def prefixed(name, value), do: Conventions.prefixed(project_conventions(), name, value)
 
-  def put_release_layout(name, version, opts) do
+  def put_release(name, opts) do
     release_name = to_string(name)
+    version = Keyword.fetch!(opts, :version)
     release_owner = Keyword.get(opts, :owner, "root")
     release_group = Keyword.get(opts, :group, release_owner)
     release_mode = Keyword.get(opts, :mode, 0o755)

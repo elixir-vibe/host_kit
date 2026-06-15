@@ -869,23 +869,23 @@ Initial execution supports systemd state, HTTP status, and filesystem existence 
 
 ## Binary release layouts
 
-Use `release_layout/3` when a service follows the common unpacked-binary pattern of a shared releases directory and a `current/<name>` symlink. It is only a helper: it emits ordinary `directory/2` and `symlink/2` resources that remain visible in plans.
+Use `release/2` when a service follows the common unpacked-binary pattern of a versions directory and a `current/<name>` symlink. It is only a helper: it emits ordinary `directory/2` and `symlink/2` resources that remain visible in plans.
 
 ```elixir
 service :gatus do
-  release = release_layout :gatus, "5.36.0", owner: "deploy", group: "deploy"
+  release :gatus, version: "5.36.0", owner: "deploy", group: "deploy"
 
   daemon do
-    exec [Path.join(release.current_path, "gatus")]
+    exec [path(:opt, "current/gatus/gatus")]
   end
 end
 ```
 
 The default layout is:
 
-- releases directory: `path(:opt, "releases/<name>")`
+- versions directory: `path(:opt, "releases/<name>")`
 - current symlink: `path(:opt, "current/<name>")`
-- symlink target: `<releases_dir>/<version>`
+- symlink target: `<versions_dir>/<version>`
 
 Use `current_dir: [owner: ..., group: ..., mode: ...]` when HostKit should also manage the parent `current` directory.
 

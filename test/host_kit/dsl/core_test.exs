@@ -101,7 +101,7 @@ defmodule HostKit.DSL.CoreTest do
              site.directives
   end
 
-  test "release_layout emits inspectable release directory and current symlink" do
+  test "release emits inspectable version directory and current symlink" do
     source = """
     use HostKit.DSL
 
@@ -109,12 +109,13 @@ defmodule HostKit.DSL.CoreTest do
       roots opt: "/opt/apps"
 
       service :gatus do
-        layout =
-          release_layout :gatus, "5.36.0",
-            owner: "deploy",
-            group: "deploy",
-            current_dir: [owner: "deploy", group: "deploy"]
-        file Path.join(layout.current_path, "VERSION"), content: layout.version
+        release :gatus,
+          version: "5.36.0",
+          owner: "deploy",
+          group: "deploy",
+          current_dir: [owner: "deploy", group: "deploy"]
+
+        file path(:opt, "current/gatus/VERSION"), content: "5.36.0"
       end
     end
     """
