@@ -156,7 +156,7 @@ defmodule HostKit.Recipes.Gatehouse do
       group:
         HostKit.Account.name!(Keyword.get(opts, :group, Keyword.get(opts, :run_as, "gatehouse"))),
       cookie: Keyword.get(opts, :cookie),
-      ready_name: Naming.readiness_name(:gatehouse, gatehouse_name),
+      ready_name: Naming.readiness(:gatehouse, gatehouse_name),
       paths: %{
         release: release_path,
         bin: Path.join([release_path, "bin", "gatehouse"]),
@@ -212,9 +212,9 @@ defmodule HostKit.Recipes.Gatehouse do
 
   defp release_commands(release, _paths) do
     %{
-      deps: %{name: Naming.resource_name([:gatehouse, release.name, :deps])},
-      release: %{name: Naming.resource_name([:gatehouse, release.name, :release])},
-      install: %{name: Naming.resource_name([:gatehouse, release.name, :install])}
+      deps: %{name: Naming.resource([:gatehouse, release.name, :deps])},
+      release: %{name: Naming.resource([:gatehouse, release.name, :release])},
+      install: %{name: Naming.resource([:gatehouse, release.name, :install])}
     }
   end
 

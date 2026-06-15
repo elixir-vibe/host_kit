@@ -31,17 +31,17 @@ defmodule HostKit.Naming do
   @spec prefixed(name_part(), name_part()) :: String.t()
   def prefixed(prefix, identity), do: to_string(prefix) <> identity_segment(identity)
 
-  @spec readiness_name([name_part()] | name_part(), [name_part()] | name_part()) :: String.t()
-  def readiness_name(namespace, name) do
-    resource_name(List.wrap(namespace) ++ List.wrap(name) ++ [:ready])
+  @spec readiness([name_part()] | name_part(), [name_part()] | name_part()) :: String.t()
+  def readiness(namespace, name) do
+    resource(List.wrap(namespace) ++ List.wrap(name) ++ [:ready])
   end
 
-  @spec resource_name([name_part()]) :: String.t()
-  def resource_name(parts), do: Enum.map_join(parts, "_", &underscore_segment/1)
+  @spec resource([name_part()]) :: String.t()
+  def resource(parts), do: Enum.map_join(parts, "_", &underscore_segment/1)
 
-  @spec ingress_route_name(name_part(), String.t(), pos_integer()) :: String.t()
-  def ingress_route_name(name, host, index) do
-    resource_name([name, route_suffix(host), index])
+  @spec ingress_route(name_part(), String.t(), pos_integer()) :: String.t()
+  def ingress_route(name, host, index) do
+    resource([name, route_suffix(host), index])
   end
 
   @spec route_suffix(String.t()) :: String.t()
@@ -51,13 +51,13 @@ defmodule HostKit.Naming do
     |> String.trim("_")
   end
 
-  @spec elixir_release_name(name_part()) :: String.t()
-  def elixir_release_name(name), do: name |> identity_segment() |> String.replace("-", "_")
+  @spec elixir_release(name_part()) :: String.t()
+  def elixir_release(name), do: name |> identity_segment() |> String.replace("-", "_")
 
-  @spec capability_name(atom() | String.t()) :: atom() | String.t()
-  def capability_name(name) when is_atom(name), do: name
+  @spec capability(atom() | String.t()) :: atom() | String.t()
+  def capability(name) when is_atom(name), do: name
 
-  def capability_name(name) when is_binary(name) do
+  def capability(name) when is_binary(name) do
     name
     |> String.replace("-", "_")
     |> String.to_existing_atom()

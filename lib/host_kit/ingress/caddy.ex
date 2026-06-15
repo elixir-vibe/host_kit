@@ -45,5 +45,5 @@ defmodule HostKit.Ingress.Caddy do
 
   defp proxy_upstream(upstream) when is_binary(upstream), do: upstream
 
-  defp site_name(name, host, index), do: Naming.ingress_route_name(name, host, index)
+  defp site_name(name, host, index), do: Naming.ingress_route(name, host, index)
 end

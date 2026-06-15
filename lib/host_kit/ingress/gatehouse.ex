@@ -75,5 +75,5 @@ defmodule HostKit.Ingress.Gatehouse do
 
   defp target_url(url) when is_binary(url), do: url
 
-  defp service_name(name, host, index), do: Naming.ingress_route_name(name, host, index)
+  defp service_name(name, host, index), do: Naming.ingress_route(name, host, index)
 end

@@ -10,12 +10,12 @@ defmodule HostKit.NamingTest do
   end
 
   test "resource names are underscore-safe" do
-    assert Naming.resource_name([:gatehouse, "my-app", :ready]) == "gatehouse_my_app_ready"
-    assert Naming.readiness_name(:gatehouse, "my-app") == "gatehouse_my_app_ready"
+    assert Naming.resource([:gatehouse, "my-app", :ready]) == "gatehouse_my_app_ready"
+    assert Naming.readiness(:gatehouse, "my-app") == "gatehouse_my_app_ready"
   end
 
   test "ingress route names use shared route suffix normalization" do
-    assert Naming.ingress_route_name(:edge, "www.elixir.toys", 1) == "edge_www_elixir_toys_1"
+    assert Naming.ingress_route(:edge, "www.elixir.toys", 1) == "edge_www_elixir_toys_1"
   end
 
   test "workspace identities and unit helpers are shared" do
@@ -27,9 +27,9 @@ defmodule HostKit.NamingTest do
   end
 
   test "Elixir release and capability names are underscore-safe" do
-    assert Naming.elixir_release_name("hello-phoenix") == "hello_phoenix"
-    assert Naming.elixir_release_name(:hello_phoenix) == "hello_phoenix"
-    assert Naming.capability_name("ca-certificates") == :ca_certificates
-    assert Naming.capability_name("custom-capability") == "custom-capability"
+    assert Naming.elixir_release("hello-phoenix") == "hello_phoenix"
+    assert Naming.elixir_release(:hello_phoenix) == "hello_phoenix"
+    assert Naming.capability("ca-certificates") == :ca_certificates
+    assert Naming.capability("custom-capability") == "custom-capability"
   end
 end

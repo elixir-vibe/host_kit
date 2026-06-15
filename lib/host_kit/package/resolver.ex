@@ -442,5 +442,5 @@ defmodule HostKit.Package.Resolver do
     %PackageResource{name: name, system_name: to_string(name), source: :semantic, meta: meta}
   end
 
-  defp normalize_capability(name), do: Naming.capability_name(name)
+  defp normalize_capability(name), do: Naming.capability(name)
 end
