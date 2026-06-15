@@ -77,7 +77,7 @@ defmodule HostKit.ProjectDSLTest do
     assert beta.owner == "app-beta"
   end
 
-  test "service path slugs can differ from service names" do
+  test "service paths can differ from service names" do
     source = """
     use HostKit.DSL
     use HostKit.ToysInfra

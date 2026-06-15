@@ -133,8 +133,10 @@ defmodule HostKit.Workspace do
     end
   end
 
-  defp unit_name(service), do: "hk-ws-#{service.identity}.service"
-  defp service_user(service), do: service.identity && "hk-#{service.identity}"
+  defp unit_name(service), do: HostKit.Naming.systemd_unit("hk-ws-#{service.identity}")
+
+  defp service_user(service),
+    do: service.identity && HostKit.Naming.prefixed("hk-", service.identity)
 
   defp workspace_dir(project, service) do
     project.conventions

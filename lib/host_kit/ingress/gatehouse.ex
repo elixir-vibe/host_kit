@@ -75,8 +75,5 @@ defmodule HostKit.Ingress.Gatehouse do
 
   defp target_url(url) when is_binary(url), do: url
 
-  defp service_name(name, host, index) do
-    suffix = host |> String.replace(~r/[^A-Za-z0-9_]+/, "_") |> String.trim("_")
-    "#{name}_#{suffix}_#{index}"
-  end
+  defp service_name(name, host, index), do: HostKit.Naming.ingress_route_name(name, host, index)
 end

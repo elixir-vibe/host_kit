@@ -232,8 +232,7 @@ defmodule HostKit.Recipes.ElixirApp do
     app = %{
       name: app_name,
       service_name: name,
-      release_name:
-        release |> Keyword.get(:name, app_name) |> to_string() |> String.replace("-", "_"),
+      release_name: HostKit.Naming.elixir_release_name(Keyword.get(release, :name, app_name)),
       source: normalize_source(source),
       runtime: %{
         erlang: Keyword.get(runtime, :erlang, @default_erlang),
@@ -323,7 +322,7 @@ defmodule HostKit.Recipes.ElixirApp do
       [] ->
         [
           %{
-            name: "#{app_name}_ecto_migrate",
+            name: HostKit.Naming.resource_name([app_name, :ecto_migrate]),
             migrate: Keyword.get(opts, :migrate, "#{release}.migrate()"),
             rollback: Keyword.get(opts, :rollback, "#{release}.rollback()"),
             timeout: timeout
@@ -338,7 +337,7 @@ defmodule HostKit.Recipes.ElixirApp do
             repo |> to_string() |> String.split(".") |> List.last() |> Macro.underscore()
 
           %{
-            name: "#{app_name}_ecto_migrate_#{repo_name}",
+            name: HostKit.Naming.resource_name([app_name, :ecto_migrate, repo_name]),
             migrate: "#{release}.migrate(#{repo})",
             rollback: "#{release}.rollback(#{repo})",
             timeout: timeout
@@ -359,7 +358,7 @@ defmodule HostKit.Recipes.ElixirApp do
     }
   end
 
-  defp command_name(app, step), do: "#{app.name}_#{step}"
+  defp command_name(app, step), do: HostKit.Naming.resource_name([app.name, step])
 
   defp mise_beam_packages do
     [

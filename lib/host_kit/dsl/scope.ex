@@ -405,7 +405,9 @@ defmodule HostKit.DSL.Scope do
   end
 
   def unit_name(suffix \\ ".service") do
-    prefixed(:unit, service_identity()) <> suffix
+    :unit
+    |> prefixed(service_identity())
+    |> HostKit.Naming.systemd_unit(suffix)
   end
 
   def service_identity do

@@ -87,7 +87,7 @@ defmodule HostKit.GatehouseRecipeTest do
            end)
 
     assert Enum.any?(resources, fn
-             %HostKit.Resources.Readiness{checks: checks} ->
+             %HostKit.Resources.Readiness{name: "gatehouse_edge_ready", checks: checks} ->
                Enum.any?(
                  checks,
                  &match?(

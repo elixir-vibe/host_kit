@@ -74,7 +74,7 @@ roots local_cache: Path.expand("~/.cache/hostkit-demo")
 
 Prefer absolute roots for production configs.
 
-## Service identity and path slugs
+## Service identity and paths
 
 Prefer the `service` `path:` option when the on-disk slug differs from the logical service name:
 
@@ -84,7 +84,9 @@ service :hex_mirror, path: "hex-mirror" do
 end
 ```
 
-Use logical service names for readability. Use `path:` only when an existing external path/unit/user convention requires a different slug. Do not add a separate directive for this concept.
+Use logical service names for readability. Use `path:` only when an existing external path/unit/user convention requires a different path segment. Do not add a separate directive for this concept.
+
+When adding recipes, providers, workspace helpers, readiness checks, ingress renderers, or generated resource names, use `HostKit.Naming` instead of hand-rolled string replacement/interpolation for path, identity, unit, user, readiness, route, or command names.
 
 ## Files and templates
 

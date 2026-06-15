@@ -154,7 +154,7 @@ defmodule HostKit.Recipes.Gatehouse do
       group:
         HostKit.Account.name!(Keyword.get(opts, :group, Keyword.get(opts, :run_as, "gatehouse"))),
       cookie: Keyword.get(opts, :cookie),
-      ready_name: "gatehouse_#{gatehouse_name}_ready",
+      ready_name: HostKit.Naming.readiness_name(:gatehouse, gatehouse_name),
       paths: %{
         release: release_path,
         bin: Path.join([release_path, "bin", "gatehouse"]),

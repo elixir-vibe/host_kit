@@ -14,6 +14,8 @@ HostKit DSL is for humans first. It should read like a declaration of the host, 
 
 ## Naming rules
 
+Generated names belong in `HostKit.Naming`, not in individual recipes/providers. Centralize path segments, identity segments, unit names, service users, readiness names, ingress route names, and command/resource names there so user-facing DSL stays consistent.
+
 ### Use nouns for declared things
 
 Declared project objects should be nouns:

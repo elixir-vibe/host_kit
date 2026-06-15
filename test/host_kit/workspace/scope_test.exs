@@ -1,7 +1,7 @@
 defmodule HostKit.WorkspaceScopeTest do
   use ExUnit.Case, async: true
 
-  test "workspace scopes regular services with metadata and path slugs" do
+  test "workspace scopes regular services with metadata and service paths" do
     source = """
     use HostKit.DSL
 

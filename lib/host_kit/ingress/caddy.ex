@@ -45,8 +45,5 @@ defmodule HostKit.Ingress.Caddy do
 
   defp proxy_upstream(upstream) when is_binary(upstream), do: upstream
 
-  defp site_name(name, host, index) do
-    suffix = host |> String.replace(~r/[^A-Za-z0-9_]+/, "_") |> String.trim("_")
-    "#{name}_#{suffix}_#{index}"
-  end
+  defp site_name(name, host, index), do: HostKit.Naming.ingress_route_name(name, host, index)
 end

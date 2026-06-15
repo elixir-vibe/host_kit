@@ -74,7 +74,7 @@ defmodule HostKit.Conventions do
   @spec prefixed(t() | map(), atom(), term()) :: String.t()
   def prefixed(conventions, name, value) do
     prefix = conventions |> normalize() |> Map.fetch!(:prefixes) |> Map.get(name, "")
-    prefix <> to_string(value)
+    HostKit.Naming.prefixed(prefix, value)
   end
 
   defp normalize(%__MODULE__{} = conventions), do: Map.from_struct(conventions)

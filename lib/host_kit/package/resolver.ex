@@ -441,11 +441,5 @@ defmodule HostKit.Package.Resolver do
     %PackageResource{name: name, system_name: to_string(name), source: :semantic, meta: meta}
   end
 
-  defp normalize_capability(name) when is_atom(name), do: name
-
-  defp normalize_capability(name) when is_binary(name) do
-    name |> String.replace("-", "_") |> String.to_existing_atom()
-  rescue
-    ArgumentError -> name
-  end
+  defp normalize_capability(name), do: HostKit.Naming.capability_name(name)
 end
