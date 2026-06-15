@@ -149,13 +149,12 @@ defmodule HostKit.RunStamp do
   defp source_inputs(inputs, opts) do
     inputs
     |> Enum.filter(&source_input?/1)
-    |> Map.new(fn %HostKit.Source.Ref{name: name} ->
+    |> Map.new(fn name ->
       {to_string(name), name |> source_identity(opts) |> HostKit.Source.Identity.dump()}
     end)
   end
 
-  defp source_input?(%HostKit.Source.Ref{}), do: true
-  defp source_input?(_input), do: false
+  defp source_input?(input), do: is_atom(input)
 
   defp source_identity(name, opts) do
     opts

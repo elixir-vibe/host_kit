@@ -45,7 +45,7 @@ defmodule HostKit.ElixirAppRecipeTest do
 
     assert Enum.any?(resources, fn
              %HostKit.Resources.Source{
-               name: "hello_source",
+               name: :hello,
                uri: "https://github.com/elixir-vibe/host_kit.git",
                ref: "main",
                checkout: "/opt/hostkit/apps/hello/source",
@@ -62,7 +62,7 @@ defmodule HostKit.ElixirAppRecipeTest do
                name: "hello_deps",
                exec: {"mix", ["deps.get", "--only", "prod"]},
                runtime: {:mise, :beam},
-               inputs: [%HostKit.Source.Ref{name: "hello_source"}, "mix.exs", "mix.lock"],
+               inputs: [:hello, "mix.exs", "mix.lock"],
                outputs: ["deps"]
              } ->
                true

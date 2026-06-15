@@ -340,7 +340,6 @@ Legend:
 | `template` | Reference | Declare an explicit EEx-rendered file resource. |
 | `symlink` | Reference | Declare an explicit symbolic link resource. |
 | `source` | Reference | Declare a source artifact/repository. |
-| `source_ref` | Reference | Reference a declared source. |
 | `command` | Escape hatch | Low-level command resource. |
 | `run` | Reference | Command resource helper; also systemd service-option helper in systemd scope. |
 | `git` | Reference | Git command resource helper. |

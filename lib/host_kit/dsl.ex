@@ -858,12 +858,6 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro source_ref(name) do
-    quote do
-      HostKit.Source.Ref.new(unquote(name))
-    end
-  end
-
   defmacro endpoint(name_or_service, name_or_opts \\ :default, opts \\ []) do
     source = HostKit.SourceLocation.from_caller(__CALLER__)
 

@@ -140,7 +140,7 @@ defmodule HostKit.Recipes.ElixirApp do
         set("SECRET_KEY_BASE", app.phoenix.secret_key_base)
       end
 
-      source(app.commands.source.name,
+      source(app.source.name,
         git: app.source.repo,
         ref: app.source.ref,
         checkout: app.paths.source,
@@ -153,7 +153,7 @@ defmodule HostKit.Recipes.ElixirApp do
         ~SH"deps.get --only prod",
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
-        inputs: [source_ref(app.commands.source.name), "mix.exs", "mix.lock"],
+        inputs: [app.source.name, "mix.exs", "mix.lock"],
         outputs: ["deps"],
         timeout: 300_000
       )
@@ -173,7 +173,7 @@ defmodule HostKit.Recipes.ElixirApp do
         cwd: app.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
         creates: app.paths.release_bin,
-        inputs: [source_ref(app.commands.source.name), "mix.exs", "mix.lock", "lib", "config"],
+        inputs: [app.source.name, "mix.exs", "mix.lock", "lib", "config"],
         outputs: [app.paths.release_bin],
         timeout: 300_000
       )
@@ -233,7 +233,7 @@ defmodule HostKit.Recipes.ElixirApp do
       name: app_name,
       service_name: name,
       release_name: HostKit.Naming.elixir_release_name(Keyword.get(release, :name, app_name)),
-      source: normalize_source(source),
+      source: Map.put(normalize_source(source), :name, name),
       runtime: %{
         erlang: Keyword.get(runtime, :erlang, @default_erlang),
         elixir: Keyword.get(runtime, :elixir, @default_elixir),

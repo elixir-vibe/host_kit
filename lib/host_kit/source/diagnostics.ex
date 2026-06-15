@@ -16,7 +16,7 @@ defmodule HostKit.Source.Diagnostics do
     Diagnostics.new([
       %Diagnostic{
         severity: :error,
-        code: :source_ref_unresolved,
+        code: :source_git_ref_unresolved,
         message:
           "source #{inspect(source.name)} ref #{inspect(source.ref)} could not be resolved",
         resource_id: Resource.id(source),

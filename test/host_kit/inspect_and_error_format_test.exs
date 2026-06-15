@@ -9,8 +9,6 @@ defmodule HostKit.InspectAndErrorFormatTest do
            ) ==
              "#HostKit.Endpoint<app.http http://127.0.0.1:4000>"
 
-    assert inspect(HostKit.Source.Ref.new(:app)) == "#HostKit.Source.Ref<app>"
-
     assert inspect(HostKit.Addr.Resource.new(:caddy_site, :app)) ==
              "#HostKit.Resource<caddy_site.app>"
 

@@ -272,7 +272,7 @@ defmodule HostKit.LivebookSessionRunner do
           app_port: env_integer("HOSTKIT_LIVEBOOK_PHOENIX_APP_PORT", 14_000),
           source_repo:
             env("HOSTKIT_LIVEBOOK_SOURCE_REPO", "https://github.com/elixir-vibe/host_kit.git"),
-          source_ref: env("HOSTKIT_LIVEBOOK_SOURCE_REF", "master"),
+          git_ref: env("HOSTKIT_LIVEBOOK_GIT_REF", "master"),
           package_repo: env("HOSTKIT_LIVEBOOK_PACKAGE_REPO", "ubuntu_24_04"),
           erlang_version: env("HOSTKIT_LIVEBOOK_ERLANG", "29.0.2"),
           elixir_version: env("HOSTKIT_LIVEBOOK_ELIXIR", "1.20.1"),

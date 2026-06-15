@@ -19,7 +19,7 @@ defmodule HostKit.Recipes.Gatehouse do
       directory(Path.dirname(release.paths.install), owner: "root", group: "root", mode: 0o755)
       directory(release.paths.base, owner: "root", group: "root", mode: 0o755)
 
-      source(release.commands.source.name,
+      source(release.source.name,
         git: release.source.repo,
         ref: release.source.ref,
         checkout: release.paths.source,
@@ -32,7 +32,7 @@ defmodule HostKit.Recipes.Gatehouse do
         runtime: {:mise, release.runtime.name},
         cwd: release.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
-        inputs: [source_ref(release.commands.source.name), "mix.exs", "mix.lock"],
+        inputs: [release.source.name, "mix.exs", "mix.lock"],
         outputs: ["deps"],
         timeout: 300_000
       )
@@ -43,7 +43,7 @@ defmodule HostKit.Recipes.Gatehouse do
         cwd: release.paths.app_dir,
         env: %{"MIX_ENV" => "prod"},
         creates: release.paths.release_bin,
-        inputs: [source_ref(release.commands.source.name), "mix.exs", "mix.lock", "lib", "config"],
+        inputs: [release.source.name, "mix.exs", "mix.lock", "lib", "config"],
         outputs: [release.paths.release_bin],
         timeout: 300_000
       )
@@ -122,7 +122,7 @@ defmodule HostKit.Recipes.Gatehouse do
     release = %{
       name: gatehouse_name,
       service_name: Keyword.get(opts, :service, :gatehouse_release),
-      source: normalize_source(source),
+      source: Map.put(normalize_source(source), :name, name),
       runtime: %{
         name: Keyword.get(runtime, :name, :gatehouse_beam),
         erlang: Keyword.get(runtime, :erlang, "29.0.2"),
@@ -210,10 +210,9 @@ defmodule HostKit.Recipes.Gatehouse do
 
   defp release_commands(release, _paths) do
     %{
-      source: %{name: "gatehouse_#{release.name}_source"},
-      deps: %{name: "gatehouse_#{release.name}_deps"},
-      release: %{name: "gatehouse_#{release.name}_release"},
-      install: %{name: "gatehouse_#{release.name}_install"}
+      deps: %{name: HostKit.Naming.resource_name([:gatehouse, release.name, :deps])},
+      release: %{name: HostKit.Naming.resource_name([:gatehouse, release.name, :release])},
+      install: %{name: HostKit.Naming.resource_name([:gatehouse, release.name, :install])}
     }
   end
 

@@ -8,7 +8,7 @@ defmodule HostKit.Resources.Shell do
           env: %{String.t() => String.t()},
           creates: String.t() | nil,
           unless: String.t() | nil,
-          inputs: [String.t() | HostKit.Source.Ref.t()],
+          inputs: [String.t() | atom()],
           outputs: [String.t()],
           stamp: String.t() | nil,
           timeout: non_neg_integer() | nil,
@@ -41,7 +41,7 @@ defmodule HostKit.Resources.Shell do
         opts
         |> Keyword.get(:inputs, [])
         |> List.wrap()
-        |> Enum.map(&HostKit.Source.Ref.normalize_input/1),
+        |> Enum.map(&normalize_input/1),
       outputs: opts |> Keyword.get(:outputs, []) |> List.wrap() |> Enum.map(&to_string/1),
       stamp: Keyword.get(opts, :stamp),
       timeout: Keyword.get(opts, :timeout),
@@ -51,6 +51,9 @@ defmodule HostKit.Resources.Shell do
   end
 
   def id(%__MODULE__{name: name}), do: {:shell, name}
+
+  defp normalize_input(input) when is_atom(input), do: input
+  defp normalize_input(input), do: to_string(input)
 
   defp normalize_script(%HostKit.ShellScript{} = script), do: script
   defp normalize_script(source) when is_binary(source), do: HostKit.ShellScript.parse!(source)

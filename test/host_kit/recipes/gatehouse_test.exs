@@ -19,7 +19,7 @@ defmodule HostKit.GatehouseRecipeTest do
 
     assert Enum.any?(
              resources,
-             &match?(%HostKit.Resources.Source{name: "gatehouse_edge_source"}, &1)
+             &match?(%HostKit.Resources.Source{name: :edge}, &1)
            )
 
     assert Enum.any?(resources, &match?(%HostKit.Resources.Mise{name: :gatehouse_beam}, &1))

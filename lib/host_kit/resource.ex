@@ -51,7 +51,6 @@ defmodule HostKit.Resource do
                       HostKit.Readiness.HTTP,
                       HostKit.Readiness.Systemd,
                       HostKit.Source.Identity,
-                      HostKit.Source.Ref,
                       HostKit.Service,
                       HostKit.ShellScript,
                       HostKit.Systemd.Service,

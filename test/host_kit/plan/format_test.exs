@@ -7,7 +7,6 @@ defmodule HostKit.PlanFormatTest do
   alias HostKit.Plan.Format
   alias HostKit.Resources.Command
   alias HostKit.Resources.{Package, Source}
-  alias HostKit.Source.Ref, as: SourceRef
 
   test "formats a concise human-readable plan" do
     plan = %HostKit.Plan{
@@ -123,7 +122,7 @@ defmodule HostKit.PlanFormatTest do
              """)
   end
 
-  test "formats command source references in inputs" do
+  test "formats atom source references in command inputs" do
     plan = %HostKit.Plan{
       changes: [
         %Change{
@@ -132,7 +131,7 @@ defmodule HostKit.PlanFormatTest do
           after: %Command{
             name: :build,
             exec: {"mix", ["compile"]},
-            inputs: [SourceRef.new(:app_source), "mix.exs"],
+            inputs: [:app_source, "mix.exs"],
             outputs: ["_build/prod/rel/app"]
           },
           reason: :missing
@@ -140,7 +139,7 @@ defmodule HostKit.PlanFormatTest do
       ]
     }
 
-    assert Format.format(plan) =~ "inputs: #HostKit.Source.Ref<app_source>, mix.exs"
+    assert Format.format(plan) =~ "inputs: :app_source, mix.exs"
   end
 
   test "formats package resolution details" do

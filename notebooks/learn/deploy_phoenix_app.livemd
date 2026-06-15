@@ -70,7 +70,7 @@ app = %{
   app_port: settings.app_port,
   public_port: settings.public_port,
   source_repo: Map.get(settings, :source_repo, "https://github.com/elixir-vibe/host_kit.git"),
-  source_ref: Map.get(settings, :source_ref, "master"),
+  git_ref: Map.get(settings, :git_ref, "master"),
   package_repo: Map.get(settings, :package_repo, "ubuntu_24_04"),
   erlang_version: Map.get(settings, :erlang_version, "29.0.2"),
   elixir_version: Map.get(settings, :elixir_version, "1.20.1")
@@ -82,7 +82,7 @@ app = %{
 ```elixir
 public_hostname = app.public_hostname
 source_repo = app.source_repo
-source_ref = app.source_ref
+git_ref = app.git_ref
 package_repo = app.package_repo
 erlang_version = app.erlang_version
 elixir_version = app.elixir_version
@@ -181,7 +181,7 @@ project =
       source: [
         git: source_repo,
         path: "examples/hello_phoenix",
-        ref: source_ref
+        ref: git_ref
       ],
       runtime: [
         erlang: erlang_version,

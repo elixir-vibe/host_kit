@@ -183,7 +183,7 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
       },
       public_hostname: "phoenix.example.test",
       source_repo: opts.source_repo,
-      source_ref: "main",
+      git_ref: "main",
       package_repo: System.get_env("HOSTKIT_INTEGRATION_PACKAGE_REPO", "ubuntu_24_04"),
       erlang_version: System.get_env("HOSTKIT_INTEGRATION_ERLANG", "29.0.2"),
       elixir_version: System.get_env("HOSTKIT_INTEGRATION_ELIXIR", "1.20.1"),

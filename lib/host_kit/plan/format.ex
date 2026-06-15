@@ -4,7 +4,6 @@ defmodule HostKit.Plan.Format do
   alias HostKit.Addr.Resource
   alias HostKit.{Change, Plan}
   alias HostKit.Package.Resolution
-  alias HostKit.Source.Ref, as: SourceRef
 
   @action_marks %{create: "+", update: "~", delete: "-", no_op: "=", read: "?"}
 
@@ -161,7 +160,6 @@ defmodule HostKit.Plan.Format do
     ["\n  ", label, ": ", Enum.map_join(paths, ", ", &format_path/1)]
   end
 
-  defp format_path(%SourceRef{} = ref), do: inspect(ref)
   defp format_path(path) when is_binary(path), do: path
   defp format_path(path), do: inspect(path)
 
