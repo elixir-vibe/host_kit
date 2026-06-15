@@ -357,7 +357,7 @@ Legend:
 | `service_name` | Reference | Return current service name. |
 | `service_user` | Reference | Return convention-derived service user; systemd setter in systemd scope. |
 | `unit_name` | Reference | Return convention-derived systemd unit name. |
-| `root_path` | Reference | Resolve a service path under a project root. |
+| `path` | Reference | Resolve a path under a project root; inside services, conventional service roots (`:source`, `:data`, `:state`, `:cache`, `:config`) include the service path. |
 | `storage_volume` | Reference | Return named storage metadata. |
 | `storage_path` | Reference | Return named storage path. |
 | `writable_storage_paths` | Reference | Return paths for writable storage volumes. |

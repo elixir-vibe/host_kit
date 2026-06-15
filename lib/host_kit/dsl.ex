@@ -425,9 +425,9 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro root_path(root, child \\ nil) do
+  defmacro path(root, child \\ nil) do
     quote do
-      HostKit.DSL.Scope.root_path(unquote(root), unquote(child))
+      HostKit.DSL.Scope.path(unquote(root), unquote(child))
     end
   end
 
@@ -601,7 +601,7 @@ defmodule HostKit.DSL do
       service Keyword.get(unquote(opts), :service, :agent) do
         account(service_user(), system: true)
 
-        directory(root_path(:data),
+        directory(path(:data),
           owner: service_user(),
           group: service_user(),
           mode: :private_dir
@@ -610,7 +610,7 @@ defmodule HostKit.DSL do
         daemon unit_name() do
           service_user(service_user())
           service_group(service_user())
-          working_directory(root_path(:data))
+          working_directory(path(:data))
 
           run(
             exec_start:

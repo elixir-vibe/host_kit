@@ -83,9 +83,7 @@ defmodule HostKit.ProjectDSL do
               service_name: 0,
               service_user: 0,
               unit_name: 0,
-              unit_name: 1,
-              root_path: 1,
-              root_path: 2
+              unit_name: 1
             ]
 
           import unquote(__MODULE__)

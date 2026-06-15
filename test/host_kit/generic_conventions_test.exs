@@ -6,11 +6,14 @@ defmodule HostKit.GenericConventionsTest do
     use HostKit.DSL
 
     project :demo do
-      roots data: "/srv/toys", config: "/etc/toys"
+      roots data: "/srv/toys", config: "/etc/toys", opt: "/opt/toys"
       prefixes user: "toys-", unit: "toys-"
 
       service :forgejo do
-        account service_user(), system: true, home: root_path(:data)
+        account service_user(), system: true, home: path(:data)
+
+        directory path(:opt, "current/forgejo"), mode: 0o755
+        directory path(:config, "forgejo.ini"), mode: 0o640
 
         storage :repositories,
           under: :data,
@@ -44,6 +47,16 @@ defmodule HostKit.GenericConventionsTest do
     assert Enum.any?(
              service.resources,
              &match?(%HostKit.Resources.Directory{path: "/srv/toys/forgejo/repositories"}, &1)
+           )
+
+    assert Enum.any?(
+             service.resources,
+             &match?(%HostKit.Resources.Directory{path: "/opt/toys/current/forgejo"}, &1)
+           )
+
+    assert Enum.any?(
+             service.resources,
+             &match?(%HostKit.Resources.Directory{path: "/etc/toys/forgejo/forgejo.ini"}, &1)
            )
 
     assert Enum.any?(

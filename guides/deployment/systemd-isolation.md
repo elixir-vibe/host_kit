@@ -23,9 +23,9 @@ project :prod do
       description "API"
       after_target :network_online
       wants :network_online
-      working_directory root_path(:source)
+      working_directory path(:source)
       env :runtime
-      exec [Path.join(root_path(:source), "bin/server")]
+      exec [Path.join(path(:source), "bin/server")]
       restart :on_failure
       restart_sec 10
 

@@ -16,7 +16,7 @@ project :toys do
   prefixes user: "toys-", unit: "toys-"
 
   service :forgejo do
-    # Optional: override the path/identity slug used by root_path/2 and service_user/0.
+    # Optional: override the path/identity slug used by path/2 and service_user/0.
     path_name "git"
 
     account system: true
@@ -29,9 +29,9 @@ project :toys do
 
     daemon do
       description "Forgejo"
-      working_directory root_path(:source)
+      working_directory path(:source)
       env :runtime
-      exec [Path.join(root_path(:source), "bin/forgejo"), "web"]
+      exec [Path.join(path(:source), "bin/forgejo"), "web"]
 
       isolate do
         writable :data
@@ -48,8 +48,8 @@ Useful helpers:
 - `prefixes user: ..., unit: ...` declares naming prefixes.
 - `storage :data` defaults under the declared `:data` root.
 - `env :runtime` defaults under the declared `:config` root.
-- `root_path(:source)` resolves the current service's source path.
-- `root_path(:data, "repositories")` resolves an explicit child path when you need one.
+- `path(:source)` resolves the current service's source path.
+- `path(:data, "repositories")` resolves an explicit child path when you need one.
 - `service_name()` returns the current service name.
 - `service_user()` returns the convention-derived service account name.
 - `unit_name()` returns the convention-derived systemd unit name.

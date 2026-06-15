@@ -15,15 +15,15 @@ project :dev_host do
 
   workspace :blog, owner: :alice do
     service :preview do
-      directory root_path(:data), mode: :private_dir
+      directory path(:data), mode: :private_dir
 
       daemon do
         service_user service_user()
-        working_directory root_path(:data)
+        working_directory path(:data)
         exec ["/usr/bin/env", "mix", "phx.server"]
 
         isolate :vibe_dev do
-          writable root_path(:data)
+          writable path(:data)
           network :loopback
         end
 

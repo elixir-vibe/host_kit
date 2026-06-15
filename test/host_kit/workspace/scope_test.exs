@@ -11,7 +11,7 @@ defmodule HostKit.WorkspaceScopeTest do
 
       workspace :blog, owner: :alice do
         service :preview do
-          directory root_path(:data), mode: :private_dir
+          directory path(:data), mode: :private_dir
 
           daemon unit_name() do
             run exec_start: ["/usr/bin/env", "true"]

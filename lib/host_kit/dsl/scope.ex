@@ -418,9 +418,15 @@ defmodule HostKit.DSL.Scope do
     Map.get(service.meta, :identity_name, service_path_name())
   end
 
-  def root_path(root, child \\ nil) do
+  def path(root, child \\ nil) do
+    base = Conventions.root!(project_conventions(), root)
+
     base =
-      Path.join(Conventions.root!(project_conventions(), root), to_string(service_path_name()))
+      if service_scoped_path?(root) do
+        Path.join(base, to_string(service_path_name()))
+      else
+        base
+      end
 
     case child do
       nil -> base
@@ -428,9 +434,14 @@ defmodule HostKit.DSL.Scope do
     end
   end
 
-  def default_storage_path(:data), do: default_root_path(:data, "/var/lib")
-  def default_storage_path(:state), do: default_root_path(:state, "/var/lib")
-  def default_storage_path(:config), do: default_root_path(:config, "/etc")
+  defp service_scoped_path?(root) when root in [:source, :data, :state, :cache, :config],
+    do: Process.get(@service_key) != nil
+
+  defp service_scoped_path?(_root), do: false
+
+  def default_storage_path(:data), do: default_path(:data, "/var/lib")
+  def default_storage_path(:state), do: default_path(:state, "/var/lib")
+  def default_storage_path(:config), do: default_path(:config, "/etc")
 
   def default_storage_path(name),
     do:
@@ -643,7 +654,7 @@ defmodule HostKit.DSL.Scope do
 
     case Keyword.pop(opts, :under) do
       {nil, opts} -> opts
-      {root, opts} -> Keyword.put(opts, :path, root_path(root, Keyword.get(opts, :path)))
+      {root, opts} -> Keyword.put(opts, :path, path(root, Keyword.get(opts, :path)))
     end
   end
 
@@ -656,7 +667,7 @@ defmodule HostKit.DSL.Scope do
     storage_opts(opts)
   end
 
-  defp default_root_path(root, fallback) do
+  defp default_path(root, fallback) do
     Path.join(default_root(root, fallback), to_string(service_path_name()))
   end
 
