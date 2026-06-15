@@ -15,7 +15,7 @@ Infrastructure code should be boring Elixir, not an opaque pile of shell scripts
 
 HostKit gives you:
 
-- **Declarative host bootstrap** — OS packages, accounts, directories, files, env files, systemd units, firewall rules, and `mise` runtimes.
+- **Declarative host bootstrap** — OS packages, accounts, directories, files, templates, env files, structured INI/YAML configs, systemd units, firewall rules, and `mise` runtimes.
 - **Docker-less service isolation** — systemd sandboxing, resource limits, network policy, read/write path allowlists, loopback listeners, and managed env files.
 - **Plan before apply** — read current state, produce a diff, write an inspectable JSON artifact, then apply exactly what was reviewed.
 - **Distribution-aware packages** — semantic package names resolve through Repology and can be locked for deterministic applies.
@@ -32,6 +32,8 @@ The complete example lives in [`examples/full_host.exs`](examples/full_host.exs)
 use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
 project :prod do
+  roots data: "/srv/apps", config: "/etc/apps"
+
   host :app, at: "app.example.com" do
     ssh do
       user "root"
@@ -53,10 +55,31 @@ project :prod do
   service :api do
     account system: true
     storage :data, mode: 0o750
+    storage :config, owner: "root", group: service_user(), mode: 0o750
 
     env :runtime do
       secret :database_url, env: "DATABASE_URL"
     end
+
+    ini path(:config, "app.ini"), owner: "root", group: service_user(), mode: 0o640 do
+      set "APP_NAME", "Example API"
+
+      section "server" do
+        set "HTTP_ADDR", "127.0.0.1"
+        set "HTTP_PORT", 4000
+        secret "JWT_SECRET", env: :redacted
+      end
+    end
+
+    yaml path(:config, "health.yaml"),
+      owner: "root",
+      group: service_user(),
+      mode: 0o640,
+      content: [
+        endpoints: [
+          [name: "api", url: "http://127.0.0.1:4000/health", conditions: ["[STATUS] == 200"]]
+        ]
+      ]
 
     daemon do
       env :runtime
@@ -78,7 +101,7 @@ project :prod do
 end
 ```
 
-This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, env files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits. See the [DSL design guidelines](guides/reference/dsl-guidelines.md) for naming, block shape, defaults, and reference style.
+This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, templates, env files, structured config files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits. Secret/redacted structured config entries are omitted from public drift comparison, so generated values can be modeled without leaking them into plans. See the [DSL design guidelines](guides/reference/dsl-guidelines.md) for naming, block shape, defaults, and reference style.
 
 Plan, review, apply:
 
