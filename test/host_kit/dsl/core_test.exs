@@ -101,6 +101,53 @@ defmodule HostKit.DSL.CoreTest do
              site.directives
   end
 
+  test "release_layout emits inspectable release directory and current symlink" do
+    source = """
+    use HostKit.DSL
+
+    project :prod do
+      roots opt: "/opt/apps"
+
+      service :gatus do
+        layout =
+          release_layout :gatus, "5.36.0",
+            owner: "deploy",
+            group: "deploy",
+            current_dir: [owner: "deploy", group: "deploy"]
+        file Path.join(layout.current_path, "VERSION"), content: layout.version
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    assert [service] = project.services
+
+    assert [
+             %HostKit.Resources.Directory{
+               path: "/opt/apps/releases/gatus",
+               owner: "deploy",
+               group: "deploy",
+               mode: 0o755
+             },
+             %HostKit.Resources.Directory{
+               path: "/opt/apps/current",
+               owner: "deploy",
+               group: "deploy",
+               mode: 0o755
+             },
+             %HostKit.Resources.Symlink{
+               path: "/opt/apps/current/gatus",
+               to: "/opt/apps/releases/gatus/5.36.0",
+               owner: "root",
+               group: "root"
+             },
+             %HostKit.Resources.File{
+               path: "/opt/apps/current/gatus/VERSION",
+               content: "5.36.0"
+             }
+           ] = service.resources
+  end
+
   test "storage and env defaults use declared service roots" do
     source = """
     use HostKit.DSL

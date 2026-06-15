@@ -471,6 +471,68 @@ defmodule HostKit.DSL.Scope do
 
   def prefixed(name, value), do: Conventions.prefixed(project_conventions(), name, value)
 
+  def put_release_layout(name, version, opts) do
+    release_name = to_string(name)
+    release_owner = Keyword.get(opts, :owner, "root")
+    release_group = Keyword.get(opts, :group, release_owner)
+    release_mode = Keyword.get(opts, :mode, 0o755)
+    current_owner = Keyword.get(opts, :current_owner, "root")
+    current_group = Keyword.get(opts, :current_group, "root")
+
+    releases_dir =
+      Keyword.get(opts, :releases_dir) || path(:opt, Path.join("releases", release_name))
+
+    current_path =
+      Keyword.get(opts, :current_path) || path(:opt, Path.join("current", release_name))
+
+    release_path =
+      Keyword.get(opts, :release_path) || Path.join(releases_dir, to_string(version))
+
+    add_resource(
+      HostKit.Resources.Directory.new(releases_dir,
+        owner: release_owner,
+        group: release_group,
+        mode: release_mode
+      )
+    )
+
+    maybe_add_release_current_dir(current_path, opts)
+
+    add_resource(
+      HostKit.Resources.Symlink.new(current_path,
+        to: release_path,
+        owner: current_owner,
+        group: current_group
+      )
+    )
+
+    %{
+      name: release_name,
+      version: to_string(version),
+      releases_dir: releases_dir,
+      release_path: release_path,
+      current_path: current_path
+    }
+  end
+
+  defp maybe_add_release_current_dir(current_path, opts) do
+    case Keyword.get(opts, :current_dir) do
+      current_dir_opts when is_list(current_dir_opts) ->
+        path = Keyword.get(current_dir_opts, :path, Path.dirname(current_path))
+
+        add_resource(
+          HostKit.Resources.Directory.new(path,
+            owner: Keyword.get(current_dir_opts, :owner, "root"),
+            group: Keyword.get(current_dir_opts, :group, "root"),
+            mode: Keyword.get(current_dir_opts, :mode, 0o755)
+          )
+        )
+
+      _other ->
+        :ok
+    end
+  end
+
   def put_storage(name, opts) do
     volume = Storage.volume(name, storage_opts(name, opts))
 

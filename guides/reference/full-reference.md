@@ -867,6 +867,28 @@ HostKit.Monitor.run(project, target: prod)
 
 Initial execution supports systemd state, HTTP status, and filesystem existence checks. Endpoint projection currently turns HTTP monitors into provider-neutral external endpoint specs; providers such as Gatus can render those specs into concrete monitoring config.
 
+## Binary release layouts
+
+Use `release_layout/3` when a service follows the common unpacked-binary pattern of a shared releases directory and a `current/<name>` symlink. It is only a helper: it emits ordinary `directory/2` and `symlink/2` resources that remain visible in plans.
+
+```elixir
+service :gatus do
+  release = release_layout :gatus, "5.36.0", owner: "deploy", group: "deploy"
+
+  daemon do
+    exec [Path.join(release.current_path, "gatus")]
+  end
+end
+```
+
+The default layout is:
+
+- releases directory: `path(:opt, "releases/<name>")`
+- current symlink: `path(:opt, "current/<name>")`
+- symlink target: `<releases_dir>/<version>`
+
+Use `current_dir: [owner: ..., group: ..., mode: ...]` when HostKit should also manage the parent `current` directory.
+
 ## File modes
 
 Mode values can be raw octal, semantic aliases, tuples, keywords, or capability lists:

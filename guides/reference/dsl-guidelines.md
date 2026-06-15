@@ -351,7 +351,7 @@ Legend:
 | `tool` | Canonical | Declare a mise-managed tool version. |
 | `directory` | Reference | Declare an explicit directory resource. Prefer `storage` for service data. |
 | `file` | Reference | Declare an explicit file resource. |
-| `template` | Reference | Declare an explicit EEx-rendered file resource; secret assigns are rejected until redacted template diffs exist. |
+| `template` | Reference | Declare an explicit EEx-rendered file resource; secret assigns are allowed as references and redacted in template assign diffs. |
 | `ini` | Reference | Declare a structured INI config file resource with public and redacted entries. |
 | `yaml` | Reference | Declare a structured YAML config file resource with ordered keyword data and public-path secret comparison. |
 | `section` | Reference | Declare an INI section inside `ini do ... end`. |
@@ -368,6 +368,7 @@ Legend:
 | --- | --- | --- |
 | `service` | Canonical | Declare an application/service boundary. |
 | `account` | Canonical | Declare/ref service account; `account system: true` derives the service user. |
+| `release_layout` | Reference | Emit an inspectable binary-release layout: releases directory plus current symlink. |
 | `storage` | Canonical | Declare named service storage and its directory resource. |
 | `env` | Canonical | Declare a managed env file in service scope; attach it in daemon scope. |
 | `secret` | Canonical | Add a secret entry inside env/dotenv or structured INI config. Use `env: :redacted` for existing generated secrets that must not render. |
