@@ -40,7 +40,9 @@ defmodule Mix.Tasks.HostKit.Plan do
           write_package_lock: :string,
           repology_cache: :string,
           repology_cache_ttl: :integer,
-          repology_no_cache: :boolean
+          repology_no_cache: :boolean,
+          show_graph: :boolean,
+          graph_format: :string
         ]
       )
 

@@ -480,6 +480,8 @@ prod = HostKit.Target.ssh(:prod, host: "elixir.toys", user: "dannote", sudo: tru
 {:ok, remote_plan} = HostKit.plan(project, target: prod, reader: HostKit.Remote)
 
 HostKit.format_plan(plan)
+execution_graph = HostKit.Plan.ExecutionGraph.build(plan)
+HostKit.Plan.ExecutionGraph.format(execution_graph)
 {:ok, results} = HostKit.apply(plan, dry_run: true)
 
 # Supported apply resources include accounts, directories, files, structured configs,
@@ -503,6 +505,15 @@ end
 
 {:ok, unit} = HostKit.Render.render(project, {:systemd_service, "toys-exograph.service"})
 ```
+
+Plans can also be inspected as an execution dependency graph. The graph is derived from active create/update/delete changes and records why ordering exists: declared `depends_on`, parent directories, owner/group accounts, command source inputs, and systemd readiness checks. It is currently an inspection/debug artifact; future parallel apply can consume the same graph without changing the plan format.
+
+```sh
+mix host_kit.plan infra/config.exs --host prod --show-graph
+mix host_kit.plan infra/config.exs --host prod --graph-format json
+```
+
+The JSON graph output is a JSON-safe map with display labels and `HostKit.Resource.dump/1` terms for resource ids; it does not encode raw Elixir structs or embed full before/after resource payloads.
 
 ## Storage volumes
 

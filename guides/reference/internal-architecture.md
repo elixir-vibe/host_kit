@@ -356,7 +356,24 @@ A target controls how HostKit reads current state and applies changes. Mix tasks
 
 ## Config resources and redaction
 
-Structured config resources render through explicit format modules but remain ordinary file-like resources for plan/apply. INI public entries are compared by section/key. YAML public entries are compared by decoded scalar path using `yaml_elixir`, while scalar rendering uses `ymlr`. Secret leaves (`%HostKit.Secret{}` or `:redacted`) are omitted from public drift comparison. `:redacted` is for existing/generated secrets and intentionally cannot render during apply; env-backed secrets resolve only at render/apply boundaries. Template resources currently reject secret assigns until redacted template diffs exist.
+Structured config resources render through explicit format modules but remain ordinary file-like resources for plan/apply. INI public entries are compared by section/key. YAML public entries are compared by decoded scalar path using `yaml_elixir`, while scalar rendering uses `ymlr`. Secret leaves (`%HostKit.Secret{}` or `:redacted`) are omitted from public drift comparison. `:redacted` is for existing/generated secrets and intentionally cannot render during apply; env-backed secrets resolve only at render/apply boundaries. Template resources allow secret assigns and render/apply resolves them only at the boundary; plan diffs compare assign metadata and intentionally do not render secret-bearing template content.
+
+## Execution dependency graph
+
+`HostKit.Plan.ExecutionGraph.build/2` derives an inspectable graph from active plan changes. Nodes wrap `%HostKit.Change{}` values and edges carry stable reasons instead of flattening everything into anonymous ordering. The first derived reasons are declared `depends_on`, parent directory, owner/group account, command source input, and systemd readiness dependencies. Delete changes reverse dependency direction so children are removed before parents.
+
+```mermaid
+flowchart TD
+  Plan[HostKit.Plan] --> Graph[Plan.ExecutionGraph]
+  Graph --> Nodes[change nodes]
+  Graph --> Edges[labelled dependency edges]
+  Edges --> Layers[topological layers]
+  Edges --> Cycles[cycle diagnostics]
+  Graph --> CLI[mix host_kit.plan --show-graph]
+  Graph -. future .-> Scheduler[parallel apply scheduler]
+```
+
+The graph is intentionally graph-only today: it improves diagnostics and establishes deterministic layering before any parallel executor is introduced. Machine-readable graph output uses explicit JSON-safe maps with display labels and `HostKit.Resource.dump/1` resource-id terms; it must not rely on Jason struct encoders or embed full before/after resources.
 
 ## Design constraints
 

@@ -29,6 +29,8 @@ Common options:
 - `--repology-cache-ttl SECONDS` — cache TTL.
 - `--repology-no-cache` — disable Repology cache.
 - `--format text|inspect` — output format.
+- `--show-graph` — append the derived execution dependency graph.
+- `--graph-format text|json` — graph output format; implies `--show-graph`.
 - `--ignore type:name` — ignore a resource.
 - `--require PATH` — load project-local DSL/support code before config.
 
@@ -38,6 +40,8 @@ Examples:
 mix host_kit.plan --host prod infra/config.exs
 mix host_kit.plan --host prod --write-package-lock host_kit.package.lock infra/config.exs
 mix host_kit.plan --host prod --package-lock host_kit.package.lock --out host_kit.plan.json infra/config.exs
+mix host_kit.plan --host prod --show-graph infra/config.exs
+mix host_kit.plan --host prod --graph-format json infra/config.exs
 ```
 
 ## `mix host_kit.down`
