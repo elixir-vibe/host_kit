@@ -134,7 +134,7 @@ defmodule HostKit.Recipes.ElixirApp do
       directory(app.paths.base, owner: "root", group: "root", mode: 0o755)
       directory(Path.dirname(app.paths.env), owner: "root", group: "root", mode: 0o755)
 
-      env_file app.paths.env, owner: "root", group: "root", mode: 0o600 do
+      dotenv app.paths.env, owner: "root", group: "root", mode: 0o600 do
         set("MIX_ENV", "prod")
         set("PHX_HOST", app.phoenix.host)
         set("PORT", to_string(app.phoenix.port))

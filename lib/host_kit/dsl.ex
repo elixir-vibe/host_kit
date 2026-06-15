@@ -104,11 +104,19 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro env_file(path, opts \\ [], do: block) do
+  defmacro dotenv(path, opts \\ [], do: block) do
     quote do
       HostKit.DSL.EnvFile.Scope.start(unquote(path), unquote(opts))
       unquote(block)
       HostKit.DSL.Scope.add_resource(HostKit.DSL.EnvFile.Scope.finish())
+    end
+  end
+
+  defmacro env_file(path, opts \\ [], do: block) do
+    quote do
+      dotenv unquote(path), unquote(opts) do
+        unquote(block)
+      end
     end
   end
 

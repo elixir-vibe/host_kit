@@ -362,7 +362,7 @@ service :app do
 end
 ```
 
-Use `env_file path do ... end` only when you need an explicit path.
+Use `dotenv path do ... end` when you need an explicit dotenv-format file at a specific path.
 
 Raw SSH flags remain available as an escape hatch: `--remote`, `--user`, `--port`, `--identity-file`, `--password`, and `--password-env`.
 
@@ -847,7 +847,7 @@ Resources store normalized integer modes, so plan/apply remains simple.
 
 ## Env files and secrets
 
-HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries; secret entry values are not read into plan artifacts for comparison. Use `secret KEY, env: :redacted` for existing/generated env-file secrets that should be modeled but never rendered by HostKit. Secret sources support `env: "NAME"`, `file: "/run/secrets/name"`, and `command: ["pass", "show", "name"]`.
+HostKit has a Dotenvy-validated `dotenv` resource for explicit env files. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries; secret entry values are not read into plan artifacts for comparison. Use `secret KEY, env: :redacted` for existing/generated env-file secrets that should be modeled but never rendered by HostKit. Secret sources support `env: "NAME"`, `file: "/run/secrets/name"`, and `command: ["pass", "show", "name"]`.
 
 ```elixir
 service :web do
@@ -863,6 +863,16 @@ service :web do
     env :runtime
     exec ["/opt/web/bin/server"]
   end
+end
+```
+
+For explicit paths, use `dotenv` alongside `ini` and `yaml`:
+
+```elixir
+dotenv path(:config, "env"), owner: "root", group: service_user(), mode: 0o640 do
+  set "MIX_ENV", "prod"
+  set "PORT", 4000
+  secret "GENERATED_TOKEN", env: :redacted
 end
 ```
 

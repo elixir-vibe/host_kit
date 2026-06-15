@@ -1,13 +1,13 @@
 defmodule HostKit.EnvFileTest do
   use ExUnit.Case, async: true
 
-  test "env_file DSL builds redacted env file resources" do
+  test "dotenv DSL builds redacted env file resources" do
     source = """
     use HostKit.DSL
 
     project :demo do
       service :web do
-        env_file "/etc/app/env", owner: "root", group: "app", mode: 0o640 do
+        dotenv "/etc/app/env", owner: "root", group: "app", mode: 0o640 do
           set :mix_env, :prod
           set :PORT, 4000
           secret :SECRET_KEY_BASE, env: "HOST_KIT_TEST_SECRET"
@@ -33,6 +33,27 @@ defmodule HostKit.EnvFileTest do
              {:secret, "GENERATED_TOKEN", :redacted},
              {:secret, "FILE_TOKEN", HostKit.Secret.file("/run/app/token")}
            ]
+  end
+
+  test "env_file remains a compatibility alias for explicit dotenv resources" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      env_file "/etc/app/env" do
+        set :mix_env, :prod
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+
+    assert [
+             %HostKit.Resources.EnvFile{
+               path: "/etc/app/env",
+               entries: [{:set, "MIX_ENV", "prod"}]
+             }
+           ] = project.resources
   end
 
   test "renders dotenv content with secrets from environment" do

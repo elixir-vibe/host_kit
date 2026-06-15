@@ -108,9 +108,14 @@ end
 file path(:sbin, "tool"), content: Infra.Files.read("usr/local/sbin/tool")
 ```
 
-Prefer structured config resources for INI/YAML when the file is naturally data, especially service config such as Forgejo `app.ini` and Gatus YAML. Use `Keyword` syntax for ordered config data:
+Prefer format-specific resources for dotenv/INI/YAML when the file is naturally data, especially service config such as env files, Forgejo `app.ini`, and Gatus YAML. Use `Keyword` syntax for ordered config data:
 
 ```elixir
+dotenv path(:config, "env"), owner: "root", group: service_user(), mode: 0o640 do
+  set "MIX_ENV", "prod"
+  secret "GENERATED_TOKEN", env: :redacted
+end
+
 ini path(:config, "app.ini"), owner: "root", group: service_user(), mode: 0o640 do
   set "APP_NAME", "elixir.toys git"
 
@@ -144,7 +149,7 @@ template path(:config, "app.ini"),
   mode: 0o640
 ```
 
-`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates, env files, and structured config resources are first-class resources in plans and render to ordinary managed files during read/apply. Secret/redacted env/config values compare only public env entries, INI keys, or YAML paths during plan reads; `:redacted` values are intentionally not renderable for apply. Secret sources support `env:`, `file:`, and `command:`. Template assigns containing secrets or `:redacted` are rejected until redacted template diffs exist.
+`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates, dotenv files, and structured config resources are first-class resources in plans and render to ordinary managed files during read/apply. Secret/redacted env/config values compare only public dotenv entries, INI keys, or YAML paths during plan reads; `:redacted` values are intentionally not renderable for apply. Secret sources support `env:`, `file:`, and `command:`. Template assigns containing secrets or `:redacted` are rejected until redacted template diffs exist.
 
 Keep templates inspectable and deterministic. Do not hide runtime behavior or shell workflows in templates. Do not commit secrets; use `content: :redacted` for existing secret-bearing files managed elsewhere, and avoid passing raw secrets as template assigns until redacted template diffs are explicitly supported.
 

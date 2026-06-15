@@ -38,7 +38,7 @@ defmodule HostKit.ModeTest do
       service :web do
         directory "/srv/app", mode: :private_dir
         file "/etc/app/env", mode: [owner: :rw, group: :r], content: :redacted
-        env_file "/etc/app/dotenv", mode: {:rw, :r, nil} do
+        dotenv "/etc/app/dotenv", mode: {:rw, :r, nil} do
           set :MIX_ENV, :prod
         end
       end

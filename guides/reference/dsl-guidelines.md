@@ -246,7 +246,7 @@ These stay available and documented in the directive inventory/reference because
 - `systemd_service`, `systemd_timer`
 - `unit`, `service`, `timer`, `install`
 - `environment_file`, `exec_start`, `exec_stop`, `wanted_by`, `read_write_paths`
-- explicit `env_file path do ... end`
+- explicit `dotenv path do ... end`
 - explicit `listener(:name)` when a string upstream is required
 - explicit named Caddy sites: `caddy_site :name, "host" do ... end`
 
@@ -356,8 +356,8 @@ Legend:
 | `account` | Canonical | Declare/ref service account; `account system: true` derives the service user. |
 | `storage` | Canonical | Declare named service storage and its directory resource. |
 | `env` | Canonical | Declare a managed env file in service scope; attach it in daemon scope. |
-| `secret` | Canonical | Add a secret entry inside env/env_file or structured INI config. Use `env: :redacted` for existing generated secrets that must not render. |
-| `set` | Canonical | Add non-secret config inside env/env_file, provider config, or structured INI config. |
+| `secret` | Canonical | Add a secret entry inside env/dotenv or structured INI config. Use `env: :redacted` for existing generated secrets that must not render. |
+| `set` | Canonical | Add non-secret config inside env/dotenv, provider config, or structured INI config. |
 | `service_name` | Reference | Return current service name. |
 | `service_user` | Reference | Return convention-derived service user; systemd setter in systemd scope. |
 | `unit_name` | Reference | Return convention-derived systemd unit name. |
@@ -366,7 +366,8 @@ Legend:
 | `storage_path` | Reference | Return named storage path. |
 | `writable_storage_paths` | Reference | Return paths for writable storage volumes. |
 | `backup_storage` | Reference | Return storage volumes marked for backup. |
-| `env_file` | Escape hatch | Declare an env file at an explicit path. Prefer contextual `env`. |
+| `dotenv` | Reference | Declare a dotenv-format env file at an explicit path. Prefer contextual `env` when the file is service-scoped and attached to daemons. |
+| `env_file` | Compatibility | Older name for explicit dotenv resources. Prefer `dotenv`. |
 
 ### Daemons and systemd
 

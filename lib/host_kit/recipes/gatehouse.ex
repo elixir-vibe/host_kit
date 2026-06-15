@@ -83,7 +83,7 @@ defmodule HostKit.Recipes.Gatehouse do
         directory(gatehouse.paths.env_dir, owner: "root", group: "root", mode: 0o755)
       end
 
-      env_file gatehouse.paths.env, owner: "root", group: "root", mode: 0o600 do
+      dotenv gatehouse.paths.env, owner: "root", group: "root", mode: 0o600 do
         set("GATEHOUSE_CONFIG", gatehouse.paths.config)
         set("GATEHOUSE_STATE", gatehouse.paths.state)
         set("RELEASE_DISTRIBUTION", "name")
