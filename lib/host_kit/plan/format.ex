@@ -96,6 +96,26 @@ defmodule HostKit.Plan.Format do
     ]
   end
 
+  defp format_details(%Change{after: %HostKit.Resources.ConfigFile{} = config_file} = change) do
+    if HostKit.Resources.ConfigFile.secret?(config_file) do
+      actual_entries = change.before && Map.get(change.before.meta, :actual_public_entries)
+
+      changed_paths =
+        HostKit.Resources.ConfigFile.changed_public_paths(config_file, actual_entries)
+
+      secret_paths = HostKit.Resources.ConfigFile.secret_paths(config_file)
+
+      [
+        "\n  public keys: ",
+        format_config_paths(changed_paths),
+        "\n  redacted keys: ",
+        format_config_paths(secret_paths)
+      ]
+    else
+      []
+    end
+  end
+
   defp format_details(%Change{after: %HostKit.Resources.Source{} = source}) do
     [
       "\n  type: ",
@@ -159,6 +179,9 @@ defmodule HostKit.Plan.Format do
   defp format_paths(label, paths) do
     ["\n  ", label, ": ", Enum.map_join(paths, ", ", &format_path/1)]
   end
+
+  defp format_config_paths([]), do: "none"
+  defp format_config_paths(paths), do: Enum.join(paths, ", ")
 
   defp format_path(path) when is_binary(path), do: path
   defp format_path(path), do: inspect(path)

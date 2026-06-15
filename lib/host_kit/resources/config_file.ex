@@ -41,7 +41,7 @@ defmodule HostKit.Resources.ConfigFile do
   def id(%__MODULE__{format: format, path: path}), do: {format, path}
 
   @spec secret?(t()) :: boolean()
-  def secret?(%__MODULE__{content: content}), do: secret_value?(content)
+  def secret?(%__MODULE__{content: content}), do: HostKit.Secret.secret?(content)
 
   @spec public_entries(t()) :: map()
   def public_entries(%__MODULE__{format: :ini, content: content}) do
@@ -51,10 +51,10 @@ defmodule HostKit.Resources.ConfigFile do
     |> Map.new()
   end
 
-  def public_entries(%__MODULE__{content: content}) do
+  def public_entries(%__MODULE__{format: :yaml, content: content}) do
     content
-    |> public_tree()
-    |> then(&%{content: &1})
+    |> yaml_public_entries()
+    |> Map.new()
   end
 
   @spec public_entries_from_content(t(), String.t()) :: {:ok, map()} | {:error, term()}
@@ -66,11 +66,11 @@ defmodule HostKit.Resources.ConfigFile do
     end
   end
 
-  def public_entries_from_content(%__MODULE__{} = desired, content) do
-    case render(%{desired | content: public_tree(desired.content)}) do
-      {:ok, public_content} when public_content == content -> {:ok, public_entries(desired)}
-      {:ok, _public_content} -> {:ok, :unknown}
-      {:error, reason} -> {:error, reason}
+  def public_entries_from_content(%__MODULE__{format: :yaml} = desired, content) do
+    public_keys = desired |> public_entries() |> Map.keys()
+
+    with {:ok, decoded} <- parse_yaml(content) do
+      {:ok, decoded |> yaml_public_entries() |> Map.new() |> Map.take(public_keys)}
     end
   end
 
@@ -111,12 +111,23 @@ defmodule HostKit.Resources.ConfigFile do
   defp ini_public_entries({section, values}) when is_map(values) or is_list(values) do
     values
     |> normalize_map()
-    |> Enum.reject(fn {_key, value} -> secret_value?(value) end)
+    |> Enum.reject(fn {_key, value} -> HostKit.Secret.secret?(value) end)
     |> Enum.map(fn {key, value} -> {{to_string(section), to_string(key)}, ini_value(value)} end)
   end
 
   defp ini_public_entries({key, value}) do
-    if secret_value?(value), do: [], else: [{{nil, to_string(key)}, ini_value(value)}]
+    if HostKit.Secret.secret?(value), do: [], else: [{{nil, to_string(key)}, ini_value(value)}]
+  end
+
+  defp ini_secret_paths({section, values}) when is_map(values) or is_list(values) do
+    values
+    |> normalize_map()
+    |> Enum.filter(fn {_key, value} -> HostKit.Secret.secret?(value) end)
+    |> Enum.map(fn {key, _value} -> format_ini_path({to_string(section), to_string(key)}) end)
+  end
+
+  defp ini_secret_paths({key, value}) do
+    if HostKit.Secret.secret?(value), do: [format_ini_path({nil, to_string(key)})], else: []
   end
 
   defp ini_pair({key, value}), do: "#{key}=#{ini_value(value)}"
@@ -192,29 +203,66 @@ defmodule HostKit.Resources.ConfigFile do
 
   defp yaml_scalar(value), do: Ymlr.Encode.to_s!(value)
 
-  defp spaces(indent), do: String.duplicate(" ", indent)
+  defp yaml_public_entries(value), do: yaml_public_entries(value, [])
 
-  defp public_tree(%HostKit.Secret{}), do: nil
-  defp public_tree(:redacted), do: nil
+  defp yaml_public_entries(%HostKit.Secret{}, _path), do: []
+  defp yaml_public_entries(:redacted, _path), do: []
 
-  defp public_tree(%{} = map) do
+  defp yaml_public_entries(%{} = map, path) do
     map
     |> normalize_map()
-    |> Enum.reject(fn {_key, value} -> secret_value?(value) end)
-    |> Map.new(fn {key, value} -> {key, public_tree(value)} end)
+    |> Enum.flat_map(fn {key, value} -> yaml_public_entries(value, [to_string(key) | path]) end)
   end
 
-  defp public_tree(values) when is_list(values) do
+  defp yaml_public_entries(values, path) when is_list(values) do
     if Keyword.keyword?(values) do
-      values
-      |> Enum.reject(fn {_key, value} -> secret_value?(value) end)
-      |> Enum.map(fn {key, value} -> {key, public_tree(value)} end)
+      Enum.flat_map(values, fn {key, value} ->
+        yaml_public_entries(value, [to_string(key) | path])
+      end)
     else
-      Enum.reject(values, &secret_value?/1)
+      values
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {value, index} -> yaml_public_entries(value, [index | path]) end)
     end
   end
 
-  defp public_tree(value), do: value
+  defp yaml_public_entries(value, path), do: [{path |> Enum.reverse() |> List.to_tuple(), value}]
+
+  defp spaces(indent), do: String.duplicate(" ", indent)
+
+  @spec secret_paths(t()) :: [String.t()]
+  def secret_paths(%__MODULE__{format: :ini, content: content}) do
+    content
+    |> normalize_map()
+    |> Enum.flat_map(&ini_secret_paths/1)
+    |> Enum.sort()
+  end
+
+  def secret_paths(%__MODULE__{format: :yaml, content: content}) do
+    content
+    |> yaml_secret_paths([])
+    |> Enum.map(&format_yaml_path/1)
+    |> Enum.sort()
+  end
+
+  @spec changed_public_paths(t(), map()) :: [String.t()]
+  def changed_public_paths(%__MODULE__{} = desired, actual_entries) when is_map(actual_entries) do
+    desired
+    |> public_entries()
+    |> Enum.reject(fn {path, value} -> Map.get(actual_entries, path) == value end)
+    |> Enum.map(fn {path, _value} -> format_public_path(desired.format, path) end)
+    |> Enum.sort()
+  end
+
+  def changed_public_paths(%__MODULE__{} = desired, :invalid), do: public_path_labels(desired)
+  def changed_public_paths(%__MODULE__{} = desired, nil), do: public_path_labels(desired)
+
+  defp public_path_labels(%__MODULE__{} = desired) do
+    desired
+    |> public_entries()
+    |> Enum.map(fn {path, _value} -> format_public_path(desired.format, path) end)
+    |> Enum.sort()
+  end
 
   defp resolve_secrets(%HostKit.Secret{} = secret) do
     {:ok, HostKit.Secret.resolve!(secret)}
@@ -257,17 +305,52 @@ defmodule HostKit.Resources.ConfigFile do
   defp put_entry(acc, key, value) when is_map(acc), do: Map.put(acc, key, value)
   defp put_entry(acc, key, value) when is_list(acc), do: acc ++ [{key, value}]
 
-  defp secret_value?(%HostKit.Secret{}), do: true
-  defp secret_value?(:redacted), do: true
-  defp secret_value?(%{} = map), do: Enum.any?(map, fn {_key, value} -> secret_value?(value) end)
+  defp yaml_secret_paths(%HostKit.Secret{}, path), do: [path |> Enum.reverse() |> List.to_tuple()]
+  defp yaml_secret_paths(:redacted, path), do: [path |> Enum.reverse() |> List.to_tuple()]
 
-  defp secret_value?(values) when is_list(values) do
-    if Keyword.keyword?(values),
-      do: Enum.any?(values, fn {_key, value} -> secret_value?(value) end),
-      else: Enum.any?(values, &secret_value?/1)
+  defp yaml_secret_paths(%{} = map, path) do
+    map
+    |> normalize_map()
+    |> Enum.flat_map(fn {key, value} -> yaml_secret_paths(value, [to_string(key) | path]) end)
   end
 
-  defp secret_value?(_value), do: false
+  defp yaml_secret_paths(values, path) when is_list(values) do
+    if Keyword.keyword?(values) do
+      Enum.flat_map(values, fn {key, value} ->
+        yaml_secret_paths(value, [to_string(key) | path])
+      end)
+    else
+      values
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {value, index} -> yaml_secret_paths(value, [index | path]) end)
+    end
+  end
+
+  defp yaml_secret_paths(_value, _path), do: []
+
+  defp format_public_path(:ini, path), do: format_ini_path(path)
+  defp format_public_path(:yaml, path), do: format_yaml_path(path)
+
+  defp format_ini_path({nil, key}), do: key
+  defp format_ini_path({section, key}), do: "#{section}.#{key}"
+
+  defp format_yaml_path(path) when is_tuple(path),
+    do: path |> Tuple.to_list() |> format_yaml_path()
+
+  defp format_yaml_path([]), do: "<root>"
+
+  defp format_yaml_path(parts) do
+    Enum.map_join(parts, ".", fn
+      index when is_integer(index) -> Integer.to_string(index)
+      key -> to_string(key)
+    end)
+  end
+
+  defp parse_yaml(content) do
+    YamlElixir.read_from_string(content)
+  rescue
+    error in [YamlElixir.ParsingError] -> {:error, {:invalid_yaml, Exception.message(error)}}
+  end
 
   defp parse_ini(content) do
     content

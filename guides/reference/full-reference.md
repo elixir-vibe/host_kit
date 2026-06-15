@@ -888,26 +888,27 @@ service :forgejo, path: "forgejo" do
 end
 ```
 
-Secret or redacted INI values are omitted from public drift comparison. `env: :redacted` is useful for modeling existing generated secrets without storing or rendering them. Use an env-backed secret when HostKit should render the file during apply:
+Secret or redacted INI/YAML values are omitted from public drift comparison. HostKit decodes YAML with `yaml_elixir` for public-path comparison and renders YAML scalars with `ymlr`; HostKit does not hand-roll YAML quoting/parsing. `env: :redacted` is useful for modeling existing generated secrets without storing or rendering them, and it is intentionally not renderable during apply. Use an env-backed secret when HostKit should render the file during apply:
 
 ```elixir
 secret "TOKEN", env: "APP_TOKEN"
 ```
 
-YAML configs use Elixir keyword data for stable order:
+YAML configs use Elixir keyword data for stable order and may contain redacted secret leaves:
 
 ```elixir
 yaml path(:config, "gatus.yaml"),
-  content: %{
-    "storage" => %{"type" => "sqlite", "path" => path(:state, "gatus.db")},
-    "endpoints" => [
-      %{
-        "name" => "Forgejo",
-        "url" => "https://git.elixir.toys",
-        "conditions" => ["[STATUS] == 200"]
-      }
+  content: [
+    storage: [type: "sqlite", path: path(:state, "gatus.db")],
+    alerting: [telegram: [token: :redacted, id: "chat-id"]],
+    endpoints: [
+      [
+        name: "Forgejo",
+        url: "https://git.elixir.toys",
+        conditions: ["[STATUS] == 200"]
+      ]
     ]
-  },
+  ],
   owner: "root",
   group: service_user(),
   mode: 0o640
@@ -941,7 +942,19 @@ HostKit.Resources.Template.new("/etc/app.conf",
 )
 ```
 
-Templates support regular EEx bindings (`<%= port %>`) and assigns syntax (`<%= @port %>`). Keep templates inspectable and deterministic; do not hide runtime behavior in templates. Avoid raw secret assigns until redacted template diffs are explicitly supported.
+Templates support regular EEx bindings (`<%= port %>`) and assigns syntax (`<%= @port %>`). Keep templates inspectable and deterministic; do not hide runtime behavior in templates. Template assigns containing `%HostKit.Secret{}` or `:redacted` are rejected until redacted template diffs are explicitly supported.
+
+## Read, audit, and facts APIs
+
+Runtime APIs are primary; Mix tasks wrap them. Besides `HostKit.plan/2`, projects expose focused read/audit helpers:
+
+```elixir
+{:ok, current_resources} = HostKit.Project.read(project, target: HostKit.Target.local(:prod))
+{:ok, audit_plan} = HostKit.Project.audit(project, target: HostKit.Target.local(:prod))
+{:ok, facts} = HostKit.Facts.collect(HostKit.Target.local(:prod), only: [:os, :users, :systemd, :ports])
+```
+
+`read/2` returns the current snapshots captured for each desired resource. `audit/2` returns the same plan shape as `HostKit.plan/2`, so callers can inspect creates, updates, deletes, read errors, and no-ops without going through Mix tasks.
 
 ## Runtime isolation
 

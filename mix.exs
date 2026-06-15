@@ -4,13 +4,13 @@ defmodule HostKit.MixProject do
   def project do
     [
       app: :host_kit,
-      version: "0.1.0-beta.2",
+      version: "0.1.0-beta.3",
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
-      dialyzer: [plt_add_apps: [:eex, :mix, :ssh]],
+      dialyzer: [plt_add_apps: [:eex, :mix, :ssh, :yaml_elixir, :yamerl]],
       package: package(),
       description: description(),
       docs: docs()
@@ -38,6 +38,7 @@ defmodule HostKit.MixProject do
       {:unitctl, "~> 0.1.0"},
       {:jason, "~> 1.4"},
       {:json_codec, "~> 0.1.4"},
+      {:yaml_elixir, "~> 2.11"},
       {:ymlr, "~> 5.1"},
       {:req, "~> 0.5"},
       {:hammer, "~> 7.0"},

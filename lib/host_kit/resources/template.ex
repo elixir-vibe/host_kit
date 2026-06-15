@@ -34,11 +34,18 @@ defmodule HostKit.Resources.Template do
       raise ArgumentError, "template #{inspect(path)} expects :from or :source"
     end
 
+    assigns = Keyword.get(opts, :assigns, %{})
+
+    if HostKit.Secret.secret?(assigns) do
+      raise ArgumentError,
+            "template #{inspect(path)} assigns cannot contain secrets until redacted template diffs are supported"
+    end
+
     %__MODULE__{
       path: path,
       source: source,
       from: from,
-      assigns: Keyword.get(opts, :assigns, %{}),
+      assigns: assigns,
       owner: normalize_account_name(Keyword.get(opts, :owner)),
       group: normalize_account_name(Keyword.get(opts, :group)),
       mode: opts |> Keyword.get(:mode) |> HostKit.Mode.normalize!(),

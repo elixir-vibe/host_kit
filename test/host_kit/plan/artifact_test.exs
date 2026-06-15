@@ -113,6 +113,44 @@ defmodule HostKit.Plan.ArtifactTest do
     assert host.meta.ssh[:password] == HostKit.Secret.env(env_var)
   end
 
+  test "structured config artifacts omit redacted actual values" do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "host-kit-config-artifact-#{System.unique_integer([:positive])}.json"
+      )
+
+    config =
+      HostKit.Resources.ConfigFile.new("/etc/app.ini", :ini,
+        content: [server: [DOMAIN: "example.test", TOKEN: :redacted]]
+      )
+
+    plan = %HostKit.Plan{
+      project: %HostKit.Project{name: :demo},
+      resources: [config],
+      changes: [
+        %HostKit.Change{
+          action: :no_op,
+          resource_id: HostKit.Resources.ConfigFile.id(config),
+          before: %{
+            config
+            | meta: %{actual_public_entries: %{{"server", "DOMAIN"} => "example.test"}}
+          },
+          after: config,
+          reason: :in_sync
+        }
+      ],
+      summary: %{no_op: 1}
+    }
+
+    assert :ok = Artifact.save(path, plan)
+
+    content = File.read!(path)
+    assert content =~ "example.test"
+    assert content =~ "redacted"
+    refute content =~ "actual-secret-value"
+  end
+
   test "loads user atoms as strings instead of creating atoms" do
     assert HostKit.Resource.load(%{
              "$type" => "atom",

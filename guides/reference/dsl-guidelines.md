@@ -337,9 +337,9 @@ Legend:
 | `tool` | Canonical | Declare a mise-managed tool version. |
 | `directory` | Reference | Declare an explicit directory resource. Prefer `storage` for service data. |
 | `file` | Reference | Declare an explicit file resource. |
-| `template` | Reference | Declare an explicit EEx-rendered file resource. |
-| `ini` | Reference | Declare a structured INI config file resource. |
-| `yaml` | Reference | Declare a structured YAML config file resource. |
+| `template` | Reference | Declare an explicit EEx-rendered file resource; secret assigns are rejected until redacted template diffs exist. |
+| `ini` | Reference | Declare a structured INI config file resource with public and redacted entries. |
+| `yaml` | Reference | Declare a structured YAML config file resource with ordered keyword data and public-path secret comparison. |
 | `section` | Reference | Declare an INI section inside `ini do ... end`. |
 | `symlink` | Reference | Declare an explicit symbolic link resource. |
 | `source` | Reference | Declare a source artifact/repository. |
@@ -356,8 +356,8 @@ Legend:
 | `account` | Canonical | Declare/ref service account; `account system: true` derives the service user. |
 | `storage` | Canonical | Declare named service storage and its directory resource. |
 | `env` | Canonical | Declare a managed env file in service scope; attach it in daemon scope. |
-| `secret` | Canonical | Add a secret entry inside env/env_file. |
-| `set` | Canonical | Add non-secret config inside env/env_file or provider config. |
+| `secret` | Canonical | Add a secret entry inside env/env_file or structured INI config. Use `env: :redacted` for existing generated secrets that must not render. |
+| `set` | Canonical | Add non-secret config inside env/env_file, provider config, or structured INI config. |
 | `service_name` | Reference | Return current service name. |
 | `service_user` | Reference | Return convention-derived service user; systemd setter in systemd scope. |
 | `unit_name` | Reference | Return convention-derived systemd unit name. |

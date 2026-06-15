@@ -14,6 +14,19 @@ defmodule HostKit.TemplateTest do
     assert Template.render(template) == {:ok, "name=demo\nhost=demo.example.com\n"}
   end
 
+  test "template assigns reject secrets until redacted template diffs are supported" do
+    assert_raise ArgumentError, ~r/assigns cannot contain secrets/, fn ->
+      Template.new("/etc/demo.conf",
+        source: "token=<%= @token %>\n",
+        assigns: %{token: HostKit.Secret.env("APP_TOKEN")}
+      )
+    end
+
+    assert_raise ArgumentError, ~r/assigns cannot contain secrets/, fn ->
+      Template.new("/etc/demo.conf", source: "token=<%= @token %>\n", assigns: [token: :redacted])
+    end
+  end
+
   test "template DSL resolves relative source paths from the declaring config" do
     config_dir = tmp_dir("template-dsl")
     File.mkdir_p!(Path.join(config_dir, "templates"))

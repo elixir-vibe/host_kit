@@ -101,7 +101,7 @@ project :prod do
 end
 ```
 
-This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, templates, env files, structured config files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits. Secret/redacted structured config entries are omitted from public drift comparison, so generated values can be modeled without leaking them into plans. See the [DSL design guidelines](guides/reference/dsl-guidelines.md) for naming, block shape, defaults, and reference style.
+This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, templates, env files, structured config files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits. Secret/redacted structured config entries are omitted from public drift comparison by INI key or YAML path, so generated values can be modeled without leaking them into plans. See the [DSL design guidelines](guides/reference/dsl-guidelines.md) for naming, block shape, defaults, and reference style.
 
 Plan, review, apply:
 
@@ -117,7 +117,7 @@ mix host_kit.apply --host app \
   infra/config.exs
 ```
 
-`secret_env/1` stores an environment-variable reference. Plan artifacts include the variable name, not the resolved secret value.
+`secret_env/1` stores an environment-variable reference. Plan artifacts include the variable name, not the resolved secret value. Runtime callers can use `HostKit.Project.audit/2`, `HostKit.Project.read/2`, and `HostKit.Facts.collect/2` directly; Mix tasks are wrappers around those inspectable APIs.
 
 ## Managed local demo instance
 

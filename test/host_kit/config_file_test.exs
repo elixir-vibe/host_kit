@@ -96,6 +96,60 @@ defmodule HostKit.ConfigFileTest do
     cleanup_tmp("config-file-secret-plan")
   end
 
+  test "secret YAML config compares only public paths" do
+    path = Path.join(tmp_dir("config-file-secret-yaml-plan"), "gatus.yaml")
+
+    File.write!(path, """
+    alerting:
+      telegram:
+        token: actual-secret
+        id: chat-id
+    endpoints:
+      - name: Forgejo
+        url: https://git.elixir.toys
+    """)
+
+    project =
+      project_with_config(path, :yaml,
+        alerting: [telegram: [token: :redacted, id: "chat-id"]],
+        endpoints: [[name: "Forgejo", url: "https://git.elixir.toys"]]
+      )
+
+    assert {:ok, plan} = HostKit.plan(project, reader: HostKit.Local)
+    assert [%Change{action: :no_op, resource_id: {:yaml, ^path}}] = plan.changes
+  after
+    cleanup_tmp("config-file-secret-yaml-plan")
+  end
+
+  test "secret YAML plan detects public path drift" do
+    path = Path.join(tmp_dir("config-file-secret-yaml-drift"), "gatus.yaml")
+
+    File.write!(path, """
+    alerting:
+      telegram:
+        token: actual-secret
+        id: old-chat-id
+    """)
+
+    project =
+      project_with_config(path, :yaml,
+        alerting: [telegram: [token: :redacted, id: "new-chat-id"]]
+      )
+
+    assert {:ok, plan} = HostKit.plan(project, reader: HostKit.Local)
+    assert [%Change{action: :update, resource_id: {:yaml, ^path}} = change] = plan.changes
+    assert HostKit.Plan.Format.format_change(change) =~ "public keys: alerting.telegram.id"
+    assert HostKit.Plan.Format.format_change(change) =~ "redacted keys: alerting.telegram.token"
+  after
+    cleanup_tmp("config-file-secret-yaml-drift")
+  end
+
+  test "redacted structured configs are not renderable" do
+    config = ConfigFile.new("/etc/app.ini", :ini, content: [server: [TOKEN: :redacted]])
+
+    assert ConfigFile.render(config) == {:error, :redacted_secret_not_renderable}
+  end
+
   test "secret config rendering resolves env-backed secrets" do
     env = "HOSTKIT_CONFIG_FILE_SECRET"
     System.put_env(env, "actual-secret")

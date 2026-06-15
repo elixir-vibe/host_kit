@@ -132,6 +132,20 @@ defmodule HostKit.Project do
   def add_proxy(%__MODULE__{} = project, %Proxy{} = proxy),
     do: %{project | proxies: project.proxies ++ [proxy]}
 
+  @doc "Reads current target state for this project's desired resources."
+  @spec read(t(), keyword()) :: {:ok, [struct() | nil]} | {:error, term()}
+  def read(%__MODULE__{} = project, opts \\ []) do
+    with {:ok, plan} <- audit(project, opts) do
+      {:ok, Enum.map(plan.changes, & &1.before)}
+    end
+  end
+
+  @doc "Audits this project by building a plan against the selected target."
+  @spec audit(t(), keyword()) :: {:ok, HostKit.Plan.t()} | {:error, term()}
+  def audit(%__MODULE__{} = project, opts \\ []) do
+    HostKit.plan(project, opts)
+  end
+
   @spec resources(t()) :: [struct()]
   def resources(%__MODULE__{} = project) do
     project.resources

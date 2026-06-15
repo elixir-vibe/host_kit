@@ -2,15 +2,19 @@
 
 ## Unreleased
 
+## v0.1.0-beta.3 - 2026-06-15
+
 - Replaced service-scoped `root_path/2` with unified `path/2`; conventional service roots are scoped by service context, while custom/global roots remain root-relative.
 - Removed the separate service path override directive; use `service :name, path: "slug"` and shared `HostKit.Naming` helpers for path/identity normalization.
 - Centralized generated recipe/provider names in `HostKit.Naming`, including readiness names, ingress route names, workspace unit/user names, Elixir release names, and command/resource names.
-- Added first-class EEx template resources via `template PATH, from: ..., assigns: ...`; templates are inspectable resources and render to managed files during read/apply.
-- Added structured config file resources via `ini/2` and `yaml/2`, including an INI block DSL with `section`/`set` and secret-aware public-entry comparison for redacted values.
+- Added first-class EEx template resources via `template PATH, from: ..., assigns: ...`; templates are inspectable resources, render to managed files during read/apply, and reject secret assigns until redacted template diffs exist.
+- Added structured config file resources via `ini/2` and `yaml/2`, including an INI block DSL with `section`/`set`, `ymlr` scalar rendering, `yaml_elixir` YAML public-path reads, secret-aware INI key/YAML path comparison for redacted values, and explicit rejection of redacted config rendering.
 - Added `symlink PATH, to: TARGET` resources with local/remote read support, apply support, rollback deletion, and documentation.
 - Added `target_host` for selecting a nested instance host when an instance has multiple connection endpoints.
 - Documented instance backend authoring callbacks and clarified instance down-plan ordering.
 - Added semantic tests for persistent/ephemeral instance rollback behavior and nested content target selection.
+- Added `HostKit.Project.read/2`, `HostKit.Project.audit/2`, and `HostKit.Facts.collect/2` for runtime read/audit/introspection workflows.
+- Added README and Livebook examples for structured config resources and redacted generated secrets.
 
 ## v0.1.0-beta.2 - 2026-06-14
 

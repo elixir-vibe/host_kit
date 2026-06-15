@@ -13,6 +13,7 @@ host_kit_dep =
 Mix.install([
   {:kino, "~> 0.19"},
   {:req, "~> 0.5"},
+  {:yaml_elixir, "~> 2.11"},
   {:ymlr, "~> 5.1"},
   host_kit_dep
 ])
@@ -172,6 +173,39 @@ Demo.plan_summary(plan)
 
 ```elixir
 Demo.plan_table(plan)
+```
+
+## Inspect structured config resources
+
+HostKit can model natural data files directly as INI/YAML resources. Public keys are compared during drift detection, while redacted/generated secrets stay out of plans.
+
+```elixir
+structured_config_project =
+  project :structured_config_preview do
+    roots config: Path.join(System.tmp_dir!(), "hostkit-livebook-config")
+
+    service :preview do
+      ini path(:config, "app.ini"), owner: "root", group: service_user(), mode: 0o640 do
+        set "APP_NAME", "HostKit demo"
+
+        section "server" do
+          set "HTTP_ADDR", "127.0.0.1"
+          set "HTTP_PORT", 4000
+          secret "JWT_SECRET", env: :redacted
+        end
+      end
+
+      yaml path(:config, "health.yaml"),
+        content: [
+          endpoints: [
+            [name: "demo", url: "http://127.0.0.1:4000/health", conditions: ["[STATUS] == 200"]]
+          ]
+        ]
+    end
+  end
+
+{:ok, structured_config_plan} = HK.plan(structured_config_project, reader: HostKit.Local)
+Demo.plan_table(structured_config_plan)
 ```
 
 ## Deploy

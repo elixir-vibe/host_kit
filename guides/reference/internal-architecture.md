@@ -352,7 +352,11 @@ flowchart LR
   Runner --> Apply
 ```
 
-A target controls how HostKit reads current state and applies changes. Mix tasks are thin wrappers around the runtime API.
+A target controls how HostKit reads current state and applies changes. Mix tasks are thin wrappers around the runtime API. Runtime callers can use `HostKit.Project.read/2` to retrieve current snapshots for desired resources, `HostKit.Project.audit/2` to retrieve the same plan/audit shape as `HostKit.plan/2`, and `HostKit.Facts.collect/2` for bounded host facts such as OS metadata, users, systemd status, and listening ports.
+
+## Config resources and redaction
+
+Structured config resources render through explicit format modules but remain ordinary file-like resources for plan/apply. INI public entries are compared by section/key. YAML public entries are compared by decoded scalar path using `yaml_elixir`, while scalar rendering uses `ymlr`. Secret leaves (`%HostKit.Secret{}` or `:redacted`) are omitted from public drift comparison. `:redacted` is for existing/generated secrets and intentionally cannot render during apply; env-backed secrets resolve only at render/apply boundaries. Template resources currently reject secret assigns until redacted template diffs exist.
 
 ## Design constraints
 
