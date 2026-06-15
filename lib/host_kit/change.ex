@@ -9,14 +9,16 @@ defmodule HostKit.Change do
           resource_id: Resource.t() | term(),
           before: struct() | nil,
           after: struct() | nil,
-          reason: String.t() | atom() | nil
+          reason: String.t() | atom() | nil,
+          diff: HostKit.Diff.t() | nil
         }
 
   defstruct action: nil,
             resource_id: nil,
             before: nil,
             after: nil,
-            reason: nil
+            reason: nil,
+            diff: nil
 
   defimpl Inspect do
     import Inspect.Algebra

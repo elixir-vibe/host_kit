@@ -55,6 +55,35 @@ defmodule HostKit.Plan.ArtifactTest do
     assert loaded.opts == []
   end
 
+  test "includes down plan stats" do
+    package = HostKit.Resources.Package.new(:git, as: "git")
+
+    plan = %HostKit.Plan{
+      project: %HostKit.Project{name: :demo},
+      changes: [
+        %HostKit.Change{
+          action: :create,
+          resource_id: {:package, :git},
+          after: package,
+          reason: :missing
+        }
+      ]
+    }
+
+    assert {:ok, down_plan} = HostKit.down(plan)
+    artifact = Artifact.from_plan(down_plan)
+
+    assert artifact.stats["down_plan"] == %{
+             source_changes: 1,
+             reversible_changes: 0,
+             noop_changes: 0,
+             skipped_changes: 1,
+             reversible_percent: 0.0,
+             skipped_by_reason: %{"delete_not_supported" => 1},
+             skipped_by_type: %{"package" => 1}
+           }
+  end
+
   test "includes source identities" do
     source = %HostKit.Resources.Source{
       name: :app,
@@ -148,7 +177,8 @@ defmodule HostKit.Plan.ArtifactTest do
             | meta: %{actual_public_entries: %{{"server", "DOMAIN"} => "example.test"}}
           },
           after: config,
-          reason: :in_sync
+          reason: :in_sync,
+          diff: HostKit.Diff.config_file(config, %{{"server", "DOMAIN"} => "old.example.test"})
         }
       ],
       summary: %{no_op: 1}
@@ -158,8 +188,14 @@ defmodule HostKit.Plan.ArtifactTest do
 
     content = File.read!(path)
     assert content =~ "example.test"
+    assert content =~ "old.example.test"
     assert content =~ "redacted"
     refute content =~ "actual-secret-value"
+
+    assert {:ok, loaded} = Artifact.load(path)
+
+    assert [%HostKit.Change{diff: %HostKit.Diff{changes: [%HostKit.Diff.Entry{}]}}] =
+             loaded.changes
   end
 
   test "loads user atoms as strings instead of creating atoms" do

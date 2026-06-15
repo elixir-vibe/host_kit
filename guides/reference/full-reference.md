@@ -60,7 +60,7 @@ end
 
 ## Plans and down plans
 
-Rollback is represented as another HostKit plan. A plan change already carries `before` and `after` state, so HostKit can derive a down plan from the exact plan that was applied:
+Rollback is represented as another HostKit plan. A plan change already carries `before` and `after` state, so HostKit can derive a down plan from the exact plan that was applied. Down plans include coverage stats for reversible, explicit no-op, and skipped original changes:
 
 ```elixir
 {:ok, plan} = HostKit.plan(project, target: prod)
@@ -328,7 +328,7 @@ mix host_kit.apply --host prod \
 
 `ssh retry: ...` is an SSH transport policy. It retries connection establishment for transient SSH startup/network failures; it does not blindly rerun arbitrary deployment commands after a command has been sent to the remote host. Use `retry: 3` as shorthand for three attempts, `retry: false` to disable, or keyword options with `:attempts`, `:base_delay`/`:base_delay_ms`, and `:max_delay`/`:max_delay_ms`. Retry progress is emitted as apply events and mirrored to Logger for collection.
 
-Plan artifacts are JSON and intended to be inspectable. They include an artifact version, target metadata, dumped project/resources/changes, source identities, diagnostics, aggregate resource/action statistics, and source-location metadata on changes where available. Secret references are stored as references, not values, for example:
+Plan artifacts are JSON and intended to be inspectable. They include an artifact version, target metadata, dumped project/resources/changes, source identities, diagnostics, aggregate resource/action statistics, source-location metadata on changes where available, and structured diffs for resources that support semantic review. Structured diffs are generated through HostKit's diff wrapper around JSON Patch concepts; HostKit stores its own stable diff structs rather than exposing the dependency as the artifact contract. Dotenv/INI/YAML resources diff public keys or paths. Templates diff public assign metadata and redacted assign names, not arbitrary rendered text. Secret references are stored as references, not values, for example:
 
 ```json
 {
@@ -847,7 +847,7 @@ Resources store normalized integer modes, so plan/apply remains simple.
 
 ## Env files and secrets
 
-HostKit has a Dotenvy-validated `dotenv` resource for explicit env files. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries; secret entry values are not read into plan artifacts for comparison. Use `secret KEY, env: :redacted` for existing/generated env-file secrets that should be modeled but never rendered by HostKit. Secret sources support `env: "NAME"`, `file: "/run/secrets/name"`, and `command: ["pass", "show", "name"]`.
+HostKit has a Dotenvy-validated `dotenv` resource for explicit env files. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries with structured key-level diffs; secret entry values are not read into plan artifacts for comparison. Use `secret KEY, env: :redacted` for existing/generated env-file secrets that should be modeled but never rendered by HostKit. Secret sources support `env: "NAME"`, `file: "/run/secrets/name"`, and `command: ["pass", "show", "name"]`.
 
 ```elixir
 service :web do
@@ -900,7 +900,7 @@ service :forgejo, path: "forgejo" do
 end
 ```
 
-Secret or redacted INI/YAML values are omitted from public drift comparison. HostKit decodes YAML with `yaml_elixir` for public-path comparison and renders YAML scalars with `ymlr`; HostKit does not hand-roll YAML quoting/parsing. `env: :redacted` is useful for modeling existing generated secrets without storing or rendering them, and it is intentionally not renderable during apply. Use an env-backed secret when HostKit should render the file during apply:
+Secret or redacted INI/YAML values are omitted from public drift comparison. For public values, HostKit produces structured plan diffs with operations, paths, before/after values, and human-readable output such as `~ server.HTTP_PORT: 3000 -> 4000`; redacted values are reported as redacted paths without reading or storing their actual values. HostKit decodes YAML with `yaml_elixir` for public-path comparison, renders YAML scalars with `ymlr`, and uses JSON Patch-style operations internally for structured diffs; HostKit does not hand-roll YAML quoting/parsing. `env: :redacted` is useful for modeling existing generated secrets without storing or rendering them, and it is intentionally not renderable during apply. Use an env-backed secret when HostKit should render the file during apply:
 
 ```elixir
 secret "TOKEN", env: "APP_TOKEN"
@@ -956,7 +956,7 @@ HostKit.Resources.Template.new("/etc/app.conf",
 )
 ```
 
-Templates support regular EEx bindings (`<%= port %>`) and assigns syntax (`<%= @port %>`). Keep templates inspectable and deterministic; do not hide runtime behavior in templates. Template assigns containing `%HostKit.Secret{}` or `:redacted` are rejected until redacted template diffs are explicitly supported.
+Templates support regular EEx bindings (`<%= port %>`) and assigns syntax (`<%= @port %>`). Assign keys must be atoms because they become EEx bindings. Keep templates inspectable and deterministic; do not hide runtime behavior in templates. Template assigns may contain `%HostKit.Secret{}` references; plans show public assign diffs and redacted assign names without resolving secret values. `:redacted` assign values are useful for modeling existing generated values but cannot be rendered or applied by HostKit.
 
 ## Read, audit, and facts APIs
 

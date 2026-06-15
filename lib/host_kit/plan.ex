@@ -118,11 +118,27 @@ defmodule HostKit.Plan do
        plan
        | resources: Enum.map(changes, & &1.after) |> Enum.reject(&is_nil/1),
          changes: changes,
-         summary: summarize(changes) |> Map.put(:direction, :down),
+         summary:
+           changes
+           |> summarize()
+           |> Map.put(:direction, :down)
+           |> Map.put(:down, down_summary(selected, changes, warnings)),
          diagnostics: diagnostics,
          opts: Keyword.put(plan.opts, :direction, :down)
      }}
   end
+
+  defp down_summary(selected, changes, warnings) do
+    %{
+      source_changes: length(selected),
+      reversible: length(changes),
+      noop: Enum.count(selected, &noop_down_change?/1),
+      skipped: length(warnings)
+    }
+  end
+
+  defp noop_down_change?(%Change{action: :create, after: %Command{down: :noop}}), do: true
+  defp noop_down_change?(_change), do: false
 
   defp merge_down_warnings(%Diagnostics{} = diagnostics, warnings),
     do: %Diagnostics{diagnostics | warnings: diagnostics.warnings ++ warnings}
@@ -305,9 +321,13 @@ defmodule HostKit.Plan do
   defp resolve_resource(%Capability{} = capability, opts), do: Resolver.resolve(capability, opts)
 
   defp resolve_resource(%Template{} = template, _opts) do
-    case Template.render(template) do
-      {:ok, _content} -> {:ok, template}
-      {:error, reason} -> {:error, {:template_render_failed, Template.id(template), reason}}
+    if Template.secret?(template) do
+      {:ok, template}
+    else
+      case Template.render(template) do
+        {:ok, _content} -> {:ok, template}
+        {:error, reason} -> {:error, {:template_render_failed, Template.id(template), reason}}
+      end
     end
   end
 
@@ -431,8 +451,50 @@ defmodule HostKit.Plan do
       resource_id: Resource.id(resource),
       before: actual,
       after: resource,
-      reason: reason
+      reason: reason,
+      diff: diff_for(action, resource, actual)
     }
+  end
+
+  defp diff_for(:update, %ConfigFile{} = desired, actual) do
+    actual_entries = config_actual_entries(desired, actual)
+    diff = HostKit.Diff.config_file(desired, actual_entries)
+    if HostKit.Diff.empty?(diff), do: nil, else: diff
+  end
+
+  defp diff_for(:update, %HostKit.Resources.EnvFile{} = desired, actual) do
+    actual_entries = Map.get(actual.meta, :actual_public_entries)
+    diff = HostKit.Diff.env_file(desired, actual_entries)
+    if HostKit.Diff.empty?(diff), do: nil, else: diff
+  end
+
+  defp diff_for(:update, %Template{} = desired, actual) do
+    diff = HostKit.Diff.template(desired, template_actual_assigns(actual))
+    if HostKit.Diff.empty?(diff), do: nil, else: diff
+  end
+
+  defp diff_for(_action, _resource, _actual), do: nil
+
+  defp template_actual_assigns(%Template{meta: %{actual_public_assigns: assigns}})
+       when is_map(assigns),
+       do: %Template{assigns: assigns}
+
+  defp template_actual_assigns(_actual), do: nil
+
+  defp config_actual_entries(%ConfigFile{} = desired, actual) do
+    cond do
+      Map.has_key?(actual.meta, :actual_public_entries) ->
+        Map.fetch!(actual.meta, :actual_public_entries)
+
+      is_binary(Map.get(actual.meta, :content)) ->
+        case ConfigFile.public_entries_from_content(desired, actual.meta.content) do
+          {:ok, entries} -> entries
+          {:error, _reason} -> :invalid
+        end
+
+      true ->
+        nil
+    end
   end
 
   defp equivalent?(%HostKit.Systemd.Service{} = desired, actual) do
@@ -507,13 +569,17 @@ defmodule HostKit.Plan do
   end
 
   defp equivalent?(%Template{} = desired, actual) do
-    case Template.render(desired) do
-      {:ok, content} ->
-        comparable(desired, actual, [:path, :owner, :group, :mode]) and
-          Map.get(actual.meta, :content) == content
+    if Template.secret?(desired) do
+      false
+    else
+      case Template.render(desired) do
+        {:ok, content} ->
+          comparable(desired, actual, [:path, :owner, :group, :mode]) and
+            Map.get(actual.meta, :content) == content
 
-      {:error, _reason} ->
-        false
+        {:error, _reason} ->
+          false
+      end
     end
   end
 

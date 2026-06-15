@@ -119,15 +119,15 @@ defmodule HostKit.Resources.ConfigFile do
     if HostKit.Secret.secret?(value), do: [], else: [{{nil, to_string(key)}, ini_value(value)}]
   end
 
-  defp ini_secret_paths({section, values}) when is_map(values) or is_list(values) do
+  defp ini_secret_path_segments({section, values}) when is_map(values) or is_list(values) do
     values
     |> normalize_map()
     |> Enum.filter(fn {_key, value} -> HostKit.Secret.secret?(value) end)
-    |> Enum.map(fn {key, _value} -> format_ini_path({to_string(section), to_string(key)}) end)
+    |> Enum.map(fn {key, _value} -> [to_string(section), to_string(key)] end)
   end
 
-  defp ini_secret_paths({key, value}) do
-    if HostKit.Secret.secret?(value), do: [format_ini_path({nil, to_string(key)})], else: []
+  defp ini_secret_path_segments({key, value}) do
+    if HostKit.Secret.secret?(value), do: [[to_string(key)]], else: []
   end
 
   defp ini_pair({key, value}), do: "#{key}=#{ini_value(value)}"
@@ -230,19 +230,26 @@ defmodule HostKit.Resources.ConfigFile do
 
   defp spaces(indent), do: String.duplicate(" ", indent)
 
-  @spec secret_paths(t()) :: [String.t()]
-  def secret_paths(%__MODULE__{format: :ini, content: content}) do
+  @spec secret_path_segments(t()) :: [[String.t() | integer()]]
+  def secret_path_segments(%__MODULE__{format: :ini, content: content}) do
     content
     |> normalize_map()
-    |> Enum.flat_map(&ini_secret_paths/1)
+    |> Enum.flat_map(&ini_secret_path_segments/1)
     |> Enum.sort()
   end
 
-  def secret_paths(%__MODULE__{format: :yaml, content: content}) do
+  def secret_path_segments(%__MODULE__{format: :yaml, content: content}) do
     content
     |> yaml_secret_paths([])
-    |> Enum.map(&format_yaml_path/1)
+    |> Enum.map(&Tuple.to_list/1)
     |> Enum.sort()
+  end
+
+  @spec secret_paths(t()) :: [String.t()]
+  def secret_paths(%__MODULE__{} = config) do
+    config
+    |> secret_path_segments()
+    |> Enum.map(&format_path_segments(config.format, &1))
   end
 
   @spec changed_public_paths(t(), map()) :: [String.t()]
@@ -348,6 +355,10 @@ defmodule HostKit.Resources.ConfigFile do
 
   defp format_public_path(:ini, path), do: format_ini_path(path)
   defp format_public_path(:yaml, path), do: format_yaml_path(path)
+
+  defp format_path_segments(:ini, [key]), do: key
+  defp format_path_segments(:ini, [section, key]), do: "#{section}.#{key}"
+  defp format_path_segments(:yaml, segments), do: format_yaml_path(segments)
 
   defp format_ini_path({nil, key}), do: key
   defp format_ini_path({section, key}), do: "#{section}.#{key}"

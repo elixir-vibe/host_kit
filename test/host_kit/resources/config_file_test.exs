@@ -145,8 +145,12 @@ defmodule HostKit.Resources.ConfigFileTest do
 
     assert {:ok, plan} = HostKit.plan(project, reader: HostKit.Local)
     assert [%Change{action: :update, resource_id: {:yaml, ^path}} = change] = plan.changes
-    assert HostKit.Plan.Format.format_change(change) =~ "public keys: alerting.telegram.id"
-    assert HostKit.Plan.Format.format_change(change) =~ "redacted keys: alerting.telegram.token"
+    assert HostKit.Plan.Format.format_change(change) =~ "public changes:"
+
+    assert HostKit.Plan.Format.format_change(change) =~
+             "~ alerting.telegram.id: \"old-chat-id\" -> \"new-chat-id\""
+
+    assert HostKit.Plan.Format.format_change(change) =~ "redacted paths: alerting.telegram.token"
   after
     cleanup_tmp("config-file-secret-yaml-drift")
   end

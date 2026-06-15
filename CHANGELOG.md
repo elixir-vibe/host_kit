@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added structured, JSON Patch-backed plan diffs for `dotenv/2`, `ini/2`, `yaml/2`, and template assign metadata, with human-readable public changes and separate redacted paths/assigns in plan output/artifacts.
+- Added down-plan coverage summaries to generated down plans and `mix host_kit.down` output.
+
 ## v0.1.0-beta.4 - 2026-06-15
 
 - Added `mix host_kit.read`, `mix host_kit.audit`, and `mix host_kit.facts` wrappers for runtime introspection APIs.

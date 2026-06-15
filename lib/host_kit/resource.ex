@@ -18,6 +18,8 @@ defmodule HostKit.Resource do
                       HostKit.Conventions,
                       HostKit.Diagnostic,
                       HostKit.Diagnostics,
+                      HostKit.Diff,
+                      HostKit.Diff.Entry,
                       HostKit.Endpoint,
                       HostKit.Firewall,
                       HostKit.Firewall.Rule,

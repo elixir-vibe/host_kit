@@ -115,6 +115,7 @@ defmodule HostKit.Plan.Artifact do
       "before" => Resource.dump(change.before),
       "after" => Resource.dump(change.after),
       "reason" => Resource.dump(change.reason),
+      "diff" => Resource.dump(change.diff),
       "source" => change_source(change)
     }
   end
@@ -129,7 +130,8 @@ defmodule HostKit.Plan.Artifact do
       resource_id: Resource.load(Map.fetch!(change, "resource_id")),
       before: Resource.load(Map.fetch!(change, "before")),
       after: Resource.load(Map.fetch!(change, "after")),
-      reason: Resource.load(Map.fetch!(change, "reason"))
+      reason: Resource.load(Map.fetch!(change, "reason")),
+      diff: Resource.load(Map.get(change, "diff"))
     }
   end
 end

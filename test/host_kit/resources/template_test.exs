@@ -14,17 +14,37 @@ defmodule HostKit.Resources.TemplateTest do
     assert Template.render(template) == {:ok, "name=demo\nhost=demo.example.com\n"}
   end
 
-  test "template assigns reject secrets until redacted template diffs are supported" do
-    assert_raise ArgumentError, ~r/assigns cannot contain secrets/, fn ->
+  test "template assigns are normalized and may contain secret references" do
+    template =
       Template.new("/etc/demo.conf",
         source: "token=<%= @token %>\n",
-        assigns: %{token: HostKit.Secret.env("APP_TOKEN")}
+        assigns: [token: HostKit.Secret.env("APP_TOKEN"), port: 4000]
       )
-    end
 
-    assert_raise ArgumentError, ~r/assigns cannot contain secrets/, fn ->
+    assert template.assigns == %{port: 4000, token: HostKit.Secret.env("APP_TOKEN")}
+    assert Template.public_assigns(template) == %{"port" => 4000}
+    assert Template.secret_assigns(template) == ["token"]
+  end
+
+  test "template redacted assigns are not renderable" do
+    template =
       Template.new("/etc/demo.conf", source: "token=<%= @token %>\n", assigns: [token: :redacted])
-    end
+
+    assert Template.render(template) == {:error, :redacted_secret_not_renderable}
+  end
+
+  test "template rendering resolves env-backed secret assigns" do
+    System.put_env("HOSTKIT_TEMPLATE_TOKEN", "secret-value")
+
+    template =
+      Template.new("/etc/demo.conf",
+        source: "token=<%= @token %>\n",
+        assigns: %{token: HostKit.Secret.env("HOSTKIT_TEMPLATE_TOKEN")}
+      )
+
+    assert Template.render(template) == {:ok, "token=secret-value\n"}
+  after
+    System.delete_env("HOSTKIT_TEMPLATE_TOKEN")
   end
 
   test "template DSL resolves relative source paths from the declaring config" do
@@ -67,9 +87,33 @@ defmodule HostKit.Resources.TemplateTest do
     drifted = project_with_template(path, source: "port=<%= @port %>\n", assigns: %{port: 5000})
 
     assert {:ok, plan} = HostKit.plan(drifted, reader: HostKit.Local)
-    assert [%Change{action: :update, resource_id: {:template, ^path}}] = plan.changes
+    assert [%Change{action: :update, resource_id: {:template, ^path}} = change] = plan.changes
+    assert HostKit.Plan.Format.format_change(change) =~ "assign changes:"
+    assert HostKit.Plan.Format.format_change(change) =~ "~ port: :unknown -> 5000"
   after
     cleanup_tmp("template-plan")
+  end
+
+  test "secret-bearing templates produce redacted assign diffs without resolving secrets during plan" do
+    path = Path.join(tmp_dir("template-secret-plan"), "app.conf")
+    File.write!(path, "token=old\n")
+
+    project =
+      project_with_template(path,
+        source: "token=<%= @token %>\nport=<%= @port %>\n",
+        assigns: %{token: HostKit.Secret.env("HOSTKIT_TEMPLATE_MISSING_TOKEN"), port: 4000}
+      )
+
+    assert {:ok, plan} = HostKit.plan(project, reader: HostKit.Local)
+    assert [%Change{action: :update, resource_id: {:template, ^path}} = change] = plan.changes
+
+    formatted = HostKit.Plan.Format.format_change(change)
+    assert formatted =~ "assign changes:"
+    assert formatted =~ "~ port: :unknown -> 4000"
+    assert formatted =~ "redacted assigns: token"
+    assert formatted =~ "rendered content: diff unavailable"
+  after
+    cleanup_tmp("template-secret-plan")
   end
 
   test "apply writes rendered template content" do

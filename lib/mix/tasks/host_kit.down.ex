@@ -48,7 +48,7 @@ defmodule Mix.Tasks.HostKit.Down do
 
       {:ok, down_plan} = HostKit.down(plan, down_opts(opts))
       maybe_write_artifact(down_plan, opts)
-      IO.puts(Mix.Tasks.HostKit.Output.format_plan(down_plan, opts))
+      IO.puts(format_down_plan(down_plan, opts))
     end)
   end
 
@@ -128,6 +128,39 @@ defmodule Mix.Tasks.HostKit.Down do
     String.to_existing_atom(type)
   rescue
     ArgumentError -> Mix.raise("unknown resource type: #{inspect(type)}")
+  end
+
+  defp format_down_plan(plan, opts) do
+    case Keyword.get(opts, :format, "text") do
+      "text" ->
+        [format_down_report(plan), "\n", Mix.Tasks.HostKit.Output.format_plan(plan, opts)]
+        |> IO.iodata_to_binary()
+
+      _format ->
+        Mix.Tasks.HostKit.Output.format_plan(plan, opts)
+    end
+  end
+
+  defp format_down_report(plan) do
+    report = HostKit.Plan.Summary.down_report(plan)
+
+    [
+      "Down plan: ",
+      to_string(report.reversible_changes),
+      " reversible, ",
+      to_string(report.noop_changes),
+      " explicit no-op, ",
+      to_string(report.skipped_changes),
+      " skipped of ",
+      to_string(report.source_changes),
+      " original changes (",
+      to_string(report.reversible_percent),
+      "% covered)",
+      "\nSkipped by type: ",
+      Mix.Tasks.HostKit.Output.format_counts(report.skipped_by_type),
+      "\nSkipped by reason: ",
+      Mix.Tasks.HostKit.Output.format_counts(report.skipped_by_reason)
+    ]
   end
 
   defp maybe_write_artifact(plan, opts) do

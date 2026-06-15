@@ -42,7 +42,7 @@ mix host_kit.plan --host prod --package-lock host_kit.package.lock --out host_ki
 
 ## `mix host_kit.down`
 
-Build a down/rollback plan from an existing plan artifact. Rollback is just another plan: inspect the generated down plan, then apply it.
+Build a down/rollback plan from an existing plan artifact. Rollback is represented as another HostKit plan: inspect the generated down plan, then apply it.
 
 ```sh
 mix host_kit.down [options] [up.plan.json]

@@ -188,7 +188,7 @@ For ordinary updates:
 
 ### Down plans
 
-`HostKit.down(plan)` reverses supported changes into another `%HostKit.Plan{}`.
+`HostKit.down(plan)` reverses supported changes into another `%HostKit.Plan{}`. Down-plan coverage is stored on the plan summary; it is not a separate rollback entity.
 
 ```mermaid
 flowchart TD

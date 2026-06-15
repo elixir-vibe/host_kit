@@ -152,6 +152,40 @@ defmodule HostKit.Plan.DownTest do
     assert down_plan.diagnostics.warnings == []
   end
 
+  test "down plan records coverage summary" do
+    file = %HostKit.Resources.File{path: "/tmp/app.env", content: "new"}
+    package = %HostKit.Resources.Package{name: :git}
+    command = HostKit.Resources.Command.new(:warm_cache, exec: {"bin/app", ["warm"]}, down: :noop)
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :rollback_test},
+      changes: [
+        %Change{action: :create, resource_id: {:file, file.path}, after: file},
+        %Change{action: :create, resource_id: {:package, :git}, after: package},
+        %Change{action: :create, resource_id: {:command, :warm_cache}, after: command}
+      ]
+    }
+
+    assert {:ok, down_plan} = HostKit.down(plan)
+
+    assert down_plan.summary.down == %{
+             source_changes: 3,
+             reversible: 1,
+             noop: 1,
+             skipped: 1
+           }
+
+    assert HostKit.Plan.Summary.down_report(down_plan) == %{
+             source_changes: 3,
+             reversible_changes: 1,
+             noop_changes: 1,
+             skipped_changes: 1,
+             reversible_percent: 66.7,
+             skipped_by_reason: %{"delete_not_supported" => 1},
+             skipped_by_type: %{"package" => 1}
+           }
+  end
+
   test "down plan records warnings for irreversible resources" do
     package = %HostKit.Resources.Package{name: :git}
 

@@ -39,6 +39,7 @@ defmodule Mix.Tasks.HostKit.DownTest do
     assert :ok = Artifact.save(up_path, plan)
 
     output = capture_io(fn -> Down.run([up_path, "--out", down_path]) end)
+    assert output =~ "Down plan: 1 reversible, 0 explicit no-op, 0 skipped of 1 original changes"
     assert output =~ "1 to update"
     assert output =~ "file./tmp/demo"
 

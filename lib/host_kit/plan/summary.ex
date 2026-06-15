@@ -87,6 +87,35 @@ defmodule HostKit.Plan.Summary do
       "drift_by_type" => drift_counts_by_type(plan),
       "redacted_config_entries" => redacted_config_count(plan)
     }
+    |> maybe_put_down_plan(plan)
+  end
+
+  defp maybe_put_down_plan(stats, %Plan{summary: %{direction: :down}} = plan),
+    do: Map.put(stats, "down_plan", down_report(plan))
+
+  defp maybe_put_down_plan(stats, _plan), do: stats
+
+  @spec down_report(Plan.t()) :: map()
+  def down_report(%Plan{} = plan) do
+    source_total = get_in(plan.summary, [:down, :source_changes]) || length(plan.changes)
+    skipped = irreversible_warnings(plan.diagnostics)
+    reversible = length(plan.changes)
+    noop = get_in(plan.summary, [:down, :noop]) || 0
+
+    %{
+      source_changes: source_total,
+      reversible_changes: reversible,
+      noop_changes: noop,
+      skipped_changes: length(skipped),
+      reversible_percent: percent(reversible + noop, source_total),
+      skipped_by_reason: skipped_by_reason(skipped),
+      skipped_by_type: skipped_by_type(skipped)
+    }
+  end
+
+  @spec irreversible_warnings(HostKit.Diagnostics.t()) :: [HostKit.Diagnostic.t()]
+  def irreversible_warnings(%HostKit.Diagnostics{} = diagnostics) do
+    Enum.filter(diagnostics.warnings, &(&1.code == :irreversible_change))
   end
 
   @spec audit_report(Plan.t()) :: map()
@@ -144,6 +173,24 @@ defmodule HostKit.Plan.Summary do
   defp resource_id_name({type, _name}), do: to_string(type)
   defp resource_id_name(%HostKit.Addr.Resource{type: type}), do: to_string(type)
   defp resource_id_name(_resource_id), do: "unknown"
+
+  defp skipped_by_reason(warnings) do
+    warnings
+    |> Enum.frequencies_by(&to_string(&1.details.reason))
+    |> sort_map()
+  end
+
+  defp skipped_by_type(warnings) do
+    warnings
+    |> Enum.frequencies_by(&warning_resource_type/1)
+    |> sort_map()
+  end
+
+  defp warning_resource_type(%{resource_id: resource_id}), do: resource_id_name(resource_id)
+  defp warning_resource_type(_warning), do: "unknown"
+
+  defp percent(_covered, 0), do: 100
+  defp percent(covered, total), do: Float.round(covered * 100 / total, 1)
 
   defp stringify_keys(counts, keys) do
     keys

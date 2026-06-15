@@ -156,6 +156,11 @@ defmodule HostKit.EnvFileTest do
     end
 
     assert {:ok, plan} = HostKit.plan(project, reader: EnvFileDriftReader)
-    assert [%{action: :update, reason: :drift}] = plan.changes
+    assert [%{action: :update, reason: :drift} = change] = plan.changes
+
+    formatted = HostKit.Plan.Format.format_change(change)
+    assert formatted =~ "public changes:"
+    assert formatted =~ "~ PORT: \"4000\" -> \"4001\""
+    assert formatted =~ "redacted paths: SECRET_KEY_BASE"
   end
 end

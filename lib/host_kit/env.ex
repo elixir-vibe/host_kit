@@ -13,6 +13,16 @@ defmodule HostKit.Env do
     |> Map.new()
   end
 
+  @spec secret_paths(EnvFile.t()) :: [String.t()]
+  def secret_paths(%EnvFile{entries: entries}) do
+    entries
+    |> Enum.flat_map(fn
+      {:secret, key, _secret} -> [key]
+      _entry -> []
+    end)
+    |> Enum.sort()
+  end
+
   @spec public_entries_from_content(String.t(), [String.t()]) :: {:ok, map()} | {:error, term()}
   def public_entries_from_content(content, keys) do
     with {:ok, entries} <- parse(content) do

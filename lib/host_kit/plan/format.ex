@@ -133,6 +133,13 @@ defmodule HostKit.Plan.Format do
     ]
   end
 
+  defp format_details(%Change{
+         after: %HostKit.Resources.ConfigFile{},
+         diff: %HostKit.Diff{} = diff
+       }) do
+    format_structured_diff(diff)
+  end
+
   defp format_details(%Change{after: %HostKit.Resources.ConfigFile{} = config_file} = change) do
     if HostKit.Resources.ConfigFile.secret?(config_file) do
       actual_entries = change.before && Map.get(change.before.meta, :actual_public_entries)
@@ -143,15 +150,17 @@ defmodule HostKit.Plan.Format do
       secret_paths = HostKit.Resources.ConfigFile.secret_paths(config_file)
 
       [
-        "\n  public keys: ",
+        "\n  public changes: ",
         format_config_entries(changed_entries),
-        "\n  redacted keys: ",
+        "\n  redacted paths: ",
         format_config_paths(secret_paths)
       ]
     else
       []
     end
   end
+
+  defp format_details(%Change{diff: %HostKit.Diff{} = diff}), do: format_structured_diff(diff)
 
   defp format_details(%Change{after: %HostKit.Resources.Source{} = source}) do
     [
@@ -215,6 +224,71 @@ defmodule HostKit.Plan.Format do
 
   defp format_paths(label, paths) do
     ["\n  ", label, ": ", Enum.map_join(paths, ", ", &format_path/1)]
+  end
+
+  defp format_structured_diff(%HostKit.Diff{format: :template} = diff) do
+    [
+      format_public_diff(diff.changes, "assign changes"),
+      format_redacted_paths(diff.redacted_paths, "redacted assigns"),
+      "\n  rendered content: diff unavailable for templates with secret or unknown assigns"
+    ]
+  end
+
+  defp format_structured_diff(%HostKit.Diff{} = diff) do
+    [
+      format_public_diff(diff.changes, "public changes"),
+      format_redacted_paths(diff.redacted_paths, "redacted paths")
+    ]
+  end
+
+  defp format_public_diff([], label), do: ["\n  ", label, ": none"]
+
+  defp format_public_diff(changes, label) do
+    [
+      "\n  ",
+      label,
+      ":",
+      changes
+      |> Enum.sort_by(&HostKit.Diff.Entry.render_path/1)
+      |> Enum.map(fn entry -> ["\n    ", diff_mark(entry.op), " ", format_diff_entry(entry)] end)
+    ]
+  end
+
+  defp diff_mark(:add), do: "+"
+  defp diff_mark(:remove), do: "-"
+  defp diff_mark(:replace), do: "~"
+  defp diff_mark(_op), do: "~"
+
+  defp format_diff_entry(%HostKit.Diff.Entry{op: :add} = entry) do
+    [HostKit.Diff.Entry.render_path(entry), ": ", inspect(entry.after)]
+  end
+
+  defp format_diff_entry(%HostKit.Diff.Entry{op: :remove} = entry) do
+    [HostKit.Diff.Entry.render_path(entry), ": ", inspect(entry.before)]
+  end
+
+  defp format_diff_entry(%HostKit.Diff.Entry{} = entry) do
+    [
+      HostKit.Diff.Entry.render_path(entry),
+      ": ",
+      inspect(entry.before),
+      " -> ",
+      inspect(entry.after)
+    ]
+  end
+
+  defp format_redacted_paths([], label), do: ["\n  ", label, ": none"]
+
+  defp format_redacted_paths(paths, label) do
+    [
+      "\n  ",
+      label,
+      ": ",
+      paths
+      |> Enum.map(&HostKit.Diff.Entry.render_path/1)
+      |> Enum.sort()
+      |> Enum.join(", ")
+    ]
   end
 
   defp format_config_entries([]), do: "none"

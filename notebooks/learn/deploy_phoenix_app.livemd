@@ -13,6 +13,7 @@ host_kit_dep =
 Mix.install([
   {:kino, "~> 0.19"},
   {:req, "~> 0.5"},
+  {:jsonpatch, "~> 2.3"},
   {:yaml_elixir, "~> 2.11"},
   {:ymlr, "~> 5.1"},
   host_kit_dep
