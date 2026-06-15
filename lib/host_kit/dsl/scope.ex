@@ -36,6 +36,10 @@ defmodule HostKit.DSL.Scope do
     end
   end
 
+  def current_project do
+    Process.get(@project_key) || raise "no HostKit project in scope"
+  end
+
   def finish_project do
     Process.delete(@project_key) || raise "no HostKit project in scope"
   end

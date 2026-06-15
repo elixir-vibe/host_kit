@@ -49,6 +49,12 @@ defmodule HostKit.Providers.Gatus.Scope do
     Enum.each(endpoints, &add_endpoint_config/1)
   end
 
+  def add_monitor_endpoints(opts) do
+    HostKit.DSL.Scope.current_project()
+    |> HostKit.Providers.Gatus.endpoints_from_monitors(opts)
+    |> add_endpoints()
+  end
+
   def finish_config do
     %{path: path, opts: opts, content: content} =
       Process.delete(@config_key) || raise "no gatus config in scope"

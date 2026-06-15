@@ -201,6 +201,18 @@ Providers should keep generated resources inspectable. For example, the Gatus pr
 use HostKit.DSL, providers: [HostKit.Providers.Gatus]
 
 project :demo, providers: [HostKit.Providers.Gatus] do
+  service :api do
+    file "/srv/api/health.txt", content: "ok"
+
+    monitor :http,
+      name: "API",
+      group: "demo",
+      url: "https://api.example.com/health",
+      interval: "1m",
+      expect: [status: 200],
+      alerts: [:telegram]
+  end
+
   service :monitoring do
     gatus_config path(:config, "gatus.yaml"), owner: "root", group: service_user(), mode: 0o640 do
       web address: "127.0.0.1", port: 8080
@@ -210,16 +222,7 @@ project :demo, providers: [HostKit.Providers.Gatus] do
         default_alert enabled: true, "failure-threshold": 3, "success-threshold": 2
       end
 
-      gatus_endpoints HostKit.Providers.Gatus.endpoints_from_monitors([
-        HostKit.Monitor.check(:http,
-          name: "API",
-          group: "demo",
-          url: "https://api.example.com/health",
-          interval: "1m",
-          expect: [status: 200],
-          alerts: [:telegram]
-        )
-      ])
+      gatus_monitor_endpoints order: ["API"]
     end
   end
 end

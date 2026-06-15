@@ -25,6 +25,56 @@ defmodule HostKit.Providers.GatusTest do
            ]
   end
 
+  test "gatus_monitor_endpoints renders monitors from resources declared earlier" do
+    project =
+      Code.eval_string("""
+      use HostKit.DSL, providers: [HostKit.Providers.Gatus]
+
+      project :monitoring, providers: [HostKit.Providers.Gatus] do
+        service :app do
+          file "/srv/app/health.txt", content: "ok"
+
+          monitor :http,
+            name: "App",
+            url: "https://app.example.com/health",
+            expect: [status: 200, response_time_lt: 5000]
+        end
+
+        service :monitoring do
+          gatus_config "/etc/gatus/gatus.yaml" do
+            gatus_monitor_endpoints group: "demo", interval: "1m", alerts: [:telegram]
+          end
+        end
+      end
+      """)
+      |> elem(0)
+
+    assert [%HostKit.Resources.File{}, %HostKit.Resources.ConfigFile{} = config] =
+             HostKit.Project.resources(project)
+
+    assert Keyword.fetch!(config.content, :endpoints) == [
+             [
+               name: "App",
+               group: "demo",
+               url: "https://app.example.com/health",
+               interval: "1m",
+               conditions: ["[STATUS] == 200", "[RESPONSE_TIME] < 5000"],
+               alerts: [[type: "telegram"]]
+             ]
+           ]
+  end
+
+  test "orders rendered monitor endpoints by name when requested" do
+    checks = [
+      HostKit.Monitor.check(:http, name: "B", url: "https://b.example.com"),
+      HostKit.Monitor.check(:http, name: "A", url: "https://a.example.com")
+    ]
+
+    assert [first, second] = HostKit.Providers.Gatus.endpoints_from_monitors(checks, order: ["A"])
+    assert first[:name] == "A"
+    assert second[:name] == "B"
+  end
+
   test "gatus_config emits a plain structured YAML resource" do
     project =
       Code.eval_string("""

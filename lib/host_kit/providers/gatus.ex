@@ -13,6 +13,7 @@ defmodule HostKit.Providers.Gatus do
   def endpoints_from_monitors(project_or_checks, opts \\ []) do
     project_or_checks
     |> HostKit.Monitor.endpoint_checks(opts)
+    |> sort_endpoints(opts)
     |> Enum.map(&endpoint/1)
   end
 
@@ -27,6 +28,20 @@ defmodule HostKit.Providers.Gatus do
       alerts: alerts(endpoint.alerts)
     ]
     |> Enum.reject(fn {_key, value} -> is_nil(value) or value == [] end)
+  end
+
+  defp sort_endpoints(endpoints, opts) do
+    order = Keyword.get(opts, :order, [])
+
+    if order == [] do
+      endpoints
+    else
+      positions = order |> Enum.with_index() |> Map.new()
+
+      Enum.sort_by(endpoints, fn endpoint ->
+        Map.get(positions, endpoint.name, length(order))
+      end)
+    end
   end
 
   defp conditions(%Endpoint{expect: expect}) do

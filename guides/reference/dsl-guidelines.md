@@ -485,6 +485,7 @@ Legend:
 | `default_alert` | Reference | Set Telegram default alert options. |
 | `gatus_endpoint` | Reference | Add a Gatus endpoint without conflicting with core `endpoint`. |
 | `gatus_endpoints` | Reference | Add pre-rendered Gatus endpoints, typically from `HostKit.Providers.Gatus.endpoints_from_monitors/2`. |
+| `gatus_monitor_endpoints` | Reference | Add Gatus endpoints generated from previously declared core monitor metadata. |
 
 ### Elixir app recipe
 
