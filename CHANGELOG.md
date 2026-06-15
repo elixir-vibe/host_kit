@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `mix host_kit.read`, `mix host_kit.audit`, and `mix host_kit.facts` wrappers for runtime introspection APIs.
+- Expanded `HostKit.Facts.collect/2` to return structured users, systemd failed units, and listening ports.
+- Added redacted env-file secrets via `secret KEY, env: :redacted` and richer safe public-value config diff output.
+
 ## v0.1.0-beta.3 - 2026-06-15
 
 - Replaced service-scoped `root_path/2` with unified `path/2`; conventional service roots are scoped by service context, while custom/global roots remain root-relative.

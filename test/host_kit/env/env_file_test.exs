@@ -11,6 +11,7 @@ defmodule HostKit.EnvFileTest do
           set :mix_env, :prod
           set :PORT, 4000
           secret :SECRET_KEY_BASE, env: "HOST_KIT_TEST_SECRET"
+          secret :GENERATED_TOKEN, env: :redacted
         end
       end
     end
@@ -27,7 +28,8 @@ defmodule HostKit.EnvFileTest do
     assert env_file.entries == [
              {:set, "MIX_ENV", "prod"},
              {:set, "PORT", "4000"},
-             {:secret, "SECRET_KEY_BASE", HostKit.Secret.env("HOST_KIT_TEST_SECRET")}
+             {:secret, "SECRET_KEY_BASE", HostKit.Secret.env("HOST_KIT_TEST_SECRET")},
+             {:secret, "GENERATED_TOKEN", :redacted}
            ]
   end
 
@@ -49,6 +51,15 @@ defmodule HostKit.EnvFileTest do
     assert content =~ ~s(SECRET="hello # world")
   after
     System.delete_env("HOST_KIT_TEST_SECRET")
+  end
+
+  test "redacted env file secrets are not renderable" do
+    env_file = %HostKit.Resources.EnvFile{
+      path: "/etc/app/env",
+      entries: [{:secret, "SECRET", :redacted}]
+    }
+
+    assert HostKit.Env.render(env_file) == {:error, :redacted_secret_not_renderable}
   end
 
   test "missing secret envs fail rendering" do

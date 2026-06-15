@@ -21,7 +21,14 @@ defmodule HostKit.FactsTest do
 
     assert facts.os.os_release["NAME"] == "DemoOS"
     assert facts.os.kernel == "Linux 1.2.3"
-    assert facts.users == ["root", "demo"]
+    assert Enum.map(facts.users, & &1.name) == ["root", "demo"]
+    assert hd(facts.users).uid == 0
     refute Map.has_key?(facts, :ports)
+  end
+
+  test "collects structured listening ports" do
+    assert {:ok, facts} = HostKit.Facts.collect(runner: Runner, only: [:ports])
+
+    assert facts.ports == [%{address: "127.0.0.1", port: 4000, process: ""}]
   end
 end

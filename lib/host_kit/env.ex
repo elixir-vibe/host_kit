@@ -43,6 +43,9 @@ defmodule HostKit.Env do
 
   defp render_entry({:set, key, value}, _opts), do: {:ok, "#{key}=#{quote_value(value)}"}
 
+  defp render_entry({:secret, _key, :redacted}, _opts),
+    do: {:error, :redacted_secret_not_renderable}
+
   defp render_entry({:secret, key, %HostKit.Secret{} = secret}, _opts) do
     {:ok, "#{key}=#{quote_value(HostKit.Secret.resolve!(secret))}"}
   rescue

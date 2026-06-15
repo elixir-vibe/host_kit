@@ -117,7 +117,7 @@ mix host_kit.apply --host app \
   infra/config.exs
 ```
 
-`secret_env/1` stores an environment-variable reference. Plan artifacts include the variable name, not the resolved secret value. Runtime callers can use `HostKit.Project.audit/2`, `HostKit.Project.read/2`, and `HostKit.Facts.collect/2` directly; Mix tasks are wrappers around those inspectable APIs.
+`secret_env/1` stores an environment-variable reference. Plan artifacts include the variable name, not the resolved secret value. Runtime callers can use `HostKit.Project.audit/2`, `HostKit.Project.read/2`, and `HostKit.Facts.collect/2` directly; `mix host_kit.audit`, `mix host_kit.read`, and `mix host_kit.facts` are wrappers around those inspectable APIs.
 
 ## Managed local demo instance
 

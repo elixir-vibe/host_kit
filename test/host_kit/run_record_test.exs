@@ -82,6 +82,54 @@ defmodule HostKit.RunRecordTest do
            ] = restored_plan.changes
   end
 
+  test "tracked apply does not back up redacted structured config content" do
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "hostkit-runs-redacted-config-#{System.unique_integer([:positive])}"
+      )
+
+    path = Path.join(root, "app.ini")
+    runs_root = Path.join(root, "runs")
+    backups_root = Path.join(root, "backups")
+    File.mkdir_p!(root)
+    File.write!(path, "[server]\nTOKEN=actual-secret\n")
+    on_exit(fn -> File.rm_rf(root) end)
+
+    before =
+      HostKit.Resources.ConfigFile.new(path, :ini,
+        content: [server: [TOKEN: :redacted]],
+        meta: %{actual_public_entries: %{}}
+      )
+
+    after_resource =
+      HostKit.Resources.ConfigFile.new(path, :ini, content: [server: [DOMAIN: "example.test"]])
+
+    plan = %Plan{
+      project: %HostKit.Project{name: :tracked},
+      changes: [
+        %Change{
+          action: :update,
+          resource_id: {:ini, path},
+          before: before,
+          after: after_resource
+        }
+      ]
+    }
+
+    assert {:ok, _results} =
+             HostKit.apply(plan,
+               confirm: true,
+               track: true,
+               hostkit_runs_root: runs_root,
+               hostkit_backups_root: backups_root
+             )
+
+    assert {:ok, record} = HostKit.RunRecord.latest(hostkit_runs_root: runs_root)
+    assert record.backups == %{}
+    assert Path.wildcard(Path.join([backups_root, "**", "*.bak"])) == []
+  end
+
   test "backup refs are applied to file-like resource metadata" do
     backup_path =
       Path.join(System.tmp_dir!(), "hostkit-backup-#{System.unique_integer([:positive])}")

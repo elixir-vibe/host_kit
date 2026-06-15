@@ -246,22 +246,40 @@ defmodule HostKit.Resources.ConfigFile do
   end
 
   @spec changed_public_paths(t(), map()) :: [String.t()]
-  def changed_public_paths(%__MODULE__{} = desired, actual_entries) when is_map(actual_entries) do
+  def changed_public_paths(%__MODULE__{} = desired, actual_entries) do
+    desired
+    |> changed_public_entries(actual_entries)
+    |> Enum.map(& &1.path)
+  end
+
+  @spec changed_public_entries(t(), map() | :invalid | nil) :: [map()]
+  def changed_public_entries(%__MODULE__{} = desired, actual_entries)
+      when is_map(actual_entries) do
     desired
     |> public_entries()
     |> Enum.reject(fn {path, value} -> Map.get(actual_entries, path) == value end)
-    |> Enum.map(fn {path, _value} -> format_public_path(desired.format, path) end)
-    |> Enum.sort()
+    |> Enum.map(fn {path, desired_value} ->
+      %{
+        path: format_public_path(desired.format, path),
+        before: Map.get(actual_entries, path),
+        after: desired_value
+      }
+    end)
+    |> Enum.sort_by(& &1.path)
   end
 
-  def changed_public_paths(%__MODULE__{} = desired, :invalid), do: public_path_labels(desired)
-  def changed_public_paths(%__MODULE__{} = desired, nil), do: public_path_labels(desired)
+  def changed_public_entries(%__MODULE__{} = desired, :invalid),
+    do: unknown_public_entries(desired)
 
-  defp public_path_labels(%__MODULE__{} = desired) do
+  def changed_public_entries(%__MODULE__{} = desired, nil), do: unknown_public_entries(desired)
+
+  defp unknown_public_entries(%__MODULE__{} = desired) do
     desired
     |> public_entries()
-    |> Enum.map(fn {path, _value} -> format_public_path(desired.format, path) end)
-    |> Enum.sort()
+    |> Enum.map(fn {path, desired_value} ->
+      %{path: format_public_path(desired.format, path), before: :unknown, after: desired_value}
+    end)
+    |> Enum.sort_by(& &1.path)
   end
 
   defp resolve_secrets(%HostKit.Secret{} = secret) do

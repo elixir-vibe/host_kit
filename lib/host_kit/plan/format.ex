@@ -100,14 +100,14 @@ defmodule HostKit.Plan.Format do
     if HostKit.Resources.ConfigFile.secret?(config_file) do
       actual_entries = change.before && Map.get(change.before.meta, :actual_public_entries)
 
-      changed_paths =
-        HostKit.Resources.ConfigFile.changed_public_paths(config_file, actual_entries)
+      changed_entries =
+        HostKit.Resources.ConfigFile.changed_public_entries(config_file, actual_entries)
 
       secret_paths = HostKit.Resources.ConfigFile.secret_paths(config_file)
 
       [
         "\n  public keys: ",
-        format_config_paths(changed_paths),
+        format_config_entries(changed_entries),
         "\n  redacted keys: ",
         format_config_paths(secret_paths)
       ]
@@ -178,6 +178,14 @@ defmodule HostKit.Plan.Format do
 
   defp format_paths(label, paths) do
     ["\n  ", label, ": ", Enum.map_join(paths, ", ", &format_path/1)]
+  end
+
+  defp format_config_entries([]), do: "none"
+
+  defp format_config_entries(entries) do
+    Enum.map_join(entries, ", ", fn entry ->
+      "#{entry.path} #{inspect(entry.before)} -> #{inspect(entry.after)}"
+    end)
   end
 
   defp format_config_paths([]), do: "none"

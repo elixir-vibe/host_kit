@@ -98,6 +98,72 @@ mix host_kit.apply --host prod --plan host_kit.plan.json --confirm infra/config.
 mix host_kit.apply --host prod --package-lock host_kit.package.lock --dry-run infra/config.exs
 ```
 
+## `mix host_kit.read`
+
+Read current target state for resources declared by a config. This is a read-only introspection wrapper around `HostKit.Project.read/2` / audit planning.
+
+```sh
+mix host_kit.read [options] [config.exs]
+```
+
+Useful options:
+
+- `--local`, `--sudo`
+- `--host NAME`, `--remote HOST`, and SSH flags shared with `plan`
+- `--format text|inspect|json`
+- `--require FILE`
+
+Examples:
+
+```sh
+mix host_kit.read --local infra/config.exs
+mix host_kit.read --host prod --format json infra/config.exs
+```
+
+## `mix host_kit.audit`
+
+Print a compact audit report followed by the normal plan diff. This is intended for drift/no-op review without applying anything.
+
+```sh
+mix host_kit.audit [options] [config.exs]
+```
+
+Useful options:
+
+- target flags shared with `plan`
+- `--ignore type:name`
+- `--package-lock PATH`
+- Repology cache flags shared with `plan`
+- `--format text|inspect|json`
+
+Examples:
+
+```sh
+mix host_kit.audit --local --sudo infra/config.exs
+mix host_kit.audit --host prod --format json infra/config.exs
+```
+
+## `mix host_kit.facts`
+
+Collect bounded host facts through the selected runner.
+
+```sh
+mix host_kit.facts [options] [config.exs]
+```
+
+Useful options:
+
+- `--only os,users,systemd,ports`
+- target flags shared with `plan`
+- `--format text|inspect|json`
+
+Examples:
+
+```sh
+mix host_kit.facts --local --only os,users
+mix host_kit.facts --host prod infra/config.exs --only os,systemd,ports
+```
+
 ## `mix host_kit.instance`
 
 Manage lifecycle for a declared `instance`. The CLI boundary is backend-neutral: HostKit loads the instance declaration and delegates to the instance's declared backend. Backend-specific operational knobs should live in backend configuration or environment, not in generic `plan`/`apply` flags.

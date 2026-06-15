@@ -847,7 +847,7 @@ Resources store normalized integer modes, so plan/apply remains simple.
 
 ## Env files and secrets
 
-HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries; secret entry values are not read into plan artifacts for comparison.
+HostKit has a Dotenvy-validated env file resource. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries; secret entry values are not read into plan artifacts for comparison. Use `secret KEY, env: :redacted` for existing/generated env-file secrets that should be modeled but never rendered by HostKit.
 
 ```elixir
 service :web do
@@ -855,6 +855,7 @@ service :web do
     set :MIX_ENV, :prod
     set :PORT, 4000
     secret :SECRET_KEY_BASE, env: "SECRET_KEY_BASE"
+    secret :GENERATED_TOKEN, env: :redacted
   end
 
   daemon do
@@ -954,7 +955,7 @@ Runtime APIs are primary; Mix tasks wrap them. Besides `HostKit.plan/2`, project
 {:ok, facts} = HostKit.Facts.collect(HostKit.Target.local(:prod), only: [:os, :users, :systemd, :ports])
 ```
 
-`read/2` returns the current snapshots captured for each desired resource. `audit/2` returns the same plan shape as `HostKit.plan/2`, so callers can inspect creates, updates, deletes, read errors, and no-ops without going through Mix tasks.
+`read/2` returns the current snapshots captured for each desired resource. `audit/2` returns the same plan shape as `HostKit.plan/2`, so callers can inspect creates, updates, deletes, read errors, and no-ops without going through Mix tasks. CLI wrappers are available as `mix host_kit.read`, `mix host_kit.audit`, and `mix host_kit.facts`.
 
 ## Runtime isolation
 
