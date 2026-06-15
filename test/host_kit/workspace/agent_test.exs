@@ -6,7 +6,7 @@ defmodule HostKit.WorkspaceAgentTest do
     use HostKit.DSL
 
     project :demo do
-      roots data: "/var/lib/hostkit/workspaces"
+      roots workspaces: "/var/lib/hostkit/workspaces", data: "/var/lib/hostkit/workspaces"
       prefixes user: "hk-", unit: "hk-ws-"
 
       workspace :blog, owner: :alice do
@@ -19,7 +19,7 @@ defmodule HostKit.WorkspaceAgentTest do
     assert [service] = project.services
     assert service.name == :agent
     assert service.meta.workspace == %{name: :blog, owner: :alice}
-    assert service.meta.path_name == "alice/blog/agent"
+    assert service.path == "alice/blog/agent"
 
     assert [user, directory, unit] = service.resources
     assert %HostKit.Resources.Account{name: "hk-alice-blog-agent", system: true} = user

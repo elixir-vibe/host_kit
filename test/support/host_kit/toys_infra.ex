@@ -16,10 +16,10 @@ defmodule HostKit.ToysInfra do
     let(:service_user, do: prefixed(:user, service_name()))
     let(:unit_name, do: prefixed(:unit, service_name()) <> ".service")
 
-    path(:source_dir, root(:source), path_name())
-    path(:data_dir, root(:data), path_name())
-    path(:state_dir, root(:state), path_name())
-    path(:config_dir, root(:config), path_name())
+    path(:source_dir, root(:source), service_path())
+    path(:data_dir, root(:data), service_path())
+    path(:state_dir, root(:state), service_path())
+    path(:config_dir, root(:config), service_path())
 
     macro :standard_user do
       account(service_user(), system: true, home: state_path("home"))

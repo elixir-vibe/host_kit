@@ -76,7 +76,7 @@ Prefer absolute roots for production configs.
 
 ## Service identity and path slugs
 
-Avoid `path_name` in new configs. Prefer the `service` option when the on-disk slug differs from the logical service name:
+Prefer the `service` `path:` option when the on-disk slug differs from the logical service name:
 
 ```elixir
 service :hex_mirror, path: "hex-mirror" do
@@ -84,7 +84,7 @@ service :hex_mirror, path: "hex-mirror" do
 end
 ```
 
-Use logical service names for readability. Use `path:` only when an existing external path/unit/user convention requires a different slug.
+Use logical service names for readability. Use `path:` only when an existing external path/unit/user convention requires a different slug. Do not add a separate directive for this concept.
 
 ## Files and templates
 

@@ -116,24 +116,66 @@ defmodule HostKit.ProjectDSL do
   defp build_service_macros({service_macro, definitions}, roots, prefixes) do
     context = %{roots: roots, prefixes: prefixes, definitions: definitions}
 
-    [build_service_macro(service_macro) | build_definition_macros(definitions, context)]
+    [
+      build_service_macro(service_macro, definitions)
+      | build_definition_macros(definitions, context)
+    ]
   end
 
-  defp build_service_macro(name) do
+  defp build_service_macro(name, definitions) do
+    if service_path_used?(definitions) do
+      build_service_macro_with_path(name)
+    else
+      build_service_macro_without_path(name)
+    end
+  end
+
+  defp build_service_macro_with_path(name) do
     quote do
       defmacro unquote(name)(service_name, opts \\ [], do: block) do
         quote do
-          service unquote(service_name) do
+          service unquote(service_name), unquote(opts) do
             var!(host_kit_project_dsl_service_name) = unquote(service_name)
 
-            var!(host_kit_project_dsl_path_name) =
-              Keyword.get(unquote(opts), :as, unquote(service_name))
+            var!(host_kit_project_dsl_service_path) =
+              Keyword.get(unquote(opts), :path, unquote(service_name))
 
             unquote(block)
           end
         end
       end
     end
+  end
+
+  defp build_service_macro_without_path(name) do
+    quote do
+      defmacro unquote(name)(service_name, opts \\ [], do: block) do
+        quote do
+          service unquote(service_name), unquote(opts) do
+            var!(host_kit_project_dsl_service_name) = unquote(service_name)
+            unquote(block)
+          end
+        end
+      end
+    end
+  end
+
+  defp service_path_used?(definitions) do
+    Enum.any?(definitions, fn definition ->
+      definition
+      |> Tuple.to_list()
+      |> Enum.any?(&service_path_expression?/1)
+    end)
+  end
+
+  defp service_path_expression?(expression) do
+    {_expression, used?} =
+      Macro.prewalk(expression, false, fn
+        {:service_path, _meta, []} = node, _used? -> {node, true}
+        node, used? -> {node, used?}
+      end)
+
+    used?
   end
 
   defp build_definition_macros(definitions, context) do
@@ -243,9 +285,9 @@ defmodule HostKit.ProjectDSL do
     end
   end
 
-  defp expand_expression({:path_name, _meta, []}, _context) do
+  defp expand_expression({:service_path, _meta, []}, _context) do
     quote do
-      var!(host_kit_project_dsl_path_name)
+      var!(host_kit_project_dsl_service_path)
     end
   end
 

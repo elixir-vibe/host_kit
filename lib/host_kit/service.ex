@@ -3,11 +3,15 @@ defmodule HostKit.Service do
 
   @type t :: %__MODULE__{
           name: atom(),
+          path: String.t(),
+          identity: String.t(),
           resources: [struct()],
           meta: map()
         }
 
   defstruct name: nil,
+            path: nil,
+            identity: nil,
             resources: [],
             meta: %{}
 
@@ -15,6 +19,8 @@ defmodule HostKit.Service do
   def new(name, opts \\ []) when is_atom(name) do
     %__MODULE__{
       name: name,
+      path: Keyword.get(opts, :path, HostKit.Naming.path_segment(name)),
+      identity: Keyword.get(opts, :identity, HostKit.Naming.identity_segment(name)),
       resources: Keyword.get(opts, :resources, []),
       meta: Keyword.get(opts, :meta, %{})
     }

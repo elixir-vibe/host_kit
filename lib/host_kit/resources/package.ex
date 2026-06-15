@@ -51,9 +51,5 @@ defmodule HostKit.Resources.Package do
     if Keyword.has_key?(opts, :as), do: :explicit, else: :semantic
   end
 
-  defp default_package_name(name) do
-    name
-    |> to_string()
-    |> String.replace("_", "-")
-  end
+  defp default_package_name(name), do: HostKit.Naming.identity_segment(name)
 end

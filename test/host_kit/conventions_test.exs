@@ -19,6 +19,17 @@ defmodule HostKit.ConventionsTest do
     assert Conventions.backups_root(conventions) == "/srv/hostkit/backups"
   end
 
+  test "workspace root can be configured independently" do
+    assert Conventions.workspaces_root(Conventions.new()) == "/var/lib/hostkit/workspaces"
+
+    assert Conventions.workspaces_root(Conventions.new(roots: %{data: "/srv/workspaces"})) ==
+             "/srv/workspaces"
+
+    assert Conventions.workspaces_root(
+             Conventions.new(roots: %{data: "/srv/workspaces", workspaces: "/mnt/ws"})
+           ) == "/mnt/ws"
+  end
+
   test "specific run tracking roots can be overridden" do
     conventions =
       Conventions.new(

@@ -1,7 +1,7 @@
 defmodule HostKit.Workspace do
   @moduledoc "Helpers for workspace-scoped metadata."
 
-  alias HostKit.{Monitor, Project, Runtime}
+  alias HostKit.{Conventions, Monitor, Project, Runtime}
 
   @spec exec(Project.t(), atom(), atom(), [String.t()], keyword()) ::
           {:ok, term()} | {:error, term()}
@@ -27,7 +27,8 @@ defmodule HostKit.Workspace do
            ),
          command: argv,
          user: Keyword.get(opts, :user, service_user(service)),
-         working_directory: Keyword.get(opts, :working_directory, workspace_dir(service)),
+         working_directory:
+           Keyword.get(opts, :working_directory, workspace_dir(project, service)),
          sandbox: Keyword.get(opts, :sandbox, %{}),
          resources: Keyword.get(opts, :resources, %{})
        )}
@@ -132,9 +133,12 @@ defmodule HostKit.Workspace do
     end
   end
 
-  defp unit_name(service), do: "hk-ws-#{service.meta.identity_name}.service"
-  defp service_user(service), do: service.meta.identity_name && "hk-#{service.meta.identity_name}"
+  defp unit_name(service), do: "hk-ws-#{service.identity}.service"
+  defp service_user(service), do: service.identity && "hk-#{service.identity}"
 
-  defp workspace_dir(service),
-    do: service.meta.path_name && "/var/lib/hostkit/workspaces/#{service.meta.path_name}"
+  defp workspace_dir(project, service) do
+    project.conventions
+    |> Conventions.workspaces_root()
+    |> Path.join(service.path)
+  end
 end

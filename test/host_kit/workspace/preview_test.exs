@@ -6,7 +6,7 @@ defmodule HostKit.WorkspacePreviewTest do
     use HostKit.DSL, providers: [HostKit.Providers.Caddy]
 
     project :demo do
-      roots data: "/var/lib/hostkit/workspaces"
+      roots workspaces: "/var/lib/hostkit/workspaces", data: "/var/lib/hostkit/workspaces"
       prefixes user: "hk-", unit: "hk-ws-"
 
       workspace :blog, owner: :alice do

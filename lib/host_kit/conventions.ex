@@ -7,6 +7,7 @@ defmodule HostKit.Conventions do
         }
 
   @default_state_root "/var/lib/hostkit"
+  @default_workspaces_root "/var/lib/hostkit/workspaces"
 
   defstruct roots: %{}, prefixes: %{}
 
@@ -49,6 +50,18 @@ defmodule HostKit.Conventions do
   @spec backups_root(t() | map()) :: String.t()
   def backups_root(conventions),
     do: root(conventions, :hostkit_backups, Path.join(state_root(conventions), "backups"))
+
+  @doc "Returns the root used for workspace service directories."
+  @spec workspaces_root(t() | map()) :: String.t()
+  def workspaces_root(conventions) do
+    conventions = normalize(conventions)
+
+    root(
+      conventions,
+      :workspaces,
+      root(conventions, :data, @default_workspaces_root)
+    )
+  end
 
   @spec root(t() | map(), atom(), String.t()) :: String.t()
   def root(conventions, name, default) do

@@ -42,7 +42,7 @@ defmodule HostKit.WorkspaceAgentClientTest do
     use HostKit.DSL
 
     project :demo do
-      roots data: "/var/lib/hostkit/workspaces"
+      roots workspaces: "/var/lib/hostkit/workspaces", data: "/var/lib/hostkit/workspaces"
 
       workspace :blog, owner: :alice do
         agent port: 4173

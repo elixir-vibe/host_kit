@@ -77,13 +77,13 @@ defmodule HostKit.ProjectDSLTest do
     assert beta.owner == "app-beta"
   end
 
-  test "service path names can differ from service names" do
+  test "service path slugs can differ from service names" do
     source = """
     use HostKit.DSL
     use HostKit.ToysInfra
 
     project :demo do
-      toy_service :hex_mirror, as: "hex-mirror" do
+      toy_service :hex_mirror, path: "hex-mirror" do
         directory data_path(), owner: service_user()
       end
     end

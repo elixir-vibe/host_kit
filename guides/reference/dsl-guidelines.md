@@ -299,7 +299,6 @@ Legend:
 | `prefixes` | Reference | Declare naming prefixes for users, units, etc. |
 | `tenant` | Reference | Declare a tenant and corresponding workspace scope. |
 | `workspace` | Reference | Scope path and identity conventions for per-user/per-workspace services. |
-| `path_name` | Reference | Override the service path/identity slug. |
 | `put_in_meta` | Escape hatch | Attach arbitrary metadata to the current service. |
 
 ### Hosts, instances, and SSH

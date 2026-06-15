@@ -395,12 +395,6 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro path_name(value) do
-    quote do
-      HostKit.DSL.Scope.set_service_path_name(unquote(value))
-    end
-  end
-
   defmacro put_in_meta(key, value) do
     quote do
       HostKit.DSL.Scope.update_current(:service, &put_in(&1.meta[unquote(key)], unquote(value)))

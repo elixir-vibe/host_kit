@@ -220,7 +220,7 @@ defmodule HostKit.Recipes.ElixirApp do
   end
 
   def assigns(name, opts) when is_atom(name) do
-    path_name = name |> to_string() |> String.replace("_", "-")
+    app_name = HostKit.Naming.identity_segment(name)
     source = Keyword.fetch!(opts, :source)
     phoenix = Keyword.fetch!(opts, :phoenix)
     phoenix_host = Keyword.fetch!(phoenix, :host)
@@ -230,10 +230,10 @@ defmodule HostKit.Recipes.ElixirApp do
     ecto = Keyword.get(opts, :ecto)
 
     app = %{
-      name: path_name,
+      name: app_name,
       service_name: name,
       release_name:
-        release |> Keyword.get(:name, path_name) |> to_string() |> String.replace("-", "_"),
+        release |> Keyword.get(:name, app_name) |> to_string() |> String.replace("-", "_"),
       source: normalize_source(source),
       runtime: %{
         erlang: Keyword.get(runtime, :erlang, @default_erlang),
@@ -250,7 +250,7 @@ defmodule HostKit.Recipes.ElixirApp do
         host: Keyword.get(caddy, :host, phoenix_host),
         listen: Keyword.get(caddy, :listen, ":443")
       },
-      ecto: normalize_ecto(ecto, path_name)
+      ecto: normalize_ecto(ecto, app_name)
     }
 
     paths = paths(app)

@@ -114,13 +114,13 @@ defmodule HostKit.Recipes.Gatehouse do
   end
 
   def release_assigns(name, opts) when is_atom(name) or is_binary(name) do
-    path_name = name |> to_string() |> String.replace("_", "-")
+    gatehouse_name = HostKit.Naming.identity_segment(name)
     source = Keyword.fetch!(opts, :source)
     runtime = Keyword.get(opts, :runtime, [])
     release_path = Keyword.get(opts, :release_path, "/opt/gatehouse")
 
     release = %{
-      name: path_name,
+      name: gatehouse_name,
       service_name: Keyword.get(opts, :service, :gatehouse_release),
       source: normalize_source(source),
       runtime: %{
@@ -140,7 +140,7 @@ defmodule HostKit.Recipes.Gatehouse do
   end
 
   def assigns(name, opts) when is_atom(name) or is_binary(name) do
-    path_name = name |> to_string() |> String.replace("_", "-")
+    gatehouse_name = HostKit.Naming.identity_segment(name)
     release_path = Keyword.get(opts, :release_path, "/opt/gatehouse")
     config_path = Keyword.get(opts, :config_path, "/etc/gatehouse/config.exs")
     state_path = Keyword.get(opts, :state_path, "/var/lib/gatehouse/state.etf")
@@ -148,13 +148,13 @@ defmodule HostKit.Recipes.Gatehouse do
     service_unit = Keyword.get(opts, :service_unit, "gatehouse.service")
 
     %{
-      name: path_name,
+      name: gatehouse_name,
       service_name: Keyword.get(opts, :service, :gatehouse),
       owner: HostKit.Account.name!(Keyword.get(opts, :run_as, "gatehouse")),
       group:
         HostKit.Account.name!(Keyword.get(opts, :group, Keyword.get(opts, :run_as, "gatehouse"))),
       cookie: Keyword.get(opts, :cookie),
-      ready_name: "gatehouse_#{path_name}_ready",
+      ready_name: "gatehouse_#{gatehouse_name}_ready",
       paths: %{
         release: release_path,
         bin: Path.join([release_path, "bin", "gatehouse"]),

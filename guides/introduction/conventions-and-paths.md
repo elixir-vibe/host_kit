@@ -15,10 +15,7 @@ project :toys do
 
   prefixes user: "toys-", unit: "toys-"
 
-  service :forgejo do
-    # Optional: override the path/identity slug used by path/2 and service_user/0.
-    path_name "git"
-
+  service :forgejo, path: "git" do
     account system: true
     storage :data, mode: 0o750
     storage :state, mode: 0o750
@@ -53,7 +50,7 @@ Useful helpers:
 - `service_name()` returns the current service name.
 - `service_user()` returns the convention-derived service account name.
 - `unit_name()` returns the convention-derived systemd unit name.
-- `path_name "slug"` overrides the path/identity slug for one service.
+- `service :name, path: "slug"` overrides the path/identity slug for one service.
 
 For HostKit's own host-side tracking, the default roots are:
 

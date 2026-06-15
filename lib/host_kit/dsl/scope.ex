@@ -317,16 +317,15 @@ defmodule HostKit.DSL.Scope do
   def add_instance_port(name, opts), do: update_instance(&Instance.add_port(&1, name, opts))
 
   def start_service(name, opts) do
-    service = Service.new(name, opts)
     base_name = Keyword.get(opts, :path, Keyword.get(opts, :as, name))
-    path_name = service_path(base_name)
-    identity_name = service_identity(base_name)
 
-    meta =
-      service.meta
-      |> Map.put(:path_name, path_name)
-      |> Map.put(:identity_name, identity_name)
-      |> maybe_put_workspace()
+    service =
+      name
+      |> Service.new(opts)
+      |> Map.put(:path, service_path(base_name))
+      |> Map.put(:identity, service_identity(base_name))
+
+    meta = service.meta |> maybe_put_workspace()
 
     Process.put(@service_key, %{service | meta: meta})
   end
@@ -344,7 +343,7 @@ defmodule HostKit.DSL.Scope do
     workspace = %{
       name: name,
       owner: Keyword.get(opts, :owner, name),
-      path_name: Keyword.get(opts, :path, name),
+      path: Keyword.get(opts, :path, name),
       identity: Keyword.get(opts, :identity)
     }
 
@@ -382,22 +381,18 @@ defmodule HostKit.DSL.Scope do
   def put_prefix(name, prefix),
     do: update_project(&Project.put_convention_prefix(&1, name, prefix))
 
-  def set_service_path_name(path_name) do
-    update_current(:service, &put_in(&1.meta[:path_name], path_name))
-  end
-
   def service_name do
     service = Process.get(@service_key) || raise "no HostKit service in scope"
     service.name
   end
 
-  def service_path_name do
+  def service_path do
     service = Process.get(@service_key) || raise "no HostKit service in scope"
-    Map.get(service.meta, :path_name, service.name)
+    service.path
   end
 
   def service_user do
-    prefixed(:user, service_identity_name())
+    prefixed(:user, service_identity())
   end
 
   def service_account do
@@ -410,12 +405,12 @@ defmodule HostKit.DSL.Scope do
   end
 
   def unit_name(suffix \\ ".service") do
-    prefixed(:unit, service_identity_name()) <> suffix
+    prefixed(:unit, service_identity()) <> suffix
   end
 
-  def service_identity_name do
+  def service_identity do
     service = Process.get(@service_key) || raise "no HostKit service in scope"
-    Map.get(service.meta, :identity_name, service_path_name())
+    service.identity
   end
 
   def path(root, child \\ nil) do
@@ -423,7 +418,7 @@ defmodule HostKit.DSL.Scope do
 
     base =
       if service_scoped_path?(root) do
-        Path.join(base, to_string(service_path_name()))
+        Path.join(base, service_path())
       else
         base
       end
@@ -447,13 +442,13 @@ defmodule HostKit.DSL.Scope do
     do:
       Path.join([
         default_root(:data, "/var/lib"),
-        to_string(service_path_name()),
+        service_path(),
         to_string(name)
       ])
 
   def env_path(name, opts \\ []) do
     Keyword.get(opts, :path) ||
-      Path.join([default_root(:config, "/etc"), to_string(service_path_name()), "#{name}.env"])
+      Path.join([default_root(:config, "/etc"), service_path(), "#{name}.env"])
   end
 
   def put_env(name, path) do
@@ -624,20 +619,20 @@ defmodule HostKit.DSL.Scope do
   defp service_path(name) do
     case Process.get(@workspace_key) do
       nil ->
-        name
+        HostKit.Naming.path_segment(name)
 
       workspace ->
-        Path.join([to_string(workspace.owner), to_string(workspace.path_name), to_string(name)])
+        HostKit.Naming.workspace_path(workspace.owner, workspace.path, name)
     end
   end
 
   defp service_identity(name) do
     case Process.get(@workspace_key) do
       nil ->
-        name
+        HostKit.Naming.identity_segment(name)
 
       workspace ->
-        Enum.join([workspace.owner, workspace.path_name, name], "-") |> String.replace("/", "-")
+        HostKit.Naming.workspace_identity(workspace.owner, workspace.path, name)
     end
   end
 
@@ -668,7 +663,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp default_path(root, fallback) do
-    Path.join(default_root(root, fallback), to_string(service_path_name()))
+    Path.join(default_root(root, fallback), service_path())
   end
 
   defp default_root(root, fallback) do
