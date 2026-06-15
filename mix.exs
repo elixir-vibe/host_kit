@@ -38,6 +38,7 @@ defmodule HostKit.MixProject do
       {:unitctl, "~> 0.1.0"},
       {:jason, "~> 1.4"},
       {:json_codec, "~> 0.1.4"},
+      {:ymlr, "~> 5.1"},
       {:req, "~> 0.5"},
       {:hammer, "~> 7.0"},
       {:dotenvy, "~> 1.1"},

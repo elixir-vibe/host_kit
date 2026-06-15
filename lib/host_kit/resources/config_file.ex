@@ -70,17 +70,29 @@ defmodule HostKit.Resources.ConfigFile do
     |> IO.iodata_to_binary()
   end
 
-  defp yaml_node(%{} = map, indent) do
-    map
-    |> normalize_map()
-    |> Enum.map(fn {key, value} -> yaml_kv(key, value, indent) end)
-  end
+  defp yaml_node(%{} = map, indent), do: yaml_map(normalize_map(map), indent)
 
   defp yaml_node(values, indent) when is_list(values) do
-    Enum.map(values, &yaml_list_item(&1, indent))
+    if Keyword.keyword?(values), do: yaml_map(values, indent), else: yaml_sequence(values, indent)
   end
 
   defp yaml_node(value, _indent), do: yaml_scalar(value)
+
+  defp yaml_map(entries, indent) do
+    separator = if indent == 0, do: "\n", else: ""
+
+    entries
+    |> Enum.map(fn {key, value} -> yaml_kv(key, value, indent) end)
+    |> Enum.intersperse(separator)
+  end
+
+  defp yaml_sequence(values, indent) do
+    separator = if Enum.any?(values, &map_like?/1), do: "\n", else: ""
+
+    values
+    |> Enum.map(&yaml_list_item(&1, indent))
+    |> Enum.intersperse(separator)
+  end
 
   defp yaml_kv(key, value, indent) when is_map(value) or is_list(value) do
     [spaces(indent), yaml_key(key), ":\n", yaml_node(value, indent + 2)]
@@ -89,15 +101,19 @@ defmodule HostKit.Resources.ConfigFile do
   defp yaml_kv(key, value, indent),
     do: [spaces(indent), yaml_key(key), ": ", yaml_scalar(value), "\n"]
 
-  defp yaml_list_item(%{} = value, indent) do
-    pairs = normalize_map(value)
+  defp yaml_list_item(value, indent) when is_map(value) or is_list(value) do
+    if map_like?(value) do
+      pairs = normalize_map(value)
 
-    case pairs do
-      [] ->
-        [spaces(indent), "- {}\n"]
+      case pairs do
+        [] ->
+          [spaces(indent), "- {}\n"]
 
-      [{key, first} | rest] ->
-        [yaml_first_list_pair(key, first, indent), yaml_rest_pairs(rest, indent + 2)]
+        [{key, first} | rest] ->
+          [yaml_first_list_pair(key, first, indent), yaml_rest_pairs(rest, indent + 2)]
+      end
+    else
+      [spaces(indent), "- ", yaml_scalar(value), "\n"]
     end
   end
 
@@ -114,28 +130,20 @@ defmodule HostKit.Resources.ConfigFile do
 
   defp yaml_key(key), do: yaml_scalar(to_string(key))
 
-  defp yaml_scalar(nil), do: "null"
-  defp yaml_scalar(true), do: "true"
-  defp yaml_scalar(false), do: "false"
-  defp yaml_scalar(value) when is_integer(value) or is_float(value), do: to_string(value)
-
-  defp yaml_scalar(value) do
-    value
-    |> to_string()
-    |> yaml_quote()
-  end
-
-  defp yaml_quote(value) do
-    escaped = value |> String.replace("\\", "\\\\") |> String.replace("\"", "\\\"")
-    ~s("#{escaped}")
-  end
+  defp yaml_scalar(value), do: Ymlr.Encode.to_s!(value)
 
   defp spaces(indent), do: String.duplicate(" ", indent)
 
   defp normalize_map(value) when is_map(value),
     do: Enum.sort_by(value, fn {key, _value} -> to_string(key) end)
 
-  defp normalize_map(value) when is_list(value), do: value
+  defp normalize_map(value) when is_list(value) do
+    if Keyword.keyword?(value), do: value, else: raise(ArgumentError, "expected keyword config")
+  end
+
+  defp map_like?(%{}), do: true
+  defp map_like?(value) when is_list(value), do: Keyword.keyword?(value)
+  defp map_like?(_value), do: false
 
   defp normalize_account_name(nil), do: nil
   defp normalize_account_name(name), do: HostKit.Account.name!(name)

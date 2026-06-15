@@ -55,4 +55,5 @@
   "unitctl": {:hex, :unitctl, "0.1.0", "3648f1efe36d106b7cc76eb381f9d98a04e6c1610815d1bfb4b1cc85796e3c96", [:mix], [{:systemdkit, "~> 0.1.1", [hex: :systemdkit, repo: "hexpm", optional: false]}], "hexpm", "6e1b367aec1f2621ee0aa0d6a47cdf1461ccaab760a62eef3baf20ab1a41ee5b"},
   "varint": {:hex, :varint, "1.6.0", "7bced828599b2eb84491a9f067f8a5a67fc35a946d3b7582278083c7fd434b00", [:mix], [], "hexpm", "2b4f4a20650aeebe993a70b03bb99571bcbddc27c361322c28b586d8a772ce4e"},
   "websock": {:hex, :websock, "0.5.3", "2f69a6ebe810328555b6fe5c831a851f485e303a7c8ce6c5f675abeb20ebdadc", [:mix], [], "hexpm", "6105453d7fac22c712ad66fab1d45abdf049868f253cf719b625151460b8b453"},
+  "ymlr": {:hex, :ymlr, "5.1.5", "0b9207c7940be3f2bc29b77cd55109d5aa2f4dcde6575942017335769e6f5628", [:mix], [], "hexpm", "7030cb240c46850caeb3b01be745307632be319b15f03083136f6251f49b516d"},
 }

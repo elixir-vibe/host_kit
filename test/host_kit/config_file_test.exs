@@ -7,10 +7,10 @@ defmodule HostKit.ConfigFileTest do
   test "INI config renders deterministic sections and keys" do
     config =
       ConfigFile.new("/etc/app.ini", :ini,
-        content: %{
-          "server" => %{"HTTP_PORT" => 3000, "DOMAIN" => "git.elixir.toys"},
-          "database" => %{"DB_TYPE" => "sqlite3", "LOG_SQL" => false}
-        }
+        content: [
+          database: [DB_TYPE: "sqlite3", LOG_SQL: false],
+          server: [DOMAIN: "git.elixir.toys", HTTP_PORT: 3000]
+        ]
       )
 
     assert ConfigFile.render(config) ==
@@ -21,21 +21,21 @@ defmodule HostKit.ConfigFileTest do
   test "YAML config renders deterministic maps and lists" do
     config =
       ConfigFile.new("/etc/gatus.yaml", :yaml,
-        content: %{
-          "storage" => %{"type" => "sqlite", "path" => "/var/lib/gatus/gatus.db"},
-          "endpoints" => [
-            %{
-              "name" => "Forgejo",
-              "url" => "https://git.elixir.toys",
-              "conditions" => ["[STATUS] == 200"]
-            }
-          ]
-        }
+        content: [
+          endpoints: [
+            [
+              name: "Forgejo",
+              url: "https://git.elixir.toys",
+              conditions: ["[STATUS] == 200"]
+            ]
+          ],
+          storage: [type: "sqlite", path: "/var/lib/gatus/gatus.db"]
+        ]
       )
 
     assert ConfigFile.render(config) ==
              {:ok,
-              "\"endpoints\":\n  - \"conditions\":\n      - \"[STATUS] == 200\"\n    \"name\": \"Forgejo\"\n    \"url\": \"https://git.elixir.toys\"\n\"storage\":\n  \"path\": \"/var/lib/gatus/gatus.db\"\n  \"type\": \"sqlite\"\n"}
+              "endpoints:\n  - name: Forgejo\n    url: https://git.elixir.toys\n    conditions:\n      - '[STATUS] == 200'\n\nstorage:\n  type: sqlite\n  path: /var/lib/gatus/gatus.db\n"}
   end
 
   test "INI block DSL builds structured config" do
@@ -83,12 +83,12 @@ defmodule HostKit.ConfigFileTest do
 
   test "apply writes rendered structured config" do
     path = Path.join(tmp_dir("config-file-apply"), "etc/gatus.yaml")
-    project = project_with_config(path, :yaml, %{"debug" => true, "port" => 8080})
+    project = project_with_config(path, :yaml, debug: true, port: 8080)
 
     assert {:ok, plan} = HostKit.plan(project, reader: HostKit.Local)
     assert {:ok, [%{status: :applied}]} = HostKit.apply(plan, confirm: true)
 
-    assert File.read!(path) == "\"debug\": true\n\"port\": 8080\n"
+    assert File.read!(path) == "debug: true\n\nport: 8080\n"
   after
     cleanup_tmp("config-file-apply")
   end
