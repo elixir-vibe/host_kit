@@ -71,6 +71,12 @@ project :prod do
       end
     end
 
+    dotenv path(:config, "worker.env"), owner: "root", group: service_user(), mode: 0o640 do
+      set "MIX_ENV", "prod"
+      set "WORKER_POOL", 4
+      secret "GENERATED_TOKEN", env: :redacted
+    end
+
     yaml path(:config, "health.yaml"),
       owner: "root",
       group: service_user(),
@@ -81,9 +87,11 @@ project :prod do
         ]
       ]
 
-    daemon do
+    daemon :api do
       env :runtime
-      exec ["/opt/api/bin/server"]
+      exec argv("/opt/api/bin/server",
+        opts: [config: path(:config, "app.ini"), port: 4000]
+      )
 
       isolate do
         memory_max "512M"
