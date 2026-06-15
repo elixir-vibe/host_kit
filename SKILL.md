@@ -108,7 +108,26 @@ end
 file path(:sbin, "tool"), content: Infra.Files.read("usr/local/sbin/tool")
 ```
 
-Use first-class EEx templates for deterministic rendered files with small assign maps:
+Prefer structured config resources for INI/YAML when the file is naturally data, especially service config such as Forgejo `app.ini` and Gatus YAML:
+
+```elixir
+ini path(:config, "app.ini"), owner: "root", group: service_user(), mode: 0o640 do
+  section "server" do
+    set "DOMAIN", "git.elixir.toys"
+    set "ROOT_URL", "https://git.elixir.toys/"
+  end
+end
+
+yaml path(:config, "gatus.yaml"),
+  content: %{
+    "storage" => %{"type" => "sqlite", "path" => path(:state, "gatus.db")},
+    "endpoints" => [
+      %{"name" => "Forgejo", "url" => "https://git.elixir.toys", "conditions" => ["[STATUS] == 200"]}
+    ]
+  }
+```
+
+Use first-class EEx templates for deterministic rendered text files with small assign maps:
 
 ```elixir
 template path(:config, "app.ini"),
@@ -122,7 +141,7 @@ template path(:config, "app.ini"),
   mode: 0o640
 ```
 
-`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates are first-class resources in plans and render to ordinary managed files during read/apply.
+`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates and structured config resources are first-class resources in plans and render to ordinary managed files during read/apply.
 
 Keep templates inspectable and deterministic. Do not hide runtime behavior or shell workflows in templates. Do not commit secrets; use `content: :redacted` for existing secret-bearing files managed elsewhere, and avoid passing raw secrets as template assigns until redacted template diffs are explicitly supported.
 

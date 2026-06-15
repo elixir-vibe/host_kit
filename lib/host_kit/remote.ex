@@ -82,6 +82,10 @@ defmodule HostKit.Remote do
     read_systemd_unit("/etc/systemd/system/#{name}", desired, context)
   end
 
+  def read(%HostKit.Resources.ConfigFile{} = desired, context) do
+    Helpers.read_config_file(desired, &read(&1, context))
+  end
+
   def read(%HostKit.Resources.Template{} = desired, context) do
     Helpers.read_template(desired, &read(&1, context))
   end

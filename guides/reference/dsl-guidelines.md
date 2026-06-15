@@ -338,6 +338,9 @@ Legend:
 | `directory` | Reference | Declare an explicit directory resource. Prefer `storage` for service data. |
 | `file` | Reference | Declare an explicit file resource. |
 | `template` | Reference | Declare an explicit EEx-rendered file resource. |
+| `ini` | Reference | Declare a structured INI config file resource. |
+| `yaml` | Reference | Declare a structured YAML config file resource. |
+| `section` | Reference | Declare an INI section inside `ini do ... end`. |
 | `symlink` | Reference | Declare an explicit symbolic link resource. |
 | `source` | Reference | Declare a source artifact/repository. |
 | `command` | Escape hatch | Low-level command resource. |

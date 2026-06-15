@@ -37,6 +37,7 @@ defmodule HostKit.Resource do
                       HostKit.Resources.Account,
                       HostKit.Resources.Capability,
                       HostKit.Resources.Command,
+                      HostKit.Resources.ConfigFile,
                       HostKit.Resources.Directory,
                       HostKit.Resources.EnvFile,
                       HostKit.Resources.File,

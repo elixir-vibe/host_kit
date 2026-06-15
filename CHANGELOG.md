@@ -6,6 +6,7 @@
 - Removed the separate service path override directive; use `service :name, path: "slug"` and shared `HostKit.Naming` helpers for path/identity normalization.
 - Centralized generated recipe/provider names in `HostKit.Naming`, including readiness names, ingress route names, workspace unit/user names, Elixir release names, and command/resource names.
 - Added first-class EEx template resources via `template PATH, from: ..., assigns: ...`; templates are inspectable resources and render to managed files during read/apply.
+- Added structured config file resources via `ini/2` and `yaml/2`, including an INI block DSL with `section`/`set`.
 - Added `symlink PATH, to: TARGET` resources with local/remote read support, apply support, rollback deletion, and documentation.
 - Added `target_host` for selecting a nested instance host when an instance has multiple connection endpoints.
 - Documented instance backend authoring callbacks and clarified instance down-plan ordering.

@@ -449,8 +449,8 @@ prod = HostKit.Target.ssh(:prod, host: "elixir.toys", user: "dannote", sudo: tru
 HostKit.format_plan(plan)
 {:ok, results} = HostKit.apply(plan, dry_run: true)
 
-# Supported apply resources include accounts, directories, files, templates, symlinks,
-# env files, systemd units, commands, packages, and provider-rendered files.
+# Supported apply resources include accounts, directories, files, structured configs,
+# templates, symlinks, env files, systemd units, commands, packages, and provider-rendered files.
 {:ok, results} = HostKit.apply(plan, confirm: true, sudo: true)
 
 # Command and filesystem operations are routed through a runner boundary.
@@ -864,9 +864,49 @@ service :web do
 end
 ```
 
+## Structured config files
+
+Use `ini/2` and `yaml/2` when a managed file is naturally data. Structured config resources are first-class resources in plans and render to ordinary managed files during read/apply.
+
+```elixir
+service :forgejo, path: "forgejo" do
+  ini path(:config, "app.ini"), owner: "root", group: service_user(), mode: 0o640 do
+    section "server" do
+      set "DOMAIN", "git.elixir.toys"
+      set "ROOT_URL", "https://git.elixir.toys/"
+      set "HTTP_PORT", 3000
+    end
+
+    section "database" do
+      set "DB_TYPE", "sqlite3"
+      set "PATH", path(:data, "forgejo.db")
+    end
+  end
+end
+```
+
+YAML configs use Elixir data:
+
+```elixir
+yaml path(:config, "gatus.yaml"),
+  content: %{
+    "storage" => %{"type" => "sqlite", "path" => path(:state, "gatus.db")},
+    "endpoints" => [
+      %{
+        "name" => "Forgejo",
+        "url" => "https://git.elixir.toys",
+        "conditions" => ["[STATUS] == 200"]
+      }
+    ]
+  },
+  owner: "root",
+  group: service_user(),
+  mode: 0o640
+```
+
 ## Templates
 
-Use `template/2` for deterministic EEx-rendered file resources. Templates are first-class resources in plans and render to ordinary managed files during read/apply.
+Use `template/2` for deterministic EEx-rendered text resources. Templates are first-class resources in plans and render to ordinary managed files during read/apply.
 
 ```elixir
 service :forgejo, path: "forgejo" do

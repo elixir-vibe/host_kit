@@ -91,10 +91,15 @@ defmodule HostKit.DSL do
 
   defmacro set(key, value) do
     quote do
-      if HostKit.DSL.EnvFile.Scope.active?() do
-        HostKit.DSL.EnvFile.Scope.put_set(unquote(key), unquote(value))
-      else
-        HostKit.DSL.Scope.put_provider_config(unquote(key), unquote(value))
+      cond do
+        HostKit.DSL.EnvFile.Scope.active?() ->
+          HostKit.DSL.EnvFile.Scope.put_set(unquote(key), unquote(value))
+
+        HostKit.DSL.ConfigFile.Scope.active?() ->
+          HostKit.DSL.ConfigFile.Scope.put_set(unquote(key), unquote(value))
+
+        true ->
+          HostKit.DSL.Scope.put_provider_config(unquote(key), unquote(value))
       end
     end
   end
@@ -929,6 +934,38 @@ defmodule HostKit.DSL do
     quote do
       opts = Keyword.put_new(unquote(opts), :base_dir, unquote(base_dir))
       HostKit.DSL.Scope.add_resource(HostKit.Resources.Template.new(unquote(path), opts))
+    end
+  end
+
+  defmacro ini(path, opts \\ []) do
+    quote do
+      HostKit.DSL.Scope.add_resource(
+        HostKit.Resources.ConfigFile.new(unquote(path), :ini, unquote(opts))
+      )
+    end
+  end
+
+  defmacro ini(path, opts, do: block) do
+    quote do
+      HostKit.DSL.ConfigFile.Scope.start(unquote(path), :ini, unquote(opts))
+      unquote(block)
+      HostKit.DSL.Scope.add_resource(HostKit.DSL.ConfigFile.Scope.finish())
+    end
+  end
+
+  defmacro yaml(path, opts) do
+    quote do
+      HostKit.DSL.Scope.add_resource(
+        HostKit.Resources.ConfigFile.new(unquote(path), :yaml, unquote(opts))
+      )
+    end
+  end
+
+  defmacro section(name, do: block) do
+    quote do
+      HostKit.DSL.ConfigFile.Scope.start_section(unquote(name))
+      unquote(block)
+      HostKit.DSL.ConfigFile.Scope.finish_section()
     end
   end
 

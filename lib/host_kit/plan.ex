@@ -8,6 +8,7 @@ defmodule HostKit.Plan do
   alias HostKit.Resources.{
     Capability,
     Command,
+    ConfigFile,
     Directory,
     EnvFile,
     File,
@@ -204,6 +205,7 @@ defmodule HostKit.Plan do
 
   defp down_change(%Change{} = change), do: {:skip, irreversible(change, :not_applied_change)}
 
+  defp delete_supported?(%ConfigFile{}), do: true
   defp delete_supported?(%File{}), do: true
   defp delete_supported?(%EnvFile{}), do: true
   defp delete_supported?(%Directory{rollback: :delete_if_created}), do: true
@@ -491,6 +493,13 @@ defmodule HostKit.Plan do
 
   defp equivalent?(%HostKit.Resources.File{} = desired, actual),
     do: comparable(desired, actual, [:path, :content, :owner, :group, :mode])
+
+  defp equivalent?(%ConfigFile{} = desired, actual) do
+    {:ok, content} = ConfigFile.render(desired)
+
+    comparable(desired, actual, [:path, :format, :owner, :group, :mode]) and
+      Map.get(actual.meta, :content) == content
+  end
 
   defp equivalent?(%Template{} = desired, actual) do
     case Template.render(desired) do
