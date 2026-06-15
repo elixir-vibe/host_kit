@@ -1,7 +1,7 @@
 defmodule HostKit.Workspace do
   @moduledoc "Helpers for workspace-scoped metadata."
 
-  alias HostKit.{Conventions, Monitor, Project, Runtime}
+  alias HostKit.{Conventions, Monitor, Naming, Project, Runtime}
 
   @spec exec(Project.t(), atom(), atom(), [String.t()], keyword()) ::
           {:ok, term()} | {:error, term()}
@@ -133,10 +133,10 @@ defmodule HostKit.Workspace do
     end
   end
 
-  defp unit_name(service), do: HostKit.Naming.systemd_unit("hk-ws-#{service.identity}")
+  defp unit_name(service), do: Naming.systemd_unit("hk-ws-#{service.identity}")
 
   defp service_user(service),
-    do: service.identity && HostKit.Naming.prefixed("hk-", service.identity)
+    do: service.identity && Naming.prefixed("hk-", service.identity)
 
   defp workspace_dir(project, service) do
     project.conventions

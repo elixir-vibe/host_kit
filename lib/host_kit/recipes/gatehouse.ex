@@ -3,6 +3,8 @@ defmodule HostKit.Recipes.Gatehouse do
 
   use HostKit.Recipe
 
+  alias HostKit.Naming
+
   defrecipe gatehouse_release(name, opts) do
     release = __MODULE__.release_assigns(name, opts)
 
@@ -114,7 +116,7 @@ defmodule HostKit.Recipes.Gatehouse do
   end
 
   def release_assigns(name, opts) when is_atom(name) or is_binary(name) do
-    gatehouse_name = HostKit.Naming.identity_segment(name)
+    gatehouse_name = Naming.identity_segment(name)
     source = Keyword.fetch!(opts, :source)
     runtime = Keyword.get(opts, :runtime, [])
     release_path = Keyword.get(opts, :release_path, "/opt/gatehouse")
@@ -140,7 +142,7 @@ defmodule HostKit.Recipes.Gatehouse do
   end
 
   def assigns(name, opts) when is_atom(name) or is_binary(name) do
-    gatehouse_name = HostKit.Naming.identity_segment(name)
+    gatehouse_name = Naming.identity_segment(name)
     release_path = Keyword.get(opts, :release_path, "/opt/gatehouse")
     config_path = Keyword.get(opts, :config_path, "/etc/gatehouse/config.exs")
     state_path = Keyword.get(opts, :state_path, "/var/lib/gatehouse/state.etf")
@@ -154,7 +156,7 @@ defmodule HostKit.Recipes.Gatehouse do
       group:
         HostKit.Account.name!(Keyword.get(opts, :group, Keyword.get(opts, :run_as, "gatehouse"))),
       cookie: Keyword.get(opts, :cookie),
-      ready_name: HostKit.Naming.readiness_name(:gatehouse, gatehouse_name),
+      ready_name: Naming.readiness_name(:gatehouse, gatehouse_name),
       paths: %{
         release: release_path,
         bin: Path.join([release_path, "bin", "gatehouse"]),
@@ -210,9 +212,9 @@ defmodule HostKit.Recipes.Gatehouse do
 
   defp release_commands(release, _paths) do
     %{
-      deps: %{name: HostKit.Naming.resource_name([:gatehouse, release.name, :deps])},
-      release: %{name: HostKit.Naming.resource_name([:gatehouse, release.name, :release])},
-      install: %{name: HostKit.Naming.resource_name([:gatehouse, release.name, :install])}
+      deps: %{name: Naming.resource_name([:gatehouse, release.name, :deps])},
+      release: %{name: Naming.resource_name([:gatehouse, release.name, :release])},
+      install: %{name: Naming.resource_name([:gatehouse, release.name, :install])}
     }
   end
 

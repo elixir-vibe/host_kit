@@ -1,6 +1,8 @@
 defmodule HostKit.Resources.Package do
   @moduledoc "Desired OS package installed through the target package manager."
 
+  alias HostKit.Naming
+
   @type source :: :semantic | :explicit
 
   @type t :: %__MODULE__{
@@ -51,5 +53,5 @@ defmodule HostKit.Resources.Package do
     if Keyword.has_key?(opts, :as), do: :explicit, else: :semantic
   end
 
-  defp default_package_name(name), do: HostKit.Naming.identity_segment(name)
+  defp default_package_name(name), do: Naming.identity_segment(name)
 end

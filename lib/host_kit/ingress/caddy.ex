@@ -3,7 +3,7 @@ defmodule HostKit.Ingress.Caddy do
 
   alias HostKit.Caddy.Directive.ReverseProxy
   alias HostKit.Caddy.Site
-  alias HostKit.Ingress
+  alias HostKit.{Ingress, Naming}
 
   @spec to_sites(Ingress.t()) :: [Site.t()]
   def to_sites(%Ingress{} = ingress) do
@@ -45,5 +45,5 @@ defmodule HostKit.Ingress.Caddy do
 
   defp proxy_upstream(upstream) when is_binary(upstream), do: upstream
 
-  defp site_name(name, host, index), do: HostKit.Naming.ingress_route_name(name, host, index)
+  defp site_name(name, host, index), do: Naming.ingress_route_name(name, host, index)
 end

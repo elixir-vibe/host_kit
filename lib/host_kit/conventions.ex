@@ -1,6 +1,8 @@
 defmodule HostKit.Conventions do
   @moduledoc "Project-level naming and path conventions."
 
+  alias HostKit.Naming
+
   @type t :: %__MODULE__{
           roots: %{optional(atom()) => String.t()},
           prefixes: %{optional(atom()) => String.t()}
@@ -74,7 +76,7 @@ defmodule HostKit.Conventions do
   @spec prefixed(t() | map(), atom(), term()) :: String.t()
   def prefixed(conventions, name, value) do
     prefix = conventions |> normalize() |> Map.fetch!(:prefixes) |> Map.get(name, "")
-    HostKit.Naming.prefixed(prefix, value)
+    Naming.prefixed(prefix, value)
   end
 
   defp normalize(%__MODULE__{} = conventions), do: Map.from_struct(conventions)

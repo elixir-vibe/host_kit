@@ -1,7 +1,7 @@
 defmodule HostKit.DSL.Scope do
   @moduledoc false
 
-  alias HostKit.{Conventions, Host, Instance, Project, ProviderConfig, Service, Storage}
+  alias HostKit.{Conventions, Host, Instance, Naming, Project, ProviderConfig, Service, Storage}
 
   @project_key {__MODULE__, :project}
   @host_key {__MODULE__, :host}
@@ -407,7 +407,7 @@ defmodule HostKit.DSL.Scope do
   def unit_name(suffix \\ ".service") do
     :unit
     |> prefixed(service_identity())
-    |> HostKit.Naming.systemd_unit(suffix)
+    |> Naming.systemd_unit(suffix)
   end
 
   def service_identity do
@@ -621,20 +621,20 @@ defmodule HostKit.DSL.Scope do
   defp service_path(name) do
     case Process.get(@workspace_key) do
       nil ->
-        HostKit.Naming.path_segment(name)
+        Naming.path_segment(name)
 
       workspace ->
-        HostKit.Naming.workspace_path(workspace.owner, workspace.path, name)
+        Naming.workspace_path(workspace.owner, workspace.path, name)
     end
   end
 
   defp service_identity(name) do
     case Process.get(@workspace_key) do
       nil ->
-        HostKit.Naming.identity_segment(name)
+        Naming.identity_segment(name)
 
       workspace ->
-        HostKit.Naming.workspace_identity(workspace.owner, workspace.path, name)
+        Naming.workspace_identity(workspace.owner, workspace.path, name)
     end
   end
 

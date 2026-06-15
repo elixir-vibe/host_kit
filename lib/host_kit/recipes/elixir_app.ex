@@ -3,6 +3,8 @@ defmodule HostKit.Recipes.ElixirApp do
 
   use HostKit.Recipe
 
+  alias HostKit.Naming
+
   @default_erlang "27.2"
   @default_elixir "1.18.2-otp-27"
   @scope_key {__MODULE__, :scope}
@@ -220,7 +222,7 @@ defmodule HostKit.Recipes.ElixirApp do
   end
 
   def assigns(name, opts) when is_atom(name) do
-    app_name = HostKit.Naming.identity_segment(name)
+    app_name = Naming.identity_segment(name)
     source = Keyword.fetch!(opts, :source)
     phoenix = Keyword.fetch!(opts, :phoenix)
     phoenix_host = Keyword.fetch!(phoenix, :host)
@@ -232,7 +234,7 @@ defmodule HostKit.Recipes.ElixirApp do
     app = %{
       name: app_name,
       service_name: name,
-      release_name: HostKit.Naming.elixir_release_name(Keyword.get(release, :name, app_name)),
+      release_name: Naming.elixir_release_name(Keyword.get(release, :name, app_name)),
       source: Map.put(normalize_source(source), :name, name),
       runtime: %{
         erlang: Keyword.get(runtime, :erlang, @default_erlang),
@@ -322,7 +324,7 @@ defmodule HostKit.Recipes.ElixirApp do
       [] ->
         [
           %{
-            name: HostKit.Naming.resource_name([app_name, :ecto_migrate]),
+            name: Naming.resource_name([app_name, :ecto_migrate]),
             migrate: Keyword.get(opts, :migrate, "#{release}.migrate()"),
             rollback: Keyword.get(opts, :rollback, "#{release}.rollback()"),
             timeout: timeout
@@ -337,7 +339,7 @@ defmodule HostKit.Recipes.ElixirApp do
             repo |> to_string() |> String.split(".") |> List.last() |> Macro.underscore()
 
           %{
-            name: HostKit.Naming.resource_name([app_name, :ecto_migrate, repo_name]),
+            name: Naming.resource_name([app_name, :ecto_migrate, repo_name]),
             migrate: "#{release}.migrate(#{repo})",
             rollback: "#{release}.rollback(#{repo})",
             timeout: timeout
@@ -358,7 +360,7 @@ defmodule HostKit.Recipes.ElixirApp do
     }
   end
 
-  defp command_name(app, step), do: HostKit.Naming.resource_name([app.name, step])
+  defp command_name(app, step), do: Naming.resource_name([app.name, step])
 
   defp mise_beam_packages do
     [

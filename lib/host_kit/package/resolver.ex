@@ -1,6 +1,7 @@
 defmodule HostKit.Package.Resolver do
   @moduledoc "Resolves semantic package capabilities to concrete OS package names."
 
+  alias HostKit.Naming
   alias HostKit.Package.Repology.Record
   alias HostKit.Package.Resolution
   alias HostKit.Package.TargetRepo
@@ -441,5 +442,5 @@ defmodule HostKit.Package.Resolver do
     %PackageResource{name: name, system_name: to_string(name), source: :semantic, meta: meta}
   end
 
-  defp normalize_capability(name), do: HostKit.Naming.capability_name(name)
+  defp normalize_capability(name), do: Naming.capability_name(name)
 end
