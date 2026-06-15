@@ -11,6 +11,7 @@ defmodule HostKit.Plan.ExecutionGraph.Edge do
           | :symlink_target_path
           | :systemd_timer_service
           | :systemd_environment_file
+          | :systemd_environment_path
           | :systemd_exec_path
           | :systemd_read_write_path
 

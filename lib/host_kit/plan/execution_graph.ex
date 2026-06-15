@@ -339,6 +339,12 @@ defmodule HostKit.Plan.ExecutionGraph do
     )
     |> add_paths(
       node,
+      directive_paths(service, :environment),
+      path_to_node,
+      :systemd_environment_path
+    )
+    |> add_paths(
+      node,
       directive_paths(service, :read_write_paths),
       path_to_node,
       :systemd_read_write_path
@@ -391,8 +397,16 @@ defmodule HostKit.Plan.ExecutionGraph do
   defp split_systemd_paths(value) when is_binary(value) do
     value
     |> String.split(~r/\s+/, trim: true)
-    |> Enum.map(&String.trim_leading(&1, "-"))
-    |> Enum.filter(&String.starts_with?(&1, "/"))
+    |> Enum.flat_map(fn token ->
+      token = String.trim_leading(token, "-")
+
+      if String.starts_with?(token, "/") do
+        [token]
+      else
+        Regex.scan(~r/(?:^|=)(\/[^\s:;]+)/, token, capture: :all_but_first)
+        |> List.flatten()
+      end
+    end)
   end
 
   defp split_systemd_paths(value),

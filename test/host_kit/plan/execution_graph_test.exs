@@ -112,6 +112,7 @@ defmodule HostKit.Plan.ExecutionGraphTest do
       name: "app.service",
       service: [
         environment_file: "/etc/app/env",
+        environment: "APP_CONFIG=/etc/app/config.yaml",
         exec_start: "/opt/app/current/gatus/gatus",
         read_write_paths: "/etc/app/config.yaml"
       ]
@@ -148,6 +149,13 @@ defmodule HostKit.Plan.ExecutionGraphTest do
              {:symlink, "/opt/app/current/gatus"},
              {:systemd_service, "app.service"},
              :systemd_exec_path
+           )
+
+    assert edge?(
+             graph,
+             {:file, "/etc/app/config.yaml"},
+             {:systemd_service, "app.service"},
+             :systemd_environment_path
            )
 
     assert edge?(
