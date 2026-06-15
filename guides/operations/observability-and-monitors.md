@@ -40,6 +40,8 @@ The declarations can be used to:
 - attach log metadata to resources,
 - derive OpenTelemetry Collector config,
 - collect expected checks with `HostKit.Monitor.checks/1`,
+- project HTTP checks into provider-neutral endpoint specs with `HostKit.Monitor.endpoint_checks/2`,
+- render those endpoint specs with providers such as `HostKit.Providers.Gatus`,
 - keep monitoring intent next to the resource it verifies.
 
 Monitors can also attach to the most recently declared resource:
@@ -52,3 +54,21 @@ end
 ```
 
 This keeps checks stable even as resources are refactored.
+
+External monitoring config should be generated from the same intent when possible. HTTP monitors can carry provider-neutral fields such as `group`, `interval`, `expect`, and `alerts`:
+
+```elixir
+monitor :http,
+  name: "api",
+  group: "prod",
+  url: "https://api.example.com/health",
+  interval: "1m",
+  expect: [status: 200, response_time_lt: 5000],
+  alerts: [:telegram]
+```
+
+Then a provider can render those specs. The Gatus provider maps endpoint specs to Gatus endpoints and conditions:
+
+```elixir
+endpoints = HostKit.Providers.Gatus.endpoints_from_monitors(project)
+```

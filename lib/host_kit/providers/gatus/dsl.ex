@@ -40,4 +40,10 @@ defmodule HostKit.Providers.Gatus.DSL do
       HostKit.Providers.Gatus.Scope.add_endpoint(unquote(name), unquote(opts))
     end
   end
+
+  defmacro gatus_endpoints(endpoints) do
+    quote do
+      HostKit.Providers.Gatus.Scope.add_endpoints(unquote(endpoints))
+    end
+  end
 end

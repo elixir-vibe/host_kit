@@ -1,7 +1,7 @@
 defmodule HostKit.Monitor do
   @moduledoc "Helpers for extracting monitoring declarations from HostKit projects."
 
-  alias HostKit.Monitor.{Check, Result}
+  alias HostKit.Monitor.{Check, Endpoint, Result}
   alias HostKit.{Project, Runner, Target}
 
   @spec check(atom(), keyword()) :: Check.t()
@@ -19,6 +19,19 @@ defmodule HostKit.Monitor do
     |> Enum.flat_map(&resource_checks/1)
   end
 
+  @spec endpoint_checks(Project.t() | [Check.t()], keyword()) :: [Endpoint.t()]
+  def endpoint_checks(project_or_checks, opts \\ [])
+
+  def endpoint_checks(%Project{} = project, opts) do
+    project
+    |> checks()
+    |> endpoint_checks(opts)
+  end
+
+  def endpoint_checks(checks, opts) when is_list(checks) do
+    Enum.flat_map(checks, &endpoint_check(&1, opts))
+  end
+
   @spec run(Project.t(), keyword()) :: {:ok, [Result.t()]} | {:error, term()}
   def run(%Project{} = project, opts \\ []) do
     project
@@ -33,6 +46,27 @@ defmodule HostKit.Monitor do
     |> Map.get(:monitor, [])
     |> List.wrap()
   end
+
+  defp endpoint_check(%Check{type: :http, target: url} = check, opts) when is_binary(url) do
+    [
+      %Endpoint{
+        name: check.name,
+        group: check.group || Keyword.get(opts, :group),
+        url: url,
+        interval: check.interval || Keyword.get(opts, :interval),
+        expect: check.expect,
+        alerts: default_list(check.alerts, Keyword.get(opts, :alerts, [])),
+        severity: check.severity,
+        source: check
+      }
+    ]
+  end
+
+  defp endpoint_check(%Check{}, _opts), do: []
+
+  defp default_list([], default), do: default
+  defp default_list(nil, default), do: default
+  defp default_list(value, _default), do: value
 
   defp run_check(%Check{type: :systemd} = check, opts) do
     unit = check.target || unit_from_resource_id(check.resource_id)

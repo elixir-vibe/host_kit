@@ -42,9 +42,11 @@ defmodule HostKit.Providers.Gatus.Scope do
       |> then(&([name: name] ++ &1))
       |> normalize_endpoint_alerts()
 
-    update_config(fn config ->
-      update_content(config, :endpoints, fn endpoints -> List.wrap(endpoints) ++ [endpoint] end)
-    end)
+    add_endpoint_config(endpoint)
+  end
+
+  def add_endpoints(endpoints) when is_list(endpoints) do
+    Enum.each(endpoints, &add_endpoint_config/1)
   end
 
   def finish_config do
@@ -52,6 +54,14 @@ defmodule HostKit.Providers.Gatus.Scope do
       Process.delete(@config_key) || raise "no gatus config in scope"
 
     HostKit.Resources.ConfigFile.new(path, :yaml, Keyword.put(opts, :content, content))
+  end
+
+  defp add_endpoint_config(endpoint) do
+    endpoint = endpoint |> normalize_keyword() |> normalize_endpoint_alerts()
+
+    update_config(fn config ->
+      update_content(config, :endpoints, fn endpoints -> List.wrap(endpoints) ++ [endpoint] end)
+    end)
   end
 
   defp update_config(fun) do

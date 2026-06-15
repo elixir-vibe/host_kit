@@ -9,12 +9,29 @@ defmodule HostKit.Monitor.Check do
           task: String.t() | nil,
           port: non_neg_integer() | nil,
           clean: boolean() | nil,
+          group: atom() | String.t() | nil,
+          interval: String.t() | nil,
+          alerts: [atom() | String.t() | keyword() | map()],
           severity: atom(),
           resource_id: term(),
           meta: map()
         }
 
-  @fields [:name, :type, :target, :expect, :task, :port, :clean, :severity, :resource_id, :meta]
+  @fields [
+    :name,
+    :type,
+    :target,
+    :expect,
+    :task,
+    :port,
+    :clean,
+    :group,
+    :interval,
+    :alerts,
+    :severity,
+    :resource_id,
+    :meta
+  ]
 
   defstruct name: nil,
             type: nil,
@@ -23,6 +40,9 @@ defmodule HostKit.Monitor.Check do
             task: nil,
             port: nil,
             clean: nil,
+            group: nil,
+            interval: nil,
+            alerts: [],
             severity: :warning,
             resource_id: nil,
             meta: %{}

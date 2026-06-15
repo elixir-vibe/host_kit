@@ -1,6 +1,30 @@
 defmodule HostKit.Providers.GatusTest do
   use ExUnit.Case, async: true
 
+  test "renders provider-neutral monitor endpoints as Gatus endpoints" do
+    checks = [
+      HostKit.Monitor.check(:http,
+        name: "Forgejo",
+        group: "elixir-toys",
+        url: "https://git.elixir.toys",
+        interval: "1m",
+        expect: [status: 200, response_time_lt: 5000],
+        alerts: [:telegram]
+      )
+    ]
+
+    assert HostKit.Providers.Gatus.endpoints_from_monitors(checks) == [
+             [
+               name: "Forgejo",
+               group: "elixir-toys",
+               url: "https://git.elixir.toys",
+               interval: "1m",
+               conditions: ["[STATUS] == 200", "[RESPONSE_TIME] < 5000"],
+               alerts: [[type: "telegram"]]
+             ]
+           ]
+  end
+
   test "gatus_config emits a plain structured YAML resource" do
     project =
       Code.eval_string("""
@@ -19,12 +43,16 @@ defmodule HostKit.Providers.GatusTest do
                 "send-on-resolved": true
             end
 
-            gatus_endpoint "Forgejo",
-              group: "elixir-toys",
-              url: "https://git.elixir.toys",
-              interval: "1m",
-              conditions: ["[STATUS] == 200", "[RESPONSE_TIME] < 5000"],
-              alerts: [:telegram]
+            gatus_endpoints HostKit.Providers.Gatus.endpoints_from_monitors([
+              HostKit.Monitor.check(:http,
+                name: "Forgejo",
+                group: "elixir-toys",
+                url: "https://git.elixir.toys",
+                interval: "1m",
+                expect: [status: 200, response_time_lt: 5000],
+                alerts: [:telegram]
+              )
+            ])
           end
         end
       end

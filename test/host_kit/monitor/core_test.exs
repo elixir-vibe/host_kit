@@ -38,6 +38,41 @@ defmodule HostKit.MonitorTest do
     assert to_string(http.resource_id) == "caddy_site.web.example.com"
   end
 
+  test "projects http monitors into provider-neutral endpoint checks" do
+    source = """
+    use HostKit.DSL, providers: [HostKit.Providers.Caddy]
+
+    project :demo do
+      service :web do
+        caddy_site "web.example.com" do
+          reverse_proxy "127.0.0.1:4000"
+
+          monitor :http,
+            name: "web",
+            group: "demo",
+            url: "https://web.example.com/health",
+            interval: "1m",
+            expect: [status: 200, response_time_lt: 5000],
+            alerts: [:telegram],
+            severity: :critical
+        end
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+
+    assert [endpoint] = HostKit.Monitor.endpoint_checks(project)
+    assert endpoint.name == "web"
+    assert endpoint.group == "demo"
+    assert endpoint.url == "https://web.example.com/health"
+    assert endpoint.interval == "1m"
+    assert endpoint.expect == [status: 200, response_time_lt: 5000]
+    assert endpoint.alerts == [:telegram]
+    assert endpoint.severity == :critical
+    assert %HostKit.Monitor.Check{type: :http} = endpoint.source
+  end
+
   test "monitor after a resource attaches to the last resource" do
     source = """
     use HostKit.DSL

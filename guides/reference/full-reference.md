@@ -210,12 +210,16 @@ project :demo, providers: [HostKit.Providers.Gatus] do
         default_alert enabled: true, "failure-threshold": 3, "success-threshold": 2
       end
 
-      gatus_endpoint "API",
-        group: "demo",
-        url: "https://api.example.com/health",
-        interval: "1m",
-        conditions: ["[STATUS] == 200"],
-        alerts: [:telegram]
+      gatus_endpoints HostKit.Providers.Gatus.endpoints_from_monitors([
+        HostKit.Monitor.check(:http,
+          name: "API",
+          group: "demo",
+          url: "https://api.example.com/health",
+          interval: "1m",
+          expect: [status: 200],
+          alerts: [:telegram]
+        )
+      ])
     end
   end
 end
@@ -849,14 +853,16 @@ caddy_site "web.example.com" do
 end
 ```
 
-Extract or run checks with:
+Extract, project, or run checks with:
 
 ```elixir
 HostKit.Monitor.checks(project)
+HostKit.Monitor.endpoint_checks(project, group: "prod", interval: "1m")
+HostKit.Providers.Gatus.endpoints_from_monitors(project)
 HostKit.Monitor.run(project, target: prod)
 ```
 
-Initial execution supports systemd state, HTTP status, and filesystem existence checks.
+Initial execution supports systemd state, HTTP status, and filesystem existence checks. Endpoint projection currently turns HTTP monitors into provider-neutral external endpoint specs; providers such as Gatus can render those specs into concrete monitoring config.
 
 ## File modes
 
