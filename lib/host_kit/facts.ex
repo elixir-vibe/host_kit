@@ -16,12 +16,7 @@ defmodule HostKit.Facts do
   def collect(opts, collect_opts) when is_list(opts) and is_list(collect_opts) do
     only = Keyword.get(collect_opts, :only, Keyword.get(opts, :only, @facts))
 
-    opts =
-      opts
-      |> Keyword.delete(:only)
-      |> Keyword.delete(:reader)
-      |> Keyword.delete(:target)
-      |> Keyword.delete(:sudo)
+    opts = Keyword.drop(opts, [:only, :reader, :target, :sudo])
 
     runner = Keyword.get(opts, :runner, HostKit.Runner.Local)
 

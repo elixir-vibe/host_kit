@@ -1,4 +1,4 @@
-defmodule HostKit.SymlinkTest do
+defmodule HostKit.Resources.SymlinkTest do
   use HostKit.Case, async: true
 
   alias HostKit.Change

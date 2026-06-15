@@ -1,4 +1,4 @@
-defmodule HostKit.ConfigFileTest do
+defmodule HostKit.Resources.ConfigFileTest do
   use HostKit.Case, async: false
 
   alias HostKit.Change

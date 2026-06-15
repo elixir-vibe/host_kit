@@ -1,4 +1,4 @@
-defmodule HostKit.RedactedFileTest do
+defmodule HostKit.Resources.FileTest do
   use ExUnit.Case, async: true
 
   alias HostKit.Resources.File, as: FileResource

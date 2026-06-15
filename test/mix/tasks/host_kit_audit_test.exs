@@ -1,30 +1,14 @@
-defmodule Mix.Tasks.HostKit.ReadAuditFactsTest do
+defmodule Mix.Tasks.HostKit.AuditTest do
   use HostKit.Case, async: false
 
   import ExUnit.CaptureIO
 
   setup do
-    Mix.Task.reenable("host_kit.read")
     Mix.Task.reenable("host_kit.audit")
-    Mix.Task.reenable("host_kit.facts")
     :ok
   end
 
-  test "read prints current state presence" do
-    dir = tmp_dir("host-kit-read-task")
-    config = Path.join(dir, "config.exs")
-    managed = Path.join(dir, "managed.txt")
-    File.write!(managed, "current")
-    File.write!(config, config_source(managed, "desired"))
-
-    output = capture_io(fn -> Mix.Task.run("host_kit.read", ["--local", config]) end)
-
-    assert output =~ "file.#{managed} present"
-  after
-    cleanup_tmp("host-kit-read-task")
-  end
-
-  test "audit prints compact report plus plan" do
+  test "prints compact report plus plan" do
     dir = tmp_dir("host-kit-audit-task")
     config = Path.join(dir, "config.exs")
     managed = Path.join(dir, "managed.txt")
@@ -37,17 +21,6 @@ defmodule Mix.Tasks.HostKit.ReadAuditFactsTest do
     assert output =~ "Plan: 0 to create, 1 to update"
   after
     cleanup_tmp("host-kit-audit-task")
-  end
-
-  test "facts prints selected local facts as json" do
-    output =
-      capture_io(fn ->
-        Mix.Task.run("host_kit.facts", ["--local", "--only", "os", "--format", "json"])
-      end)
-
-    assert {:ok, decoded} = Jason.decode(output)
-    assert Map.has_key?(decoded, "os")
-    refute Map.has_key?(decoded, "users")
   end
 
   defp config_source(path, content) do

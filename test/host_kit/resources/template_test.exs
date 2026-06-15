@@ -1,4 +1,4 @@
-defmodule HostKit.TemplateTest do
+defmodule HostKit.Resources.TemplateTest do
   use HostKit.Case, async: false
 
   alias HostKit.Change
