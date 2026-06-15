@@ -148,8 +148,10 @@ flowchart TD
 The generic ordering rule is:
 
 1. create/start/update the instance through its backend,
-2. resolve the nested host target,
+2. resolve the nested host target (`target_host` when set, otherwise the first nested host),
 3. read/apply nested resources through that target.
+
+Down-plan ordering reverses nested content before instance lifecycle: nested resources are rolled back first, and an ephemeral instance delete is emitted last. Persistent instances are skipped with warnings instead of being destroyed implicitly.
 
 This keeps `host` and `instance` separate: `host` is how HostKit connects; `instance` is what HostKit manages as compute lifecycle.
 

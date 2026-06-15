@@ -311,6 +311,9 @@ defmodule HostKit.DSL.Scope do
   def put_instance_lifecycle(lifecycle),
     do: update_instance(&Instance.put_lifecycle(&1, lifecycle))
 
+  def put_instance_target_host(target_host),
+    do: update_instance(&Instance.put_target_host(&1, target_host))
+
   def add_instance_port(name, opts), do: update_instance(&Instance.add_port(&1, name, opts))
 
   def start_service(name, opts) do

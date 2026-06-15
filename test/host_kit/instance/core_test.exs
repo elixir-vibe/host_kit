@@ -137,6 +137,97 @@ defmodule HostKit.InstanceTest do
     assert block.backend_config == %{sudo: true, project: "hostkit"}
   end
 
+  test "instance target_host selects which nested host receives content resources" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      instance :demo_vm do
+        backend :incus
+        target_host :private
+
+        host :public, at: "127.0.0.1" do
+          ssh user: "root", port: 2222
+        end
+
+        host :private, at: "10.0.3.10" do
+          ssh user: "ubuntu", port: 22
+        end
+
+        service :web do
+          file "/srv/www/index.html", content: "hello"
+        end
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    assert [%HostKit.Instance{target_host: :private}] = project.instances
+
+    file = Enum.find(HostKit.Project.resources(project), &match?(%HostKit.Resources.File{}, &1))
+    assert file.meta.instance == :demo_vm
+    assert file.meta.host == :private
+    assert file.meta.target_opts[:target].opts[:host] == "10.0.3.10"
+    assert file.meta.target_opts[:target].opts[:user] == "ubuntu"
+  end
+
+  test "instance target_host must refer to a nested host" do
+    project = %HostKit.Project{
+      name: :demo,
+      instances: [
+        %HostKit.Instance{
+          name: :demo_vm,
+          target_host: :missing,
+          resources: [%HostKit.Resources.File{path: "/tmp/demo", content: "demo"}]
+        }
+      ]
+    }
+
+    assert_raise ArgumentError, ~r/target_host :missing is not declared/, fn ->
+      HostKit.Project.resources(project)
+    end
+  end
+
+  test "persistent instances are skipped in down plans while ephemeral instances are destroyed last" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      instance :persistent_vm do
+        backend :incus
+        lifecycle :persistent
+      end
+
+      instance :ephemeral_vm do
+        backend :incus
+        lifecycle :ephemeral
+
+        host :guest, at: "127.0.0.1" do
+          ssh user: "root", port: 2222
+        end
+
+        service :web do
+          file "/srv/www/index.html", content: "hello"
+        end
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    assert {:ok, plan} = HostKit.plan(project)
+    assert {:ok, down} = HostKit.down(plan)
+
+    assert Enum.any?(down.diagnostics.warnings, fn warning ->
+             warning.resource_id == {:instance, :persistent_vm} and
+               warning.details.reason == :delete_not_supported
+           end)
+
+    assert Enum.map(down.changes, & &1.resource_id) == [
+             {:file, "/srv/www/index.html"},
+             {:instance, :ephemeral_vm}
+           ]
+  end
+
   test "instances participate in project resources plans and ephemeral down plans" do
     source = """
     use HostKit.DSL

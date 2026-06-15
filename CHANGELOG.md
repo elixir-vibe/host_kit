@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `target_host` for selecting a nested instance host when an instance has multiple connection endpoints.
+- Documented instance backend authoring callbacks and clarified instance down-plan ordering.
+- Added semantic tests for persistent/ephemeral instance rollback behavior and nested content target selection.
+
 ## v0.1.0-beta.2 - 2026-06-14
 
 - Added generic `instance` DSL for lifecycle-managed compute boundaries with backend selection, nested host endpoints, nested services/resources, and target-scoped content planning.

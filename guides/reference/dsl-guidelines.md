@@ -132,7 +132,7 @@ instance :demo do
 end
 ```
 
-Rule: `instance` manages the compute lifecycle; nested `host` describes how HostKit connects into that instance. Plans order the instance lifecycle resource before nested content resources, and nested content carries the nested host target metadata so read/apply operations execute inside the managed compute boundary.
+Rule: `instance` manages the compute lifecycle; nested `host` describes how HostKit connects into that instance. Plans order the instance lifecycle resource before nested content resources, and nested content carries the selected nested host target metadata so read/apply operations execute inside the managed compute boundary. Use `target_host :name` when an instance has multiple nested host endpoints.
 
 ## References between declarations
 
@@ -312,7 +312,8 @@ Legend:
 | `option` | Reference | Set a backend option inside `backend ... do`; options stay attached to the selected backend instead of leaking into generic plan/apply flags. |
 | `image` | Canonical | Set the instance image. |
 | `kind` | Canonical | Set the instance kind, such as `:container` or `:vm`. |
-| `lifecycle` | Reference | Set instance lifecycle policy, such as `:persistent` or `:ephemeral`. |
+| `lifecycle` | Reference | Set instance lifecycle policy, such as `:persistent` or `:ephemeral`. Ephemeral instances are deleted in down plans; persistent instances are skipped with a warning. |
+| `target_host` | Canonical | Select which nested host endpoint receives nested instance content resources when multiple nested hosts exist. |
 | `expose` | Canonical | Declare an instance port exposure from host to guest. |
 | `ssh` | Canonical | Configure host SSH transport as a block. |
 | `user` | Canonical | SSH user inside `ssh`. |

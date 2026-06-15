@@ -17,6 +17,7 @@ defmodule HostKit.Instance do
           kind: atom() | nil,
           lifecycle: atom(),
           ports: [port_exposure()],
+          target_host: atom() | nil,
           hosts: [HostKit.Host.t()],
           services: [HostKit.Service.t()],
           resources: [struct()],
@@ -30,6 +31,7 @@ defmodule HostKit.Instance do
             kind: nil,
             lifecycle: :persistent,
             ports: [],
+            target_host: nil,
             hosts: [],
             services: [],
             resources: [],
@@ -44,6 +46,7 @@ defmodule HostKit.Instance do
       image: Keyword.get(opts, :image),
       kind: Keyword.get(opts, :kind),
       lifecycle: Keyword.get(opts, :lifecycle, :persistent),
+      target_host: Keyword.get(opts, :target_host),
       meta: Keyword.get(opts, :meta, %{})
     }
   end
@@ -65,6 +68,9 @@ defmodule HostKit.Instance do
 
   def put_lifecycle(%__MODULE__{} = instance, lifecycle) when is_atom(lifecycle),
     do: %{instance | lifecycle: lifecycle}
+
+  def put_target_host(%__MODULE__{} = instance, target_host) when is_atom(target_host),
+    do: %{instance | target_host: target_host}
 
   def add_port(%__MODULE__{} = instance, name, opts) when is_atom(name) and is_list(opts) do
     port = %{

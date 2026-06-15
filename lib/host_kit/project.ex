@@ -147,11 +147,18 @@ defmodule HostKit.Project do
   end
 
   defp instance_content_resources(%Instance{} = instance) do
-    host = List.first(instance.hosts)
+    host = instance_target_host(instance)
 
     instance.resources
     |> Kernel.++(instance.services |> Enum.flat_map(&expand_resources(&1.resources)))
     |> Enum.map(&put_instance_target(&1, instance, host))
+  end
+
+  defp instance_target_host(%Instance{target_host: nil, hosts: hosts}), do: List.first(hosts)
+
+  defp instance_target_host(%Instance{target_host: name, hosts: hosts}) do
+    Enum.find(hosts, &(&1.name == name)) ||
+      raise ArgumentError, "instance target_host #{inspect(name)} is not declared"
   end
 
   defp put_instance_target(resource, _instance, nil), do: resource

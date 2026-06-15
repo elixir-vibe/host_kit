@@ -210,6 +210,8 @@ project :demo do
     expose :ssh, host: 2222, guest: 22
     expose :web, host: 18080, guest: 80
 
+    target_host :guest
+
     host :guest, at: "127.0.0.1" do
       ssh do
         user "root"
@@ -231,7 +233,9 @@ project :demo do
 end
 ```
 
-The instance owns compute lifecycle metadata (`backend`, `image`, `kind`, `lifecycle`, `expose`). The nested host owns connection metadata. Nested services/resources are ordinary HostKit declarations scoped to the instance contents. Plans emit the instance lifecycle resource first, then nested content resources annotated with the nested host target so read/apply operations run through that endpoint.
+The instance owns compute lifecycle metadata (`backend`, `image`, `kind`, `lifecycle`, `expose`). The nested host owns connection metadata. Nested services/resources are ordinary HostKit declarations scoped to the instance contents. Plans emit the instance lifecycle resource first, then nested content resources annotated with the nested host target so read/apply operations run through that endpoint. If an instance declares more than one nested host, use `target_host :name` to choose the endpoint for nested content resources; otherwise HostKit uses the first nested host.
+
+Down plans delete `lifecycle :ephemeral` instances after their nested content has been rolled back. Persistent instances are intentionally skipped in down plans and reported as warnings rather than destroyed implicitly.
 
 Backend implementations are intentionally separate from the generic DSL. Incus is implemented as a backend for `instance`, not as a user-facing `incus_machine` DSL. The Incus backend maps `expose` declarations to Incus proxy devices.
 
@@ -253,6 +257,14 @@ instance :demo_vm do
   end
 end
 ```
+
+Backend authors implement `HostKit.Instance.Backend`:
+
+- `read/2` returns the observed instance or `nil`,
+- `apply/2` creates/starts/configures/waits for the instance,
+- `delete/2` destroys an instance when an ephemeral down plan requests it.
+
+Backends should emit apply events for long-running lifecycle work so CLI and Livebook progress remain mailbox-first.
 
 ## Host bootstrap packages and mise-managed runtimes
 

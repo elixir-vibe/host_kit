@@ -353,6 +353,12 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro target_host(name) do
+    quote do
+      HostKit.DSL.Scope.put_instance_target_host(unquote(name))
+    end
+  end
+
   defmacro expose(name, opts) do
     quote do
       HostKit.DSL.Scope.add_instance_port(unquote(name), unquote(opts))
