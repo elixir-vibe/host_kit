@@ -44,6 +44,25 @@ mix host_kit.plan --host prod --show-graph infra/config.exs
 mix host_kit.plan --host prod --graph-format json infra/config.exs
 ```
 
+`--show-graph` appends dependency reasons and topological layers for active create/update/delete changes:
+
+```text
+Execution graph: 3 nodes, 2 edges, 2 layers, 0 cycles
+
+Edges:
+  symlink./opt/toys/current/gatus -> systemd_service.toys-gatus.service [systemd_exec_path: /opt/toys/current/gatus/gatus]
+  yaml./etc/toys/monitoring/gatus.yaml -> systemd_service.toys-gatus.service [systemd_environment_path: /etc/toys/monitoring/gatus.yaml]
+
+Layer 1:
+  update symlink./opt/toys/current/gatus
+  update yaml./etc/toys/monitoring/gatus.yaml
+
+Layer 2:
+  update systemd_service.toys-gatus.service
+```
+
+`--graph-format json` emits JSON-safe graph data with display labels and `HostKit.Resource.dump/1` terms for resource ids. It does not encode raw Elixir structs or full before/after resource payloads.
+
 ## `mix host_kit.down`
 
 Build a down/rollback plan from an existing plan artifact. Rollback is represented as another HostKit plan: inspect the generated down plan, then apply it.
