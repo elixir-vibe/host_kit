@@ -887,7 +887,7 @@ The default layout is:
 - current symlink: `path(:opt, "current/<name>")`
 - symlink target: `<versions_dir>/<version>`
 
-Use `current_dir: [owner: ..., group: ..., mode: ...]` when HostKit should also manage the parent `current` directory.
+Use `current_dir: [owner: ..., group: ..., mode: ...]` when HostKit should also manage the parent `current` directory. See [Release design notes](release-design.md) for the intended boundary before adding artifact download, activation, retention, or rollback behavior.
 
 ## File modes
 

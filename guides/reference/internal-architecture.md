@@ -24,7 +24,7 @@ flowchart LR
   DownPlan --> Apply
 ```
 
-The key rule is: **the plan is the operational unit**. A rollback is not a separate migration system; it is a down plan derived from an existing plan and applied through the same apply engine.
+The key rule is: **the plan is the operational unit**. A rollback is not a separate migration system; it is a down plan derived from an existing plan and applied through the same apply engine. Release work follows the same rule; see [Release design notes](release-design.md) for the boundary between release/artifact state, runtime declarations, and verification.
 
 ## Main entities
 
