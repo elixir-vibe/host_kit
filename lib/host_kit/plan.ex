@@ -13,7 +13,8 @@ defmodule HostKit.Plan do
     File,
     Package,
     Source,
-    Symlink
+    Symlink,
+    Template
   }
 
   @type t :: %__MODULE__{
@@ -208,6 +209,7 @@ defmodule HostKit.Plan do
   defp delete_supported?(%Directory{rollback: :delete_if_created}), do: true
   defp delete_supported?(%Directory{}), do: false
   defp delete_supported?(%Symlink{}), do: true
+  defp delete_supported?(%Template{}), do: true
   defp delete_supported?(%HostKit.Firewall{}), do: true
   defp delete_supported?(%HostKit.Proxy{}), do: true
   defp delete_supported?(%HostKit.Instance{lifecycle: :ephemeral}), do: true
@@ -299,6 +301,13 @@ defmodule HostKit.Plan do
   defp resolve_resource(%Package{} = package, opts), do: Resolver.resolve(package, opts)
 
   defp resolve_resource(%Capability{} = capability, opts), do: Resolver.resolve(capability, opts)
+
+  defp resolve_resource(%Template{} = template, _opts) do
+    case Template.render(template) do
+      {:ok, _content} -> {:ok, template}
+      {:error, reason} -> {:error, {:template_render_failed, Template.id(template), reason}}
+    end
+  end
 
   defp resolve_resource(%Source{} = source, _opts) do
     case HostKit.Source.Git.resolve(source) do
@@ -482,6 +491,17 @@ defmodule HostKit.Plan do
 
   defp equivalent?(%HostKit.Resources.File{} = desired, actual),
     do: comparable(desired, actual, [:path, :content, :owner, :group, :mode])
+
+  defp equivalent?(%Template{} = desired, actual) do
+    case Template.render(desired) do
+      {:ok, content} ->
+        comparable(desired, actual, [:path, :owner, :group, :mode]) and
+          Map.get(actual.meta, :content) == content
+
+      {:error, _reason} ->
+        false
+    end
+  end
 
   defp equivalent?(%Symlink{} = desired, actual),
     do: comparable(desired, actual, [:path, :to, :owner, :group])

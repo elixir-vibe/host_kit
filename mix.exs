@@ -10,7 +10,7 @@ defmodule HostKit.MixProject do
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
-      dialyzer: [plt_add_apps: [:mix, :ssh]],
+      dialyzer: [plt_add_apps: [:eex, :mix, :ssh]],
       package: package(),
       description: description(),
       docs: docs()

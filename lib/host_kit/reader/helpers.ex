@@ -6,7 +6,7 @@ defmodule HostKit.Reader.Helpers do
   end
 
   alias HostKit.Caddy
-  alias HostKit.Resources.{Account, Directory, File, Symlink}
+  alias HostKit.Resources.{Account, Directory, File, Symlink, Template}
   alias HostKit.Systemd
 
   def read_directory(%Directory{path: path} = desired, stat_fun) do
@@ -67,6 +67,34 @@ defmodule HostKit.Reader.Helpers do
       {:ok, content} -> {:ok, %{desired | meta: Map.put(desired.meta, :content, content)}}
       {:error, :enoent} -> {:ok, nil}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def read_template(%Template{path: path} = desired, read_fun) do
+    desired_file = %File{
+      path: path,
+      content: "",
+      owner: desired.owner,
+      group: desired.group,
+      mode: desired.mode
+    }
+
+    case read_fun.(desired_file) do
+      {:ok, nil} ->
+        {:ok, nil}
+
+      {:ok, actual} ->
+        {:ok,
+         %Template{
+           desired
+           | owner: actual.owner,
+             group: actual.group,
+             mode: actual.mode,
+             meta: Map.put(desired.meta, :content, actual.content)
+         }}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

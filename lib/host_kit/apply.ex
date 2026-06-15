@@ -16,7 +16,8 @@ defmodule HostKit.Apply do
     Readiness,
     Shell,
     Source,
-    Symlink
+    Symlink,
+    Template
   }
 
   alias Runner.Ops
@@ -256,6 +257,10 @@ defmodule HostKit.Apply do
     apply_or_dry_run(change, opts, fn -> delete_path(proxy.path, [:file], opts) end)
   end
 
+  defp apply_change(%Change{action: :delete, before: %Template{} = template} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_path(template.path, [:file], opts) end)
+  end
+
   defp apply_change(%Change{action: :delete, before: %Instance{} = instance} = change, opts) do
     apply_or_dry_run(change, opts, fn -> HostKit.Instance.Backend.delete(instance, opts) end)
   end
@@ -282,6 +287,11 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %Symlink{} = symlink} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn -> apply_symlink(symlink, opts) end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Template{} = template} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> apply_template(template, opts) end)
   end
 
   defp apply_change(%Change{action: action, after: %Command{} = command} = change, opts)
@@ -454,6 +464,16 @@ defmodule HostKit.Apply do
     args = args ++ Enum.flat_map(account.groups, &["--groups", &1])
 
     Ops.cmd(opts, "useradd", args ++ [name])
+  end
+
+  defp apply_template(%Template{path: path} = template, opts) do
+    with {:ok, rendered} <- Template.render(template),
+         {:ok, content} <- rendered_content(template, rendered, opts),
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
+         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
+         :ok <- Ops.chown(path, template.owner, template.group, opts) do
+      Ops.chmod(path, template.mode, opts)
+    end
   end
 
   defp apply_env_file(%EnvFile{path: path} = env_file, opts) do

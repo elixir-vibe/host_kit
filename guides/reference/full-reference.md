@@ -449,7 +449,8 @@ prod = HostKit.Target.ssh(:prod, host: "elixir.toys", user: "dannote", sudo: tru
 HostKit.format_plan(plan)
 {:ok, results} = HostKit.apply(plan, dry_run: true)
 
-# Supported apply resources: accounts, directories, files, systemd services, and systemd timers.
+# Supported apply resources include accounts, directories, files, templates, symlinks,
+# env files, systemd units, commands, packages, and provider-rendered files.
 {:ok, results} = HostKit.apply(plan, confirm: true, sudo: true)
 
 # Command and filesystem operations are routed through a runner boundary.
@@ -862,6 +863,36 @@ service :web do
   end
 end
 ```
+
+## Templates
+
+Use `template/2` for deterministic EEx-rendered file resources. Templates are first-class resources in plans and render to ordinary managed files during read/apply.
+
+```elixir
+service :forgejo, path: "forgejo" do
+  template path(:config, "app.ini"),
+    from: "templates/forgejo/app.ini.eex",
+    assigns: %{
+      domain: "git.elixir.toys",
+      data_dir: path(:data),
+      repositories_dir: path(:data, "repositories")
+    },
+    owner: "root",
+    group: service_user(),
+    mode: 0o640
+end
+```
+
+In DSL configs, relative `from:` paths are resolved relative to the declaring config file. Runtime code may use absolute `from:` paths or inline `source:`:
+
+```elixir
+HostKit.Resources.Template.new("/etc/app.conf",
+  source: "port=<%= @port %>\n",
+  assigns: %{port: 4000}
+)
+```
+
+Templates support regular EEx bindings (`<%= port %>`) and assigns syntax (`<%= @port %>`). Keep templates inspectable and deterministic; do not hide runtime behavior in templates. Avoid raw secret assigns until redacted template diffs are explicitly supported.
 
 ## Runtime isolation
 

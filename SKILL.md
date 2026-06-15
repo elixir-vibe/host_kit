@@ -108,9 +108,23 @@ end
 file path(:sbin, "tool"), content: Infra.Files.read("usr/local/sbin/tool")
 ```
 
-HostKit file resources currently accept content (`iodata`) and redaction markers. There is no first-class HEEx file-template resource. If templating is needed, keep it explicit and inspectable in Elixir, and prefer adding a HostKit template resource/provider before spreading ad hoc rendering helpers.
+Use first-class EEx templates for deterministic rendered files with small assign maps:
 
-Do not commit secrets. Use `content: :redacted` for existing secret-bearing files managed elsewhere.
+```elixir
+template path(:config, "app.ini"),
+  from: "templates/app.ini.eex",
+  assigns: %{
+    domain: "git.elixir.toys",
+    data_dir: path(:data)
+  },
+  owner: "root",
+  group: service_user(),
+  mode: 0o640
+```
+
+`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates are first-class resources in plans and render to ordinary managed files during read/apply.
+
+Keep templates inspectable and deterministic. Do not hide runtime behavior or shell workflows in templates. Do not commit secrets; use `content: :redacted` for existing secret-bearing files managed elsewhere, and avoid passing raw secrets as template assigns until redacted template diffs are explicitly supported.
 
 ## Symlinks
 

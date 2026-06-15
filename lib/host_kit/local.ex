@@ -175,6 +175,10 @@ defmodule HostKit.Local do
     Helpers.read_env_file(desired, &read(&1, context))
   end
 
+  def read(%HostKit.Resources.Template{} = desired, context) do
+    Helpers.read_template(desired, &read(&1, context))
+  end
+
   def read(%Symlink{} = desired, context) do
     Helpers.read_symlink(desired, &stat_metadata(&1, context), &read_link(&1, context))
   end

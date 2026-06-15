@@ -46,6 +46,7 @@ defmodule HostKit.Resource do
                       HostKit.Resources.Shell,
                       HostKit.Resources.Source,
                       HostKit.Resources.Symlink,
+                      HostKit.Resources.Template,
                       HostKit.Secret,
                       HostKit.Readiness.HTTP,
                       HostKit.Readiness.Systemd,

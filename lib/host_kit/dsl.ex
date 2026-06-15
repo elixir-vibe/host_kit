@@ -929,6 +929,15 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro template(path, opts) do
+    base_dir = __CALLER__.file |> Path.dirname() |> Path.expand()
+
+    quote do
+      opts = Keyword.put_new(unquote(opts), :base_dir, unquote(base_dir))
+      HostKit.DSL.Scope.add_resource(HostKit.Resources.Template.new(unquote(path), opts))
+    end
+  end
+
   defmacro symlink(path, opts) do
     quote do
       HostKit.DSL.Scope.add_resource(HostKit.Resources.Symlink.new(unquote(path), unquote(opts)))
