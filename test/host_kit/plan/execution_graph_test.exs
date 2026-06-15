@@ -182,6 +182,14 @@ defmodule HostKit.Plan.ExecutionGraphTest do
     refute ExecutionGraph.acyclic?(graph)
     assert graph.layers == []
     assert graph.cycles == [[{:file, "/tmp/one"}, {:symlink, "/tmp/two"}]]
+
+    assert ExecutionGraph.format(graph) =~
+             """
+             Cycle:
+               file./tmp/one -> symlink./tmp/two [explicit_dependency: file./tmp/one]
+               symlink./tmp/two -> file./tmp/one [explicit_dependency: symlink./tmp/two]
+             """
+             |> String.trim_trailing()
   end
 
   test "formats a concise graph summary" do
@@ -231,6 +239,7 @@ defmodule HostKit.Plan.ExecutionGraphTest do
 
     assert Jason.encode!(json)
     assert get_in(json, ["stats", "nodes"]) == 2
+    assert get_in(json, ["cycle_edges"]) == []
     assert get_in(json, ["edges", Access.at(0), "reason"]) == "parent_directory"
     assert get_in(json, ["edges", Access.at(0), "from", "display"]) == "directory./srv/app"
 

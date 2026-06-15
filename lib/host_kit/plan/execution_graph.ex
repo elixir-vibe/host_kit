@@ -57,6 +57,7 @@ defmodule HostKit.Plan.ExecutionGraph do
       "edges" => Enum.map(graph.edges, &edge_json/1),
       "layers" => Enum.map(graph.layers, fn layer -> Enum.map(layer, &id_json/1) end),
       "cycles" => Enum.map(graph.cycles, fn cycle -> Enum.map(cycle, &id_json/1) end),
+      "cycle_edges" => cycle_edges_json(graph.cycles, graph.edges),
       "stats" => %{
         "nodes" => length(graph.nodes),
         "edges" => length(graph.edges),
@@ -79,7 +80,7 @@ defmodule HostKit.Plan.ExecutionGraph do
       " layers, ",
       Integer.to_string(length(graph.cycles)),
       " cycles",
-      format_cycles(graph.cycles),
+      format_cycles(graph.cycles, graph.edges),
       format_edges(graph.edges),
       format_layers(graph)
     ]
@@ -501,11 +502,33 @@ defmodule HostKit.Plan.ExecutionGraph do
     end
   end
 
-  defp format_cycles([]), do: []
+  defp format_cycles([], _edges), do: []
 
-  defp format_cycles(cycles) do
+  defp format_cycles(cycles, edges) do
     cycles
-    |> Enum.map(fn cycle -> ["\nCycle: ", Enum.map_join(cycle, " -> ", &format_id/1)] end)
+    |> Enum.map(fn cycle ->
+      cycle_edges = cycle_edges(cycle, edges)
+
+      if cycle_edges == [] do
+        ["\nCycle: ", Enum.map_join(cycle, " -> ", &format_id/1)]
+      else
+        [
+          "\nCycle:",
+          Enum.map(cycle_edges, fn edge ->
+            [
+              "\n  ",
+              format_id(edge.from),
+              " -> ",
+              format_id(edge.to),
+              " [",
+              Atom.to_string(edge.reason),
+              format_edge_detail(edge.detail),
+              "]"
+            ]
+          end)
+        ]
+      end
+    end)
   end
 
   defp node_json(%Node{} = node) do
@@ -527,6 +550,20 @@ defmodule HostKit.Plan.ExecutionGraph do
       "detail" => detail_json(edge.detail),
       "source" => Atom.to_string(edge.source)
     }
+  end
+
+  defp cycle_edges_json(cycles, edges) do
+    Enum.map(cycles, fn cycle -> Enum.map(cycle_edges(cycle, edges), &edge_json/1) end)
+  end
+
+  defp cycle_edges(cycle, edges) do
+    cycle_set = MapSet.new(cycle)
+
+    edges
+    |> Enum.filter(&(MapSet.member?(cycle_set, &1.from) and MapSet.member?(cycle_set, &1.to)))
+    |> Enum.sort_by(
+      &{format_id(&1.from), format_id(&1.to), to_string(&1.reason), inspect(&1.detail)}
+    )
   end
 
   defp id_json(id), do: %{"display" => format_id(id), "term" => Resource.dump(id)}
@@ -565,6 +602,8 @@ defmodule HostKit.Plan.ExecutionGraph do
   defp format_edge_detail(nil), do: ""
   defp format_edge_detail(detail), do: ": " <> format_detail(detail)
 
+  defp format_detail(%HostKit.Addr.Resource{} = detail), do: format_id(detail)
+  defp format_detail({type, name}) when is_atom(type), do: format_id({type, name})
   defp format_detail(detail) when is_binary(detail), do: detail
   defp format_detail(detail) when is_atom(detail), do: Atom.to_string(detail)
   defp format_detail(detail), do: inspect(detail)
