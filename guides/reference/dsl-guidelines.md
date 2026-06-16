@@ -199,23 +199,23 @@ end
 Use `rpc` inside a service to group broad service-to-service RPC surfaces, and `bind` from a caller service to declare Docker-like service bindings:
 
 ```elixir
-service :llm_proxy, path: "llm-proxy" do
+service :catalog do
   daemon do
     listen :rpc, protocol: :rpc
   end
 
   rpc do
-    expose :api
+    expose :query
     expose :control
   end
 end
 
-service :incant_admin, path: "incant-admin" do
-  bind :llm_proxy, rpc: [:control]
+service :web do
+  bind :catalog, rpc: [:query]
 end
 ```
 
-HostKit owns service names, listener/socket locations, and broad surface bindings. The runtime RPC protocol owns exact operation names and schemas.
+HostKit owns service names, listener/socket locations, broad surface bindings, validation, and caller-local binding files. The runtime RPC protocol owns exact operation names and schemas.
 
 ## Defaults
 

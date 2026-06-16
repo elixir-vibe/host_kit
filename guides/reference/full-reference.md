@@ -176,31 +176,66 @@ Use `:migrate` and `:rollback` for custom release functions when the defaults do
 Same-host RPC defaults to Unix sockets instead of TCP ports:
 
 ```elixir
-service :llm_proxy, path: "llm-proxy" do
+service :catalog do
   daemon do
     listen :rpc, protocol: :rpc
   end
 
   rpc do
-    expose :api
+    expose :query
     expose :control
   end
 end
 
-service :incant_admin, path: "incant-admin" do
-  bind :llm_proxy, rpc: [:control]
+service :web do
+  bind :catalog, rpc: [:query]
 end
 ```
 
-With `roots run: "/run/toys"`, the default RPC socket for `llm_proxy` is:
+With `roots run: "/run/apps"`, the default RPC socket for `catalog` is:
 
 ```text
-/run/toys/llm-proxy/rpc.sock
+/run/apps/catalog/rpc.sock
 ```
 
 The provider side uses `expose` for broad surfaces. Do not list every runtime operation in HostKit; SafeRPC or another RPC runtime should describe exact callable operations during handshake.
 
-The caller side uses `bind` to declare Docker-like service bindings. `bind :llm_proxy, rpc: [:control]` means the current service may discover and connect to `llm_proxy`'s `:control` RPC surface. HostKit currently stores this as inspectable service metadata; rendering socket permissions, caller-local binding files, or Gatehouse/SafeRPC config can build on the same data.
+The caller side uses `bind` to declare Docker-like service bindings. `bind :catalog, rpc: [:query]` means the current service may discover and connect to `catalog`'s `:query` RPC surface.
+
+HostKit validates RPC bindings during planning:
+
+- the target service must exist;
+- the target listener must exist;
+- the target service must expose requested surfaces;
+- a service cannot bind itself.
+
+For each service with RPC bindings, HostKit emits a caller-local binding file under the service config directory:
+
+```text
+/etc/<service>/rpc.exs
+```
+
+With service-scoped config roots, this becomes for example:
+
+```text
+/etc/apps/web/rpc.exs
+```
+
+The file contains only bindings for that caller:
+
+```elixir
+%{
+  catalog: %{
+    listener: :rpc,
+    socket: "/run/apps/catalog/rpc.sock",
+    upstream: "unix:/run/apps/catalog/rpc.sock",
+    surfaces: [:query],
+    unit: "catalog.service"
+  }
+}
+```
+
+Socket permissions or Gatehouse/SafeRPC config can build on the same metadata later.
 
 Use TCP explicitly only when the RPC endpoint must cross a host/container boundary:
 

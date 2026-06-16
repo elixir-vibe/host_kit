@@ -76,18 +76,18 @@ Prefer absolute roots for production configs.
 
 ## RPC service bindings
 
-Use `listen :rpc, protocol: :rpc` for same-host RPC listeners. With no `port:` or `socket:`, HostKit defaults to a Unix socket under the configured `:run` root and current service path, for example `/run/toys/llm-proxy/rpc.sock` when `roots run: "/run/toys"` and `service :llm_proxy, path: "llm-proxy"`.
+Use `listen :rpc, protocol: :rpc` for same-host RPC listeners. With no `port:` or `socket:`, HostKit defaults to a Unix socket under the configured `:run` root and current service path, for example `/run/apps/catalog/rpc.sock` when `roots run: "/run/apps"` and `service :catalog`.
 
 Provider services declare broad RPC surfaces:
 
 ```elixir
-service :llm_proxy, path: "llm-proxy" do
+service :catalog do
   daemon do
     listen :rpc, protocol: :rpc
   end
 
   rpc do
-    expose :api
+    expose :query
     expose :control
   end
 end
@@ -96,12 +96,12 @@ end
 Caller services declare Docker-like bindings:
 
 ```elixir
-service :incant_admin, path: "incant-admin" do
-  bind :llm_proxy, rpc: [:control]
+service :web do
+  bind :catalog, rpc: [:query]
 end
 ```
 
-HostKit owns service names, listener/socket locations, and broad surface bindings. Do not list exact operation names in HostKit; SafeRPC or another runtime handshake owns concrete ops and schemas.
+HostKit owns service names, listener/socket locations, broad surface bindings, validation, and caller-local binding files such as `/etc/apps/web/rpc.exs`. Do not list exact operation names in HostKit; SafeRPC or another runtime handshake owns concrete ops and schemas.
 
 ## Service identity and paths
 

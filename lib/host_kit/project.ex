@@ -152,6 +152,7 @@ defmodule HostKit.Project do
     |> Kernel.++(Enum.flat_map(project.instances, &instance_resources/1))
     |> Kernel.++(project.proxies)
     |> Kernel.++(project.services |> Enum.flat_map(&expand_resources(&1.resources)))
+    |> Kernel.++(HostKit.RPC.binding_resources(project))
     |> Kernel.++(Firewall.policies(project))
     |> Kernel.++(workspace_egress(project))
   end

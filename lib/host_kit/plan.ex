@@ -67,9 +67,15 @@ defmodule HostKit.Plan do
 
   @spec build(Project.t(), keyword()) :: {:ok, t()} | {:error, HostKit.Diagnostics.t() | term()}
   def build(%Project{} = project, opts \\ []) do
-    resources = Project.resources(project)
-    opts = maybe_put_package_manager(resources, opts)
+    with :ok <- HostKit.RPC.validate(project) do
+      resources = Project.resources(project)
+      opts = maybe_put_package_manager(resources, opts)
 
+      build_resources(project, resources, opts)
+    end
+  end
+
+  defp build_resources(project, resources, opts) do
     with {:ok, resources} <- resolve_resources(resources, opts),
          {:ok, resources} <- HostKit.Endpoint.Resolver.resolve(resources, project.services),
          {:ok, resources} <- expand_ingress(resources, project),

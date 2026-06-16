@@ -154,22 +154,22 @@ defmodule HostKit.DSL.CoreTest do
     use HostKit.DSL
 
     project :prod do
-      roots run: "/run/toys"
-      prefixes user: "toys-", unit: "toys-"
+      roots run: "/run/apps", config: "/etc/apps"
+      prefixes user: "app-", unit: "app-"
 
-      service :llm_proxy, path: "llm-proxy" do
+      service :catalog do
         daemon do
           listen :rpc, protocol: :rpc
         end
 
         rpc do
-          expose :api
+          expose :query
           expose :control
         end
       end
 
-      service :incant_admin, path: "incant-admin" do
-        bind :llm_proxy, rpc: [:control]
+      service :web do
+        bind :catalog, rpc: [:query]
       end
     end
     """
@@ -180,12 +180,12 @@ defmodule HostKit.DSL.CoreTest do
     assert %HostKit.Listener{
              name: :rpc,
              protocol: :rpc,
-             socket: "/run/toys/llm-proxy/rpc.sock",
+             socket: "/run/apps/catalog/rpc.sock",
              port: nil
            } = provider.meta.listeners.rpc
 
     assert %HostKit.RPC{exposes: exposes, bindings: []} = provider.meta.rpc
-    assert Enum.map(exposes, & &1.name) == [:api, :control]
+    assert Enum.map(exposes, & &1.name) == [:query, :control]
     assert Enum.all?(exposes, &(&1.listener == :rpc))
 
     refute Enum.any?(
@@ -194,9 +194,53 @@ defmodule HostKit.DSL.CoreTest do
            )
 
     assert %HostKit.RPC{exposes: [], bindings: [binding]} = caller.meta.rpc
-    assert binding.service == :llm_proxy
-    assert binding.surfaces == [:control]
+    assert binding.service == :catalog
+    assert binding.surfaces == [:query]
     assert binding.listener == :rpc
+
+    assert %HostKit.Resources.File{path: "/etc/apps/web/rpc.exs", content: content} =
+             Enum.find(
+               HostKit.Project.resources(project),
+               &match?(%HostKit.Resources.File{path: "/etc/apps/web/rpc.exs"}, &1)
+             )
+
+    assert Code.eval_string(content) |> elem(0) == %{
+             catalog: %{
+               listener: :rpc,
+               socket: "/run/apps/catalog/rpc.sock",
+               upstream: "unix:/run/apps/catalog/rpc.sock",
+               surfaces: [:query],
+               unit: "app-catalog.service"
+             }
+           }
+  end
+
+  test "rpc bindings validate target services listeners and surfaces" do
+    project =
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :prod do
+        service :catalog do
+          daemon do
+            listen :rpc, protocol: :rpc
+          end
+
+          rpc do
+            expose :query
+          end
+        end
+
+        service :web do
+          bind :catalog, rpc: [:control]
+          bind :missing, rpc: [:query]
+        end
+      end
+      """)
+      |> elem(0)
+
+    assert {:error, diagnostics} = HostKit.plan(project)
+    assert Enum.map(diagnostics.errors, & &1.code) == [:rpc_unknown_surface, :rpc_unknown_service]
   end
 
   test "non-rpc listeners still require ports" do
