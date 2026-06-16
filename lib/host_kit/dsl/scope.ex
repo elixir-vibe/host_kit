@@ -642,6 +642,21 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp default_listener_opts(_name, opts) do
+    opts = default_rpc_socket(opts)
+
+    if Keyword.get(opts, :protocol) == :rpc do
+      Keyword.update(
+        opts,
+        :meta,
+        default_rpc_socket_meta(),
+        &Map.merge(default_rpc_socket_meta(), &1)
+      )
+    else
+      opts
+    end
+  end
+
+  defp default_rpc_socket(opts) do
     if Keyword.get(opts, :protocol) == :rpc and is_nil(Keyword.get(opts, :port)) and
          is_nil(Keyword.get(opts, :socket)) do
       Keyword.put(
@@ -652,6 +667,14 @@ defmodule HostKit.DSL.Scope do
     else
       opts
     end
+  end
+
+  defp default_rpc_socket_meta do
+    %{
+      socket_owner: service_user(),
+      socket_group: service_user(),
+      socket_mode: 0o660
+    }
   end
 
   defp put_host_ssh_opts(host, opts) do

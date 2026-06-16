@@ -215,7 +215,7 @@ service :web do
 end
 ```
 
-HostKit owns service names, listener/socket locations, broad surface bindings, validation, and caller-local binding files. The runtime RPC protocol owns exact operation names and schemas.
+HostKit owns service names, listener/socket locations, broad surface bindings, validation, caller-local binding files, and derived local socket access from `bind`. The runtime RPC protocol owns exact operation names and schemas.
 
 ## Defaults
 

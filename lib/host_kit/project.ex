@@ -148,10 +148,15 @@ defmodule HostKit.Project do
 
   @spec resources(t()) :: [struct()]
   def resources(%__MODULE__{} = project) do
-    project.resources
-    |> Kernel.++(Enum.flat_map(project.instances, &instance_resources/1))
-    |> Kernel.++(project.proxies)
-    |> Kernel.++(project.services |> Enum.flat_map(&expand_resources(&1.resources)))
+    resources =
+      project.resources
+      |> Kernel.++(Enum.flat_map(project.instances, &instance_resources/1))
+      |> Kernel.++(project.proxies)
+      |> Kernel.++(project.services |> Enum.flat_map(&expand_resources(&1.resources)))
+
+    resources = HostKit.RPC.apply_permissions(project, resources)
+
+    resources
     |> Kernel.++(HostKit.RPC.binding_resources(project))
     |> Kernel.++(Firewall.policies(project))
     |> Kernel.++(workspace_egress(project))

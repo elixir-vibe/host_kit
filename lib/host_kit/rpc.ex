@@ -44,6 +44,20 @@ defmodule HostKit.RPC do
     if Diagnostics.ok?(diagnostics), do: :ok, else: {:error, diagnostics}
   end
 
+  @spec apply_permissions(Project.t(), [struct()]) :: [struct()]
+  def apply_permissions(%Project{} = project, resources) when is_list(resources) do
+    caller_groups = caller_rpc_groups(project)
+
+    Enum.map(resources, fn
+      %HostKit.Resources.Account{name: name, groups: groups} = account ->
+        extra_groups = Map.get(caller_groups, name, [])
+        %{account | groups: Enum.uniq(groups ++ extra_groups)}
+
+      resource ->
+        resource
+    end)
+  end
+
   @spec binding_resources(Project.t()) :: [File.t()]
   def binding_resources(%Project{} = project) do
     service_index = service_index(project)
@@ -51,6 +65,33 @@ defmodule HostKit.RPC do
     project.services
     |> Enum.filter(&(rpc(&1).bindings != []))
     |> Enum.map(&binding_file(project, &1, service_index))
+  end
+
+  defp caller_rpc_groups(project) do
+    service_index = service_index(project)
+
+    project.services
+    |> Enum.flat_map(fn caller ->
+      caller_user = service_user(project, caller)
+
+      caller
+      |> rpc()
+      |> Map.fetch!(:bindings)
+      |> Enum.map(fn binding ->
+        {caller_user, provider_group(project, service_index, binding)}
+      end)
+    end)
+    |> Enum.reject(fn {_caller_user, group} -> is_nil(group) end)
+    |> Enum.group_by(fn {caller_user, _group} -> caller_user end, fn {_caller_user, group} ->
+      group
+    end)
+  end
+
+  defp provider_group(project, service_index, %Binding{} = binding) do
+    case Map.fetch(service_index, binding.service) do
+      {:ok, provider} -> service_user(project, provider)
+      :error -> nil
+    end
   end
 
   defp binding_file(project, %Service{} = caller, service_index) do
@@ -92,7 +133,7 @@ defmodule HostKit.RPC do
 
   defp binding_path(project, service) do
     Path.join([
-      Conventions.root(project.conventions, :config, "/etc"),
+      Conventions.root(conventions(project), :config, "/etc"),
       service.path,
       "rpc.exs"
     ])
@@ -183,13 +224,16 @@ defmodule HostKit.RPC do
   defp rpc(%Service{} = service), do: Map.get(service.meta, :rpc, new())
 
   defp service_user(project, service),
-    do: Conventions.prefixed(project.conventions, :user, service.identity)
+    do: project |> conventions() |> Conventions.prefixed(:user, service.identity)
 
   defp unit_name(project, service),
     do:
-      project.conventions
+      project
+      |> conventions()
       |> Conventions.prefixed(:unit, service.identity)
       |> HostKit.Naming.systemd_unit()
+
+  defp conventions(project), do: Conventions.new(project.conventions)
 
   defp diagnostic(code, message) do
     %Diagnostic{severity: :error, code: code, message: message}

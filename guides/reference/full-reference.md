@@ -235,7 +235,9 @@ The file contains only bindings for that caller:
 }
 ```
 
-Socket permissions or Gatehouse/SafeRPC config can build on the same metadata later.
+HostKit also derives the local access boundary from `bind`. The provider RPC socket metadata defaults to the provider service user/group with mode `0660`, and the caller service account is added to the provider service group when an account resource is declared for the caller. For example, `bind :catalog, rpc: [:query]` lets the `web` service account join the `catalog` service group so it can open `/run/apps/catalog/rpc.sock`.
+
+Gatehouse/SafeRPC config can build on the same metadata later.
 
 Use TCP explicitly only when the RPC endpoint must cross a host/container boundary:
 

@@ -158,6 +158,8 @@ defmodule HostKit.DSL.CoreTest do
       prefixes user: "app-", unit: "app-"
 
       service :catalog do
+        account system: true
+
         daemon do
           listen :rpc, protocol: :rpc
         end
@@ -169,6 +171,7 @@ defmodule HostKit.DSL.CoreTest do
       end
 
       service :web do
+        account system: true
         bind :catalog, rpc: [:query]
       end
     end
@@ -181,7 +184,8 @@ defmodule HostKit.DSL.CoreTest do
              name: :rpc,
              protocol: :rpc,
              socket: "/run/apps/catalog/rpc.sock",
-             port: nil
+             port: nil,
+             meta: %{socket_owner: "app-catalog", socket_group: "app-catalog", socket_mode: 0o660}
            } = provider.meta.listeners.rpc
 
     assert %HostKit.RPC{exposes: exposes, bindings: []} = provider.meta.rpc
@@ -193,16 +197,24 @@ defmodule HostKit.DSL.CoreTest do
              &match?(%HostKit.Systemd.Service{service: %{listen_stream: _}}, &1)
            )
 
+    resources = HostKit.Project.resources(project)
+
+    assert %HostKit.Resources.Account{name: "app-web", groups: ["app-catalog"]} =
+             Enum.find(resources, &match?(%HostKit.Resources.Account{name: "app-web"}, &1))
+
     assert %HostKit.RPC{exposes: [], bindings: [binding]} = caller.meta.rpc
     assert binding.service == :catalog
     assert binding.surfaces == [:query]
     assert binding.listener == :rpc
 
     assert %HostKit.Resources.File{path: "/etc/apps/web/rpc.exs", content: content} =
+             rpc_file =
              Enum.find(
-               HostKit.Project.resources(project),
+               resources,
                &match?(%HostKit.Resources.File{path: "/etc/apps/web/rpc.exs"}, &1)
              )
+
+    assert rpc_file.group == "app-web"
 
     assert Code.eval_string(content) |> elem(0) == %{
              catalog: %{

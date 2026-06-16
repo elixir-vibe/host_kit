@@ -101,7 +101,7 @@ service :web do
 end
 ```
 
-HostKit owns service names, listener/socket locations, broad surface bindings, validation, and caller-local binding files such as `/etc/apps/web/rpc.exs`. Do not list exact operation names in HostKit; SafeRPC or another runtime handshake owns concrete ops and schemas.
+HostKit owns service names, listener/socket locations, broad surface bindings, validation, caller-local binding files such as `/etc/apps/web/rpc.exs`, and derived local socket access. By default, RPC sockets are owned by the provider service user/group with mode `0660`, and `bind` adds the caller service account to the provider service group when the caller declares an account resource. Do not list exact operation names in HostKit; SafeRPC or another runtime handshake owns concrete ops and schemas.
 
 ## Service identity and paths
 
