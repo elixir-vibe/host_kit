@@ -3,9 +3,12 @@ defmodule HostKit.ConventionsTest do
 
   alias HostKit.Conventions
 
-  test "HostKit run tracking roots default under the state root" do
+  test "common executable roots and HostKit run tracking roots have defaults" do
     conventions = Conventions.new()
 
+    assert Conventions.root!(conventions, :bin) == "/usr/local/bin"
+    assert Conventions.root!(conventions, :sbin) == "/usr/local/sbin"
+    assert Conventions.root(conventions, :bin, "/bin") == "/usr/local/bin"
     assert Conventions.state_root(conventions) == "/var/lib/hostkit"
     assert Conventions.runs_root(conventions) == "/var/lib/hostkit/runs"
     assert Conventions.backups_root(conventions) == "/var/lib/hostkit/backups"

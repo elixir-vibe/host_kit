@@ -10,6 +10,7 @@ defmodule HostKit.Conventions do
 
   @default_state_root "/var/lib/hostkit"
   @default_workspaces_root "/var/lib/hostkit/workspaces"
+  @default_roots %{bin: "/usr/local/bin", sbin: "/usr/local/sbin"}
 
   defstruct roots: %{}, prefixes: %{}
 
@@ -33,10 +34,12 @@ defmodule HostKit.Conventions do
 
   @spec root!(t() | map(), atom()) :: String.t()
   def root!(conventions, name) do
-    conventions
-    |> normalize()
-    |> Map.fetch!(:roots)
-    |> Map.fetch!(name)
+    conventions = normalize(conventions)
+
+    case Map.fetch!(conventions, :roots) do
+      %{^name => root} -> root
+      _roots -> Map.fetch!(@default_roots, name)
+    end
   end
 
   @doc "Returns the HostKit state root, defaulting to /var/lib/hostkit."
@@ -70,7 +73,7 @@ defmodule HostKit.Conventions do
     conventions
     |> normalize()
     |> Map.fetch!(:roots)
-    |> Map.get(name, default)
+    |> Map.get(name, Map.get(@default_roots, name, default))
   end
 
   @spec prefixed(t() | map(), atom(), term()) :: String.t()

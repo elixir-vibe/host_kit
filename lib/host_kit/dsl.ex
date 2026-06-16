@@ -1060,19 +1060,29 @@ defmodule HostKit.DSL do
 
   defmacro mix(task, opts \\ []) do
     quote do
-      HostKit.CommandLine.mix(unquote(task), unquote(opts))
+      opts = Keyword.put_new(unquote(opts), :command, path(:bin, "mix"))
+      HostKit.CommandLine.mix(unquote(task), opts)
     end
   end
 
   defmacro elixir(opts \\ []) do
     quote do
-      HostKit.CommandLine.elixir(unquote(opts))
+      opts = Keyword.put_new(unquote(opts), :command, path(:bin, "elixir"))
+      HostKit.CommandLine.elixir(opts)
     end
   end
 
   defmacro elixir(script_or_args, opts) do
     quote do
-      HostKit.CommandLine.elixir(unquote(script_or_args), unquote(opts))
+      opts = Keyword.put_new(unquote(opts), :command, path(:bin, "elixir"))
+      HostKit.CommandLine.elixir(unquote(script_or_args), opts)
+    end
+  end
+
+  defmacro eval(expression, opts \\ []) do
+    quote do
+      opts = Keyword.put_new(unquote(opts), :command, path(:bin, "elixir"))
+      HostKit.CommandLine.eval(unquote(expression), opts)
     end
   end
 

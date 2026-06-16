@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Added command monitor execution with `monitor :command, exec: ...`, reusing the same command shapes as command resources.
-- Added `mix/2` and `elixir/1,2` command-line builders for first-class BEAM CLI commands.
+- Added `mix/2`, `elixir/1,2`, and `eval/1,2` command-line builders for first-class BEAM CLI commands, with DSL defaults from the `:bin` convention root.
 - Added quoted `.exs` file resources via `exs PATH do ... end`, with strict `unquote(value(...))` and `unquote(secret(...))` placeholders.
 
 ## v0.1.0-beta.5 - 2026-06-16

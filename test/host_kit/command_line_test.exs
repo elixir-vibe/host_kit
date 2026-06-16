@@ -69,6 +69,9 @@ defmodule HostKit.CommandLineTest do
 
     assert %CommandLine{command: "/opt/mise/shims/elixir", args: ["--version"]} =
              CommandLine.elixir(command: "/opt/mise/shims/elixir", args: ["--version"])
+
+    assert %CommandLine{command: "elixir", args: ["-e", "IO.puts(:ok)"]} =
+             CommandLine.eval("IO.puts(:ok)")
   end
 
   test "supports trailing arguments after structured options" do

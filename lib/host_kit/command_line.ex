@@ -45,6 +45,12 @@ defmodule HostKit.CommandLine do
     argv(command, prepend_args(opts, List.wrap(script_or_args)))
   end
 
+  @doc "Builds an `elixir -e` command line."
+  @spec eval(String.t(), keyword()) :: t()
+  def eval(expression, opts \\ []) when is_binary(expression) do
+    elixir(["-e", expression], opts)
+  end
+
   @doc "Normalizes a HostKit command shape into `{command, args}` argv form."
   @spec to_exec(t() | String.t() | {term(), [term()]} | [term()]) :: {String.t(), [String.t()]}
   def to_exec(%__MODULE__{command: command, args: args}), do: {command, args}

@@ -363,8 +363,9 @@ Legend:
 | `git` | Reference | Git command resource helper. |
 | `bash` | Reference | Bash command resource helper. |
 | `argv` | Reference | Structured argv command builder. |
-| `mix` | Reference | Mix task command builder. |
-| `elixir` | Reference | Elixir CLI command builder. |
+| `mix` | Reference | Mix task command builder using the `:bin` convention root by default. |
+| `elixir` | Reference | Elixir CLI command builder using the `:bin` convention root by default. |
+| `eval` | Reference | `elixir -e` command builder using the `:bin` convention root by default. |
 
 ### Service conventions, storage, env
 

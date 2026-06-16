@@ -111,6 +111,7 @@ defmodule HostKit.MonitorTest do
       service :ops do
         command :migrate, exec: mix("ecto.migrate", opts: [quiet: true])
         monitor :command, name: :script, exec: elixir("script.exs", opts: [name: "demo"])
+        monitor :command, name: :eval, exec: eval("IO.puts(:ok)")
       end
     end
     """
@@ -118,11 +119,17 @@ defmodule HostKit.MonitorTest do
     {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
     assert [service] = project.services
     assert [%HostKit.Resources.Command{} = command] = service.resources
-    assert command.exec == {"mix", ["ecto.migrate", "--quiet"]}
-    assert [check] = HostKit.Monitor.checks(project)
+    assert command.exec == {"/usr/local/bin/mix", ["ecto.migrate", "--quiet"]}
+    assert [script, eval] = HostKit.Monitor.checks(project)
 
-    assert %HostKit.CommandLine{command: "elixir", args: ["script.exs", "--name", "demo"]} =
-             check.exec
+    assert %HostKit.CommandLine{
+             command: "/usr/local/bin/elixir",
+             args: ["script.exs", "--name", "demo"]
+           } =
+             script.exec
+
+    assert %HostKit.CommandLine{command: "/usr/local/bin/elixir", args: ["-e", "IO.puts(:ok)"]} =
+             eval.exec
   end
 
   test "monitor after a resource attaches to the last resource" do

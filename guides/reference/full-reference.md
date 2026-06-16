@@ -1098,12 +1098,13 @@ BEAM command builders wrap the same argv structure:
 
 ```elixir
 mix("ecto.migrate", opts: [quiet: true])
-mix("exograph.web", command: path(:bin, "mix"), opts: [port: 4200])
+mix("exograph.web", opts: [port: 4200])
 elixir("script.exs", opts: [name: "demo"])
 elixir(args: ["--version"])
+eval("IO.puts(:ok)")
 ```
 
-These return `%HostKit.CommandLine{}` and can be used anywhere `exec:` or `exec_start` accepts command lines.
+These return `%HostKit.CommandLine{}` and can be used anywhere `exec:` or `exec_start` accepts command lines. In DSL context, `mix`, `elixir`, and `eval` default to `path(:bin, "mix")` / `path(:bin, "elixir")`, so projects can override the executable root with `roots bin: ...`.
 
 ## Systemd unit names
 

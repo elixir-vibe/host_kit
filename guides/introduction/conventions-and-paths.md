@@ -52,6 +52,17 @@ Useful helpers:
 - `unit_name()` returns the convention-derived systemd unit name.
 - `service :name, path: "slug"` overrides the path/identity slug for one service.
 
+Common executable roots have defaults and can be overridden:
+
+```elixir
+# defaults
+path(:bin, "mix")  # /usr/local/bin/mix
+path(:sbin, "tool") # /usr/local/sbin/tool
+
+# override
+roots bin: "/opt/mise/shims"
+```
+
 For HostKit's own host-side tracking, the default roots are:
 
 ```elixir
