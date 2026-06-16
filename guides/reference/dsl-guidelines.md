@@ -535,3 +535,9 @@ Legend:
 | `ecto` | Reference | Ecto migration/rollback config. |
 | `repo` | Reference | Ecto repo entry. |
 | `mix` | Reference | Mix command entry for recipe operations. |
+
+### Xamal release recipe
+
+| Directive | Level | Purpose |
+| --- | --- | --- |
+| `xamal_release` | Reference | Consume a Xamal HostKit ETF artifact manifest and emit ordinary deployment resources. |

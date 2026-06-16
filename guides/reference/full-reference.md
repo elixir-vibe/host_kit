@@ -169,6 +169,36 @@ Shop.Release.rollback(Shop.Repo)
 
 Use `:migrate` and `:rollback` for custom release functions when the defaults do not fit.
 
+## Xamal release artifacts
+
+The Xamal release recipe consumes a Xamal HostKit artifact manifest written as ETF and expands it into ordinary HostKit resources. Xamal remains responsible for building the release artifact; HostKit remains responsible for accounts, directories, env files, systemd, readiness, planning, apply, and down plans.
+
+Import the recipe explicitly:
+
+```elixir
+use HostKit.DSL, recipes: [HostKit.Recipes.XamalRelease]
+```
+
+Then reference the manifest:
+
+```elixir
+project :example do
+  xamal_release :demo_app,
+    manifest: "_build/prod/demo_app-hostkit.etf",
+    port: 4000,
+    base_dir: "/opt/example/demo_app",
+    config_dir: "/etc/example/demo_app"
+end
+```
+
+The manifest is decoded with:
+
+```elixir
+:erlang.binary_to_term(binary, [:safe])
+```
+
+HostKit does not embed release tarball bytes into the plan. The tarball path recorded in the manifest must be available to the target where the generated unpack command runs.
+
 ## RPC service bindings
 
 `rpc` models service-to-service RPC wiring. HostKit owns service names, listener locations, module-level bindings, and local socket access; the runtime RPC protocol owns exact operations, typespecs, and handshakes.
