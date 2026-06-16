@@ -194,6 +194,29 @@ end
 
 `:http` resolves to the declared loopback listener upstream.
 
+### RPC bindings
+
+Use `rpc` inside a service to group broad service-to-service RPC surfaces, and `bind` from a caller service to declare Docker-like service bindings:
+
+```elixir
+service :llm_proxy, path: "llm-proxy" do
+  daemon do
+    listen :rpc, protocol: :rpc
+  end
+
+  rpc do
+    expose :api
+    expose :control
+  end
+end
+
+service :incant_admin, path: "incant-admin" do
+  bind :llm_proxy, rpc: [:control]
+end
+```
+
+HostKit owns service names, listener/socket locations, and broad surface bindings. The runtime RPC protocol owns exact operation names and schemas.
+
 ## Defaults
 
 ### Host / SSH

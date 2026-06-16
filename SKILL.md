@@ -74,6 +74,35 @@ roots local_cache: Path.expand("~/.cache/hostkit-demo")
 
 Prefer absolute roots for production configs.
 
+## RPC service bindings
+
+Use `listen :rpc, protocol: :rpc` for same-host RPC listeners. With no `port:` or `socket:`, HostKit defaults to a Unix socket under the configured `:run` root and current service path, for example `/run/toys/llm-proxy/rpc.sock` when `roots run: "/run/toys"` and `service :llm_proxy, path: "llm-proxy"`.
+
+Provider services declare broad RPC surfaces:
+
+```elixir
+service :llm_proxy, path: "llm-proxy" do
+  daemon do
+    listen :rpc, protocol: :rpc
+  end
+
+  rpc do
+    expose :api
+    expose :control
+  end
+end
+```
+
+Caller services declare Docker-like bindings:
+
+```elixir
+service :incant_admin, path: "incant-admin" do
+  bind :llm_proxy, rpc: [:control]
+end
+```
+
+HostKit owns service names, listener/socket locations, and broad surface bindings. Do not list exact operation names in HostKit; SafeRPC or another runtime handshake owns concrete ops and schemas.
+
 ## Service identity and paths
 
 Prefer the `service` `path:` option when the on-disk slug differs from the logical service name:

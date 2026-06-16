@@ -149,6 +149,72 @@ defmodule HostKit.DSL.CoreTest do
            ] = service.resources
   end
 
+  test "rpc exposes and binds service surfaces through unix socket listeners" do
+    source = """
+    use HostKit.DSL
+
+    project :prod do
+      roots run: "/run/toys"
+      prefixes user: "toys-", unit: "toys-"
+
+      service :llm_proxy, path: "llm-proxy" do
+        daemon do
+          listen :rpc, protocol: :rpc
+        end
+
+        rpc do
+          expose :api
+          expose :control
+        end
+      end
+
+      service :incant_admin, path: "incant-admin" do
+        bind :llm_proxy, rpc: [:control]
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    [provider, caller] = project.services
+
+    assert %HostKit.Listener{
+             name: :rpc,
+             protocol: :rpc,
+             socket: "/run/toys/llm-proxy/rpc.sock",
+             port: nil
+           } = provider.meta.listeners.rpc
+
+    assert %HostKit.RPC{exposes: exposes, bindings: []} = provider.meta.rpc
+    assert Enum.map(exposes, & &1.name) == [:api, :control]
+    assert Enum.all?(exposes, &(&1.listener == :rpc))
+
+    refute Enum.any?(
+             provider.resources,
+             &match?(%HostKit.Systemd.Service{service: %{listen_stream: _}}, &1)
+           )
+
+    assert %HostKit.RPC{exposes: [], bindings: [binding]} = caller.meta.rpc
+    assert binding.service == :llm_proxy
+    assert binding.surfaces == [:control]
+    assert binding.listener == :rpc
+  end
+
+  test "non-rpc listeners still require ports" do
+    assert_raise ArgumentError, ~r/http listener requires a port/, fn ->
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :prod do
+        service :api do
+          daemon do
+            listen :http
+          end
+        end
+      end
+      """)
+    end
+  end
+
   test "storage and env defaults use declared service roots" do
     source = """
     use HostKit.DSL

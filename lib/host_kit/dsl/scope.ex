@@ -1,7 +1,17 @@
 defmodule HostKit.DSL.Scope do
   @moduledoc false
 
-  alias HostKit.{Conventions, Host, Instance, Naming, Project, ProviderConfig, Service, Storage}
+  alias HostKit.{
+    Conventions,
+    Host,
+    Instance,
+    Naming,
+    Project,
+    ProviderConfig,
+    RPC,
+    Service,
+    Storage
+  }
 
   @project_key {__MODULE__, :project}
   @host_key {__MODULE__, :host}
@@ -18,6 +28,7 @@ defmodule HostKit.DSL.Scope do
   @firewall_key {__MODULE__, :firewall}
   @proxy_key {__MODULE__, :proxy}
   @proxy_service_key {__MODULE__, :proxy_service}
+  @rpc_key {__MODULE__, :rpc}
   @default_providers_key {__MODULE__, :default_providers}
 
   def put_default_providers(providers) do
@@ -567,8 +578,18 @@ defmodule HostKit.DSL.Scope do
     |> Enum.map(fn {_name, volume} -> volume end)
   end
 
+  def start_rpc do
+    Process.put(@rpc_key, true)
+  end
+
+  def finish_rpc do
+    Process.delete(@rpc_key) || raise "no HostKit rpc in scope"
+  end
+
+  def rpc_active?, do: Process.get(@rpc_key) == true
+
   def put_listener(name, opts) do
-    listener = HostKit.Listener.new(name, opts)
+    listener = HostKit.Listener.new(name, default_listener_opts(name, opts))
 
     update_current(:service, fn service ->
       listeners = service.meta |> Map.get(:listeners, %{}) |> Map.put(name, listener)
@@ -597,6 +618,41 @@ defmodule HostKit.DSL.Scope do
   end
 
   def listener_upstream(name), do: name |> listener() |> HostKit.Listener.upstream()
+
+  def put_rpc_exposure(name, opts \\ []) do
+    exposure = HostKit.RPC.Exposure.new(name, opts)
+
+    update_current(:service, fn service ->
+      rpc = service.meta |> Map.get(:rpc, RPC.new()) |> RPC.add_exposure(exposure)
+      %{service | meta: Map.put(service.meta, :rpc, rpc)}
+    end)
+
+    exposure
+  end
+
+  def put_rpc_binding(service_name, opts \\ []) do
+    binding = HostKit.RPC.Binding.new(service_name, opts)
+
+    update_current(:service, fn service ->
+      rpc = service.meta |> Map.get(:rpc, RPC.new()) |> RPC.add_binding(binding)
+      %{service | meta: Map.put(service.meta, :rpc, rpc)}
+    end)
+
+    binding
+  end
+
+  defp default_listener_opts(_name, opts) do
+    if Keyword.get(opts, :protocol) == :rpc and is_nil(Keyword.get(opts, :port)) and
+         is_nil(Keyword.get(opts, :socket)) do
+      Keyword.put(
+        opts,
+        :socket,
+        Path.join([default_root(:run, "/run"), service_path(), "rpc.sock"])
+      )
+    else
+      opts
+    end
+  end
 
   defp put_host_ssh_opts(host, opts) do
     host

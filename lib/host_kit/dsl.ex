@@ -376,9 +376,13 @@ defmodule HostKit.DSL do
     end
   end
 
-  defmacro expose(name, opts) do
+  defmacro expose(name, opts \\ []) do
     quote do
-      HostKit.DSL.Scope.add_instance_port(unquote(name), unquote(opts))
+      if HostKit.DSL.Scope.rpc_active?() do
+        HostKit.DSL.Scope.put_rpc_exposure(unquote(name), unquote(opts))
+      else
+        HostKit.DSL.Scope.add_instance_port(unquote(name), unquote(opts))
+      end
     end
   end
 
@@ -599,6 +603,20 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro rpc(do: block) do
+    quote do
+      HostKit.DSL.Scope.start_rpc()
+      unquote(block)
+      HostKit.DSL.Scope.finish_rpc()
+    end
+  end
+
+  defmacro bind(service, opts \\ []) do
+    quote do
+      HostKit.DSL.Scope.put_rpc_binding(unquote(service), unquote(opts))
+    end
+  end
+
   defmacro inside(do: block) do
     quote do
       HostKit.DSL.Scope.start_inside()
@@ -801,7 +819,7 @@ defmodule HostKit.DSL do
   def attach_listener(name, opts) when is_atom(name) do
     listener = HostKit.DSL.Scope.put_listener(name, opts)
 
-    if HostKit.DSL.Systemd.Scope.active?() do
+    if HostKit.DSL.Systemd.Scope.active?() and is_integer(listener.port) do
       HostKit.DSL.Systemd.Scope.put_listen(listener.port, on: listener.on)
     end
 

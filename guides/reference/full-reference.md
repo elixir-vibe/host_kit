@@ -169,6 +169,47 @@ Shop.Release.rollback(Shop.Repo)
 
 Use `:migrate` and `:rollback` for custom release functions when the defaults do not fit.
 
+## RPC service bindings
+
+`rpc` models service-to-service RPC wiring. HostKit owns service names, listener locations, and broad surface bindings; the runtime RPC protocol owns exact operations, schemas, and handshakes.
+
+Same-host RPC defaults to Unix sockets instead of TCP ports:
+
+```elixir
+service :llm_proxy, path: "llm-proxy" do
+  daemon do
+    listen :rpc, protocol: :rpc
+  end
+
+  rpc do
+    expose :api
+    expose :control
+  end
+end
+
+service :incant_admin, path: "incant-admin" do
+  bind :llm_proxy, rpc: [:control]
+end
+```
+
+With `roots run: "/run/toys"`, the default RPC socket for `llm_proxy` is:
+
+```text
+/run/toys/llm-proxy/rpc.sock
+```
+
+The provider side uses `expose` for broad surfaces. Do not list every runtime operation in HostKit; SafeRPC or another RPC runtime should describe exact callable operations during handshake.
+
+The caller side uses `bind` to declare Docker-like service bindings. `bind :llm_proxy, rpc: [:control]` means the current service may discover and connect to `llm_proxy`'s `:control` RPC surface. HostKit currently stores this as inspectable service metadata; rendering socket permissions, caller-local binding files, or Gatehouse/SafeRPC config can build on the same data.
+
+Use TCP explicitly only when the RPC endpoint must cross a host/container boundary:
+
+```elixir
+daemon do
+  listen :rpc, protocol: :rpc, port: 4451, on: :loopback
+end
+```
+
 ## Providers
 
 Providers can contribute DSL modules, resource types, renderers, validators, and read/plan/apply lifecycle operations. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.
