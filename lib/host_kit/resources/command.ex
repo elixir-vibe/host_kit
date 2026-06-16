@@ -94,11 +94,5 @@ defmodule HostKit.Resources.Command do
     end
   end
 
-  defp normalize_exec(%HostKit.CommandLine{command: command, args: args}), do: {command, args}
-
-  defp normalize_exec(command) when is_binary(command),
-    do: command |> HostKit.CommandLine.parse!() |> normalize_exec()
-
-  defp normalize_exec({command, args}), do: {to_string(command), Enum.map(args, &to_string/1)}
-  defp normalize_exec([command | args]), do: normalize_exec({command, args})
+  defp normalize_exec(exec), do: HostKit.CommandLine.to_exec(exec)
 end

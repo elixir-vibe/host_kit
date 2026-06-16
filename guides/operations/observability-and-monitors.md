@@ -53,6 +53,22 @@ service :data do
 end
 ```
 
+Operational validation commands can be modeled as monitor metadata without making them apply resources:
+
+```elixir
+service :ops do
+  file "/usr/local/sbin/dr-validate", content: "..."
+
+  monitor :command,
+    name: :dr_validate,
+    exec: argv("/usr/local/sbin/dr-validate"),
+    expect: [exit: 0],
+    severity: :critical
+end
+```
+
+Use the same `exec:` command shapes as command resources: `argv(...)`, `~SH`, `{command, args}`, or `[command | args]`. Use `command/2` resources for operations that change host state and need plan/down behavior; use `monitor :command` for observational checks.
+
 This keeps checks stable even as resources are refactored.
 
 External monitoring config should be generated from the same intent when possible. HTTP monitors can carry provider-neutral fields such as `group`, `interval`, `expect`, and `alerts`:

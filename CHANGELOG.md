@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added command monitor execution with `monitor :command, exec: ...`, reusing the same command shapes as command resources.
+
 ## v0.1.0-beta.5 - 2026-06-16
 
 - Added structured, JSON Patch-backed plan diffs for `dotenv/2`, `ini/2`, `yaml/2`, and template assign metadata, with human-readable public changes and separate redacted paths/assigns in plan output/artifacts.

@@ -84,6 +84,25 @@ defmodule HostKit.MonitorTest do
     assert %HostKit.Monitor.Check{type: :http} = endpoint.source
   end
 
+  test "command monitors use existing exec command shapes" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      service :ops do
+        file "/usr/local/sbin/check", content: "#!/bin/sh\nexit 0\n"
+        monitor :command, name: :dr_check, exec: argv("/usr/local/sbin/check", opts: [fast: true])
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    assert [check] = HostKit.Monitor.checks(project)
+    assert check.type == :command
+    assert check.name == :dr_check
+    assert %HostKit.CommandLine{command: "/usr/local/sbin/check", args: ["--fast"]} = check.exec
+  end
+
   test "monitor after a resource attaches to the last resource" do
     source = """
     use HostKit.DSL

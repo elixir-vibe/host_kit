@@ -12,6 +12,13 @@ defmodule HostKit.MonitorRunTest do
 
     def cmd("systemctl", ["is-active", "failed.service"], _opts), do: {"failed\n", 3}
 
+    def cmd("/usr/local/sbin/check", ["--fast"], opts) do
+      send(opts[:test_pid], {:command_check, opts})
+      {"ok\n", 0}
+    end
+
+    def cmd("/usr/local/sbin/fail", [], _opts), do: {"boom\n", 2}
+
     @impl true
     def mkdir_p(_path, _opts), do: :ok
 
@@ -40,6 +47,37 @@ defmodule HostKit.MonitorRunTest do
     assert {:ok, [result]} = HostKit.Monitor.run(project, runner: Runner)
     assert result.status == :error
     assert result.reason == {:unexpected_state, "failed"}
+  end
+
+  test "runs command checks through runner" do
+    project =
+      project_with_check(
+        HostKit.Monitor.check(:command,
+          exec: HostKit.CommandLine.argv("/usr/local/sbin/check", args: ["--fast"]),
+          expect: [exit: 0]
+        )
+      )
+
+    assert {:ok, [result]} =
+             HostKit.Monitor.run(project, runner: Runner, runner_opts: [test_pid: self()])
+
+    assert result.status == :ok
+    assert result.observed.exit == 0
+    assert result.observed.output == "ok\n"
+    assert_received {:command_check, opts}
+    assert opts[:stderr_to_stdout] == true
+  end
+
+  test "reports failing command checks" do
+    project =
+      project_with_check(
+        HostKit.Monitor.check(:command, exec: ["/usr/local/sbin/fail"], expect: [exit: 0])
+      )
+
+    assert {:ok, [result]} = HostKit.Monitor.run(project, runner: Runner)
+    assert result.status == :error
+    assert result.reason == {:unexpected_exit, 0, 2}
+    assert result.observed.output == "boom\n"
   end
 
   test "runs filesystem checks" do

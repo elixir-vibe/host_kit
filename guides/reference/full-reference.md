@@ -876,7 +876,17 @@ HostKit.Providers.Gatus.endpoints_from_monitors(project)
 HostKit.Monitor.run(project, target: prod)
 ```
 
-Initial execution supports systemd state, HTTP status, and filesystem existence checks. Endpoint projection currently turns HTTP monitors into provider-neutral external endpoint specs; providers such as Gatus can render those specs into concrete monitoring config.
+Initial execution supports systemd state, HTTP status, filesystem existence, and command exit checks. Command monitors use the same `exec:` command shapes as command resources:
+
+```elixir
+monitor :command,
+  name: :dr_validate,
+  exec: argv("/usr/local/sbin/dr-validate"),
+  expect: [exit: 0],
+  severity: :critical
+```
+
+Endpoint projection currently turns HTTP monitors into provider-neutral external endpoint specs; providers such as Gatus can render those specs into concrete monitoring config.
 
 ## Binary release layouts
 

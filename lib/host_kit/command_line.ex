@@ -22,6 +22,16 @@ defmodule HostKit.CommandLine do
     %__MODULE__{command: command, args: Enum.map(args ++ option_args ++ trailing, &to_string/1)}
   end
 
+  @doc "Normalizes a HostKit command shape into `{command, args}` argv form."
+  @spec to_exec(t() | String.t() | {term(), [term()]} | [term()]) :: {String.t(), [String.t()]}
+  def to_exec(%__MODULE__{command: command, args: args}), do: {command, args}
+
+  def to_exec(command) when is_binary(command),
+    do: command |> parse!() |> to_exec()
+
+  def to_exec({command, args}), do: {to_string(command), Enum.map(args, &to_string/1)}
+  def to_exec([command | args]), do: to_exec({command, args})
+
   @spec parse(String.t()) :: {:ok, t()} | {:error, term()}
   def parse(source) when is_binary(source) do
     with {:ok, script} <- parse_bash(source),

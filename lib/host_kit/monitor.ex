@@ -105,6 +105,33 @@ defmodule HostKit.Monitor do
     end
   end
 
+  defp run_check(%Check{type: :command} = check, opts) do
+    expected_exit = get_in(check.expect, [:exit]) || 0
+
+    case monitor_exec(check) do
+      {:ok, {command, args}} ->
+        target = Keyword.get(opts, :target, Target.local(:local))
+        runner = Keyword.get(opts, :runner, target.runner)
+
+        runner_opts =
+          target |> Target.opts(Keyword.get(opts, :runner_opts, [])) |> Keyword.delete(:runner)
+
+        case Runner.cmd(runner, command, args, Keyword.put(runner_opts, :stderr_to_stdout, true)) do
+          {output, ^expected_exit} ->
+            Result.ok(check, %{exit: expected_exit, output: output})
+
+          {output, status} ->
+            Result.error(check, {:unexpected_exit, expected_exit, status}, %{
+              exit: status,
+              output: output
+            })
+        end
+
+      {:error, reason} ->
+        Result.error(check, reason)
+    end
+  end
+
   defp run_check(%Check{type: :filesystem} = check, _opts) do
     path = check.target || path_from_resource_id(check.resource_id)
 
@@ -124,6 +151,15 @@ defmodule HostKit.Monitor do
 
   defp path_from_resource_id({_type, path}) when is_binary(path), do: path
   defp path_from_resource_id(_resource_id), do: nil
+
+  defp monitor_exec(%Check{exec: nil}), do: {:error, :missing_exec}
+
+  defp monitor_exec(%Check{exec: exec}) do
+    {:ok, HostKit.CommandLine.to_exec(exec)}
+  rescue
+    ArgumentError -> {:error, :invalid_exec}
+    FunctionClauseError -> {:error, :invalid_exec}
+  end
 
   defp http_status(nil), do: {:error, :missing_url}
 
