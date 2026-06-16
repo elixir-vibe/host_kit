@@ -38,6 +38,17 @@ defmodule HostKit.MonitorTest do
     assert to_string(http.resource_id) == "caddy_site.web.example.com"
   end
 
+  test "monitor structs are JSON artifact safe" do
+    check = %HostKit.Monitor.Check{type: :http, name: :web}
+    endpoint = %HostKit.Monitor.Endpoint{name: "web", source: check}
+
+    assert %{"$type" => "struct", "module" => "Elixir.HostKit.Monitor.Check"} =
+             HostKit.Resource.dump(check)
+
+    assert %{"$type" => "struct", "module" => "Elixir.HostKit.Monitor.Endpoint"} =
+             HostKit.Resource.dump(endpoint)
+  end
+
   test "projects http monitors into provider-neutral endpoint checks" do
     source = """
     use HostKit.DSL, providers: [HostKit.Providers.Caddy]
