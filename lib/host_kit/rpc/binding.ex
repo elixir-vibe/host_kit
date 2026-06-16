@@ -3,26 +3,26 @@ defmodule HostKit.RPC.Binding do
 
   @type t :: %__MODULE__{
           service: atom() | String.t(),
-          surfaces: [atom() | String.t()],
+          modules: [module()],
           listener: atom() | String.t(),
           meta: map()
         }
 
-  defstruct [:service, surfaces: [], listener: :rpc, meta: %{}]
+  defstruct [:service, modules: [], listener: :rpc, meta: %{}]
 
   @spec new(atom() | String.t(), keyword()) :: t()
   def new(service, opts \\ []) when is_atom(service) or is_binary(service) do
     %__MODULE__{
       service: service,
-      surfaces: normalize_surfaces(opts),
+      modules: normalize_modules(opts),
       listener: Keyword.get(opts, :listener, :rpc),
       meta: Keyword.get(opts, :meta, %{})
     }
   end
 
-  defp normalize_surfaces(opts) do
+  defp normalize_modules(opts) do
     opts
-    |> Keyword.get(:rpc, Keyword.get(opts, :surfaces, []))
+    |> Keyword.get(:modules, [])
     |> List.wrap()
   end
 end

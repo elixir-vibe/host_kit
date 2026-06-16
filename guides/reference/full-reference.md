@@ -171,7 +171,7 @@ Use `:migrate` and `:rollback` for custom release functions when the defaults do
 
 ## RPC service bindings
 
-`rpc` models service-to-service RPC wiring. HostKit owns service names, listener locations, and broad surface bindings; the runtime RPC protocol owns exact operations, schemas, and handshakes.
+`rpc` models service-to-service RPC wiring. HostKit owns service names, listener locations, module-level bindings, and local socket access; the runtime RPC protocol owns exact operations, typespecs, and handshakes.
 
 Same-host RPC defaults to Unix sockets instead of TCP ports:
 
@@ -182,13 +182,13 @@ service :catalog do
   end
 
   rpc do
-    expose :query
-    expose :control
+    expose Catalog.API
+    expose Catalog.Admin
   end
 end
 
 service :web do
-  bind :catalog, rpc: [:query]
+  bind :catalog
 end
 ```
 
@@ -198,15 +198,15 @@ With `roots run: "/run/apps"`, the default RPC socket for `catalog` is:
 /run/apps/catalog/rpc.sock
 ```
 
-The provider side uses `expose` for broad surfaces. Do not list every runtime operation in HostKit; SafeRPC or another RPC runtime should describe exact callable operations during handshake.
+The provider side uses `expose` for RPC modules. Do not list every runtime operation in HostKit; SafeRPC or another RPC runtime should describe exact callable functions during handshake.
 
-The caller side uses `bind` to declare Docker-like service bindings. `bind :catalog, rpc: [:query]` means the current service may discover and connect to `catalog`'s `:query` RPC surface.
+The caller side uses `bind` to declare Docker-like service bindings. `bind :catalog` means the current service may discover and connect to `catalog`'s exposed RPC modules. Use `bind :catalog, modules: [Catalog.Admin]` only when the caller should narrow the binding metadata to a subset.
 
 HostKit validates RPC bindings during planning:
 
 - the target service must exist;
 - the target listener must exist;
-- the target service must expose requested surfaces;
+- the target service must expose requested modules when a module subset is specified;
 - a service cannot bind itself.
 
 For each service with RPC bindings, HostKit emits a caller-local binding file under the service config directory:
@@ -229,13 +229,13 @@ The file contains only bindings for that caller:
     listener: :rpc,
     socket: "/run/apps/catalog/rpc.sock",
     upstream: "unix:/run/apps/catalog/rpc.sock",
-    surfaces: [:query],
+    modules: [Catalog.API, Catalog.Admin],
     unit: "catalog.service"
   }
 }
 ```
 
-HostKit also derives the local access boundary from `bind`. The provider RPC socket metadata defaults to the provider service user/group with mode `0660`, and the caller service account is added to the provider service group when an account resource is declared for the caller. For example, `bind :catalog, rpc: [:query]` lets the `web` service account join the `catalog` service group so it can open `/run/apps/catalog/rpc.sock`.
+HostKit also derives the local access boundary from `bind`. The provider RPC socket metadata defaults to the provider service user/group with mode `0660`, and the caller service account is added to the provider service group when an account resource is declared for the caller. For example, `bind :catalog` lets the `web` service account join the `catalog` service group so it can open `/run/apps/catalog/rpc.sock`.
 
 Gatehouse/SafeRPC config can build on the same metadata later.
 

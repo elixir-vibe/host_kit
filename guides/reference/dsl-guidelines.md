@@ -196,7 +196,7 @@ end
 
 ### RPC bindings
 
-Use `rpc` inside a service to group broad service-to-service RPC surfaces, and `bind` from a caller service to declare Docker-like service bindings:
+Use `rpc` inside a service to declare exposed RPC modules, and `bind` from a caller service to declare Docker-like service bindings:
 
 ```elixir
 service :catalog do
@@ -205,17 +205,17 @@ service :catalog do
   end
 
   rpc do
-    expose :query
-    expose :control
+    expose Catalog.API
+    expose Catalog.Admin
   end
 end
 
 service :web do
-  bind :catalog, rpc: [:query]
+  bind :catalog
 end
 ```
 
-HostKit owns service names, listener/socket locations, broad surface bindings, validation, caller-local binding files, and derived local socket access from `bind`. The runtime RPC protocol owns exact operation names and schemas.
+HostKit owns service names, listener/socket locations, module-level bindings, validation, caller-local binding files, and derived local socket access from `bind`. The runtime RPC protocol owns exact operation names, typespecs, and handshakes.
 
 ## Defaults
 

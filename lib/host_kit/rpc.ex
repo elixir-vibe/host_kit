@@ -2,8 +2,8 @@ defmodule HostKit.RPC do
   @moduledoc """
   Service-to-service RPC binding metadata.
 
-  HostKit models the deployment wiring: which service exposes broad RPC surfaces
-  and which other services are bound to them. Runtime protocols such as SafeRPC
+  HostKit models the deployment wiring: which service exposes RPC modules and
+  which other services are bound to them. Runtime protocols such as SafeRPC
   own exact operations, schemas, and handshakes.
   """
 
@@ -117,7 +117,7 @@ defmodule HostKit.RPC do
     |> Map.fetch!(:bindings)
     |> Map.new(fn %Binding{} = binding ->
       provider = Map.fetch!(service_index, binding.service)
-      surfaces = bound_surfaces(provider, binding)
+      modules = bound_modules(provider, binding)
       listener = provider.meta.listeners[binding.listener]
 
       {binding.service,
@@ -125,7 +125,7 @@ defmodule HostKit.RPC do
          listener: binding.listener,
          socket: listener.socket,
          upstream: Listener.upstream(listener),
-         surfaces: surfaces,
+         modules: modules,
          unit: unit_name(project, provider)
        }}
     end)
@@ -177,19 +177,19 @@ defmodule HostKit.RPC do
           )
         ]
 
-      exposed_surfaces(provider, binding.listener) == [] ->
+      exposed_modules(provider, binding.listener) == [] ->
         [
           diagnostic(
-            :rpc_no_surfaces,
-            "service #{inspect(provider.name)} does not expose RPC surfaces on listener #{inspect(binding.listener)}"
+            :rpc_no_modules,
+            "service #{inspect(provider.name)} does not expose RPC modules on listener #{inspect(binding.listener)}"
           )
         ]
 
-      missing = missing_surfaces(provider, binding) ->
+      missing = missing_modules(provider, binding) ->
         [
           diagnostic(
-            :rpc_unknown_surface,
-            "service #{inspect(caller.name)} binds unknown RPC surface(s) #{inspect(missing)} from #{inspect(provider.name)}"
+            :rpc_unknown_module,
+            "service #{inspect(caller.name)} binds unknown RPC module(s) #{inspect(missing)} from #{inspect(provider.name)}"
           )
         ]
 
@@ -198,25 +198,25 @@ defmodule HostKit.RPC do
     end
   end
 
-  defp missing_surfaces(_provider, %Binding{surfaces: []}), do: nil
+  defp missing_modules(_provider, %Binding{modules: []}), do: nil
 
-  defp missing_surfaces(provider, %Binding{surfaces: surfaces, listener: listener}) do
-    exposed = MapSet.new(exposed_surfaces(provider, listener))
-    missing = Enum.reject(surfaces, &MapSet.member?(exposed, &1))
+  defp missing_modules(provider, %Binding{modules: modules, listener: listener}) do
+    exposed = MapSet.new(exposed_modules(provider, listener))
+    missing = Enum.reject(modules, &MapSet.member?(exposed, &1))
     if missing == [], do: nil, else: missing
   end
 
-  defp bound_surfaces(provider, %Binding{surfaces: [], listener: listener}),
-    do: exposed_surfaces(provider, listener)
+  defp bound_modules(provider, %Binding{modules: [], listener: listener}),
+    do: exposed_modules(provider, listener)
 
-  defp bound_surfaces(_provider, %Binding{surfaces: surfaces}), do: surfaces
+  defp bound_modules(_provider, %Binding{modules: modules}), do: modules
 
-  defp exposed_surfaces(provider, listener) do
+  defp exposed_modules(provider, listener) do
     provider
     |> rpc()
     |> Map.fetch!(:exposes)
     |> Enum.filter(&(&1.listener == listener))
-    |> Enum.map(& &1.name)
+    |> Enum.map(& &1.module)
   end
 
   defp service_index(project), do: Map.new(project.services, &{&1.name, &1})

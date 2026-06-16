@@ -149,7 +149,7 @@ defmodule HostKit.DSL.CoreTest do
            ] = service.resources
   end
 
-  test "rpc exposes and binds service surfaces through unix socket listeners" do
+  test "rpc exposes modules and binds services through unix socket listeners" do
     source = """
     use HostKit.DSL
 
@@ -165,14 +165,14 @@ defmodule HostKit.DSL.CoreTest do
         end
 
         rpc do
-          expose :query
-          expose :control
+          expose Catalog.API
+          expose Catalog.Admin
         end
       end
 
       service :web do
         account system: true
-        bind :catalog, rpc: [:query]
+        bind :catalog
       end
     end
     """
@@ -189,7 +189,7 @@ defmodule HostKit.DSL.CoreTest do
            } = provider.meta.listeners.rpc
 
     assert %HostKit.RPC{exposes: exposes, bindings: []} = provider.meta.rpc
-    assert Enum.map(exposes, & &1.name) == [:query, :control]
+    assert Enum.map(exposes, & &1.module) == [Catalog.API, Catalog.Admin]
     assert Enum.all?(exposes, &(&1.listener == :rpc))
 
     refute Enum.any?(
@@ -204,7 +204,7 @@ defmodule HostKit.DSL.CoreTest do
 
     assert %HostKit.RPC{exposes: [], bindings: [binding]} = caller.meta.rpc
     assert binding.service == :catalog
-    assert binding.surfaces == [:query]
+    assert binding.modules == []
     assert binding.listener == :rpc
 
     assert %HostKit.Resources.File{path: "/etc/apps/web/rpc.exs", content: content} =
@@ -221,13 +221,13 @@ defmodule HostKit.DSL.CoreTest do
                listener: :rpc,
                socket: "/run/apps/catalog/rpc.sock",
                upstream: "unix:/run/apps/catalog/rpc.sock",
-               surfaces: [:query],
+               modules: [Catalog.API, Catalog.Admin],
                unit: "app-catalog.service"
              }
            }
   end
 
-  test "rpc bindings validate target services listeners and surfaces" do
+  test "rpc bindings validate target services listeners and modules" do
     project =
       Code.eval_string("""
       use HostKit.DSL
@@ -239,20 +239,20 @@ defmodule HostKit.DSL.CoreTest do
           end
 
           rpc do
-            expose :query
+            expose Catalog.API
           end
         end
 
         service :web do
-          bind :catalog, rpc: [:control]
-          bind :missing, rpc: [:query]
+          bind :catalog, modules: [Catalog.Admin]
+          bind :missing, modules: [Catalog.API]
         end
       end
       """)
       |> elem(0)
 
     assert {:error, diagnostics} = HostKit.plan(project)
-    assert Enum.map(diagnostics.errors, & &1.code) == [:rpc_unknown_surface, :rpc_unknown_service]
+    assert Enum.map(diagnostics.errors, & &1.code) == [:rpc_unknown_module, :rpc_unknown_service]
   end
 
   test "non-rpc listeners still require ports" do
