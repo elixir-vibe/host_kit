@@ -19,6 +19,11 @@ defmodule HostKit.MonitorRunTest do
 
     def cmd("/usr/local/sbin/fail", [], _opts), do: {"boom\n", 2}
 
+    def cmd("sudo", ["/usr/local/sbin/check", "--fast"], opts) do
+      send(opts[:test_pid], {:sudo_command_check, opts})
+      {"ok\n", 0}
+    end
+
     @impl true
     def mkdir_p(_path, _opts), do: :ok
 
@@ -65,6 +70,29 @@ defmodule HostKit.MonitorRunTest do
     assert result.observed.exit == 0
     assert result.observed.output == "ok\n"
     assert_received {:command_check, opts}
+    assert opts[:stderr_to_stdout] == true
+  end
+
+  test "runs command checks through sudo when target opts request it" do
+    project =
+      project_with_check(
+        HostKit.Monitor.check(:command,
+          exec: HostKit.CommandLine.argv("/usr/local/sbin/check", args: ["--fast"]),
+          expect: [exit: 0]
+        )
+      )
+
+    target = HostKit.Target.local(:local, sudo: true)
+
+    assert {:ok, [result]} =
+             HostKit.Monitor.run(project,
+               target: target,
+               runner: Runner,
+               runner_opts: [test_pid: self()]
+             )
+
+    assert result.status == :ok
+    assert_received {:sudo_command_check, opts}
     assert opts[:stderr_to_stdout] == true
   end
 

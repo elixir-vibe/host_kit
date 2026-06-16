@@ -116,6 +116,8 @@ defmodule HostKit.Monitor do
         runner_opts =
           target |> Target.opts(Keyword.get(opts, :runner_opts, [])) |> Keyword.delete(:runner)
 
+        {command, args} = maybe_sudo(command, args, runner_opts)
+
         case Runner.cmd(runner, command, args, Keyword.put(runner_opts, :stderr_to_stdout, true)) do
           {output, ^expected_exit} ->
             Result.ok(check, %{exit: expected_exit, output: output})
@@ -159,6 +161,10 @@ defmodule HostKit.Monitor do
   rescue
     ArgumentError -> {:error, :invalid_exec}
     FunctionClauseError -> {:error, :invalid_exec}
+  end
+
+  defp maybe_sudo(command, args, opts) do
+    if Keyword.get(opts, :sudo, false), do: {"sudo", [command | args]}, else: {command, args}
   end
 
   defp http_status(nil), do: {:error, :missing_url}
