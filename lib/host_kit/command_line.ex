@@ -15,10 +15,11 @@ defmodule HostKit.CommandLine do
   @spec argv(String.t(), keyword()) :: t()
   def argv(command, opts \\ []) when is_binary(command) do
     args = Keyword.get(opts, :args, [])
+    trailing = Keyword.get(opts, :trailing, [])
     option_style = Keyword.get(opts, :style, Keyword.get(opts, :opts_style, :gnu))
     option_args = opts |> Keyword.get(:opts, []) |> option_args(option_style)
 
-    %__MODULE__{command: command, args: Enum.map(args ++ option_args, &to_string/1)}
+    %__MODULE__{command: command, args: Enum.map(args ++ option_args ++ trailing, &to_string/1)}
   end
 
   @spec parse(String.t()) :: {:ok, t()} | {:error, term()}

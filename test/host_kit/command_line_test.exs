@@ -45,4 +45,13 @@ defmodule HostKit.CommandLineTest do
     assert %CommandLine{args: ["--include", "a", "--include", "b"]} =
              CommandLine.argv("cmd", opts: [include: ["a", "b"]])
   end
+
+  test "supports trailing arguments after structured options" do
+    assert %CommandLine{args: ["task", "--mode", "latest", "--no-bm25"]} =
+             CommandLine.argv("mix",
+               args: ["task"],
+               opts: [mode: "latest"],
+               trailing: ["--no-bm25"]
+             )
+  end
 end
