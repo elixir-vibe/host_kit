@@ -173,6 +173,10 @@ defmodule HostKit.DSL.CoreTest do
       service :web do
         account system: true
         bind :catalog
+
+        daemon do
+          service(exec_start: "/bin/true")
+        end
       end
     end
     """
@@ -207,16 +211,16 @@ defmodule HostKit.DSL.CoreTest do
     assert binding.modules == []
     assert binding.listener == :rpc
 
-    assert %HostKit.Resources.File{path: "/etc/apps/web/rpc.exs", content: content} =
+    assert %HostKit.Resources.File{path: "/run/apps/web/rpc.etf", content: content} =
              rpc_file =
              Enum.find(
                resources,
-               &match?(%HostKit.Resources.File{path: "/etc/apps/web/rpc.exs"}, &1)
+               &match?(%HostKit.Resources.File{path: "/run/apps/web/rpc.etf"}, &1)
              )
 
     assert rpc_file.group == "app-web"
 
-    assert Code.eval_string(content) |> elem(0) == %{
+    assert :erlang.binary_to_term(content, [:safe]) == %{
              catalog: %{
                listener: :rpc,
                socket: "/run/apps/catalog/rpc.sock",
@@ -225,6 +229,11 @@ defmodule HostKit.DSL.CoreTest do
                unit: "app-catalog.service"
              }
            }
+
+    assert %HostKit.Systemd.Service{service: service_opts} =
+             Enum.find(resources, &match?(%HostKit.Systemd.Service{name: "app-web.service"}, &1))
+
+    assert "HOSTKIT_RPC_BINDINGS=/run/apps/web/rpc.etf" in service_opts[:environment]
   end
 
   test "rpc bindings validate target services listeners and modules" do

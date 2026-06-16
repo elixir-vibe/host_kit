@@ -209,19 +209,19 @@ HostKit validates RPC bindings during planning:
 - the target service must expose requested modules when a module subset is specified;
 - a service cannot bind itself.
 
-For each service with RPC bindings, HostKit emits a caller-local binding file under the service config directory:
+For each service with RPC bindings, HostKit emits a caller-local SafeRPC binding term under the service runtime directory and injects its path as `HOSTKIT_RPC_BINDINGS` into the caller's systemd services:
 
 ```text
-/etc/<service>/rpc.exs
+/run/<service>/rpc.etf
 ```
 
-With service-scoped config roots, this becomes for example:
+With service-scoped runtime roots, this becomes for example:
 
 ```text
-/etc/apps/web/rpc.exs
+/run/apps/web/rpc.etf
 ```
 
-The file contains only bindings for that caller:
+The ETF file contains only bindings for that caller:
 
 ```elixir
 %{
@@ -233,6 +233,15 @@ The file contains only bindings for that caller:
     unit: "catalog.service"
   }
 }
+```
+
+Consumers read it with:
+
+```elixir
+bindings =
+  System.fetch_env!("HOSTKIT_RPC_BINDINGS")
+  |> File.read!()
+  |> :erlang.binary_to_term([:safe])
 ```
 
 HostKit also derives the local access boundary from `bind`. The provider RPC socket metadata defaults to the provider service user/group with mode `0660`, and the caller service account is added to the provider service group when an account resource is declared for the caller. For example, `bind :catalog` lets the `web` service account join the `catalog` service group so it can open `/run/apps/catalog/rpc.sock`.

@@ -58,6 +58,21 @@ defmodule HostKit.RPC do
     end)
   end
 
+  @spec apply_runtime_bindings([struct()], Project.t(), Service.t()) :: [struct()]
+  def apply_runtime_bindings(resources, %Project{} = project, %Service{} = service)
+      when is_list(resources) do
+    if rpc(service).bindings == [] do
+      resources
+    else
+      path = binding_path(project, service)
+
+      Enum.map(resources, fn
+        %HostKit.Systemd.Service{} = systemd -> put_rpc_bindings_env(systemd, path)
+        resource -> resource
+      end)
+    end
+  end
+
   @spec binding_resources(Project.t()) :: [File.t()]
   def binding_resources(%Project{} = project) do
     service_index = service_index(project)
@@ -107,8 +122,7 @@ defmodule HostKit.RPC do
   defp binding_content(project, caller, service_index) do
     caller
     |> bindings_map(project, service_index)
-    |> inspect(pretty: true, limit: :infinity, printable_limit: :infinity, width: 100)
-    |> Kernel.<>("\n")
+    |> :erlang.term_to_binary()
   end
 
   defp bindings_map(caller, project, service_index) do
@@ -133,9 +147,9 @@ defmodule HostKit.RPC do
 
   defp binding_path(project, service) do
     Path.join([
-      Conventions.root(conventions(project), :config, "/etc"),
+      Conventions.root(conventions(project), :run, "/run"),
       service.path,
-      "rpc.exs"
+      "rpc.etf"
     ])
   end
 
@@ -218,6 +232,16 @@ defmodule HostKit.RPC do
     |> Enum.filter(&(&1.listener == listener))
     |> Enum.map(& &1.module)
   end
+
+  defp put_rpc_bindings_env(%HostKit.Systemd.Service{} = systemd, path) do
+    env = "HOSTKIT_RPC_BINDINGS=#{path}"
+    service = Keyword.update(systemd.service, :environment, [env], &append_environment(&1, env))
+    %{systemd | service: service}
+  end
+
+  defp append_environment(existing, env) when is_list(existing), do: existing ++ [env]
+  defp append_environment(existing, env) when is_binary(existing), do: [existing, env]
+  defp append_environment(_existing, env), do: [env]
 
   defp service_index(project), do: Map.new(project.services, &{&1.name, &1})
 

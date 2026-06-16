@@ -152,7 +152,7 @@ defmodule HostKit.Project do
       project.resources
       |> Kernel.++(Enum.flat_map(project.instances, &instance_resources/1))
       |> Kernel.++(project.proxies)
-      |> Kernel.++(project.services |> Enum.flat_map(&expand_resources(&1.resources)))
+      |> Kernel.++(project.services |> Enum.flat_map(&service_resources(project, &1)))
 
     resources = HostKit.RPC.apply_permissions(project, resources)
 
@@ -197,6 +197,12 @@ defmodule HostKit.Project do
     else
       resource
     end
+  end
+
+  defp service_resources(project, service) do
+    service.resources
+    |> expand_resources()
+    |> HostKit.RPC.apply_runtime_bindings(project, service)
   end
 
   defp expand_resources(resources) do
