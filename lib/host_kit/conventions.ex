@@ -10,7 +10,7 @@ defmodule HostKit.Conventions do
 
   @default_state_root "/var/lib/hostkit"
   @default_workspaces_root "/var/lib/hostkit/workspaces"
-  @default_roots %{bin: "/usr/local/bin", sbin: "/usr/local/sbin"}
+  @default_roots %{bin: "/usr/local/bin", sbin: "/usr/local/sbin", run: "/run"}
 
   defstruct roots: %{}, prefixes: %{}
 

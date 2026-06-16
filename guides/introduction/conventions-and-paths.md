@@ -46,6 +46,7 @@ Useful helpers:
 - `storage :data` defaults under the declared `:data` root.
 - `env :runtime` defaults under the declared `:config` root.
 - `path(:source)` resolves the current service's source path.
+- `path(:run, "rpc.sock")` resolves the current service's runtime socket path.
 - `path(:data, "repositories")` resolves an explicit child path when you need one.
 - `service_name()` returns the current service name.
 - `service_user()` returns the convention-derived service account name.

@@ -446,7 +446,7 @@ defmodule HostKit.DSL.Scope do
     end
   end
 
-  defp service_scoped_path?(root) when root in [:source, :data, :state, :cache, :config],
+  defp service_scoped_path?(root) when root in [:source, :data, :state, :cache, :config, :run],
     do: Process.get(@service_key) != nil
 
   defp service_scoped_path?(_root), do: false
@@ -662,7 +662,7 @@ defmodule HostKit.DSL.Scope do
       Keyword.put(
         opts,
         :socket,
-        Path.join([default_root(:run, "/run"), service_path(), "rpc.sock"])
+        path(:run, "rpc.sock")
       )
     else
       opts
