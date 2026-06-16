@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.1.0-beta.5 - 2026-06-16
+
 - Added structured, JSON Patch-backed plan diffs for `dotenv/2`, `ini/2`, `yaml/2`, and template assign metadata, with human-readable public changes and separate redacted paths/assigns in plan output/artifacts.
 - Added provider-neutral endpoint projection for HTTP monitor metadata and a thin Gatus provider DSL that emits ordinary structured YAML config resources, including `gatus_monitor_endpoints/1` for rendering previously declared monitors.
 - Added `release/2`, a small service DSL helper that emits plain version-directory and current-symlink resources for binary release layouts.
