@@ -1082,6 +1082,35 @@ schedule :health_alert do ... end
 
 Use raw `systemd_service`/`systemd_timer` only when you intentionally want the low-level resource constructor.
 
+## Timer schedule helpers
+
+`schedule` supports typed helpers for common systemd timer shapes while keeping raw systemd calendar syntax available through `timer on_calendar: ...`.
+
+```elixir
+schedule :backup do
+  daily at: ~T[02:30:00]
+  jitter "15m"
+  persistent true
+  wanted_by :timers
+end
+
+schedule :weekly_maintenance do
+  weekly :monday, at: "03:00"
+end
+
+schedule :monthly_report do
+  monthly day: 1, at: "04:00"
+end
+```
+
+- `daily at: time` renders `*-*-* HH:MM:SS`.
+- `weekly day, at: time` renders `Day *-*-* HH:MM:SS`.
+- `monthly day: n, at: time` renders `*-*-NN HH:MM:SS`.
+- Times may be `Time` structs or strict `"HH:MM"` / `"HH:MM:SS"` strings.
+- `jitter value` sets `RandomizedDelaySec`.
+- `repeat_after value` sets `OnUnitActiveSec`.
+- `after_boot value` and `on_boot value` set `OnBootSec`.
+
 ## Runtime isolation
 
 HostKit uses shared runtime isolation structs for persistent systemd units and future transient Unitctl workloads:

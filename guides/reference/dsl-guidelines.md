@@ -421,8 +421,14 @@ Legend:
 | `hardening` | Reference | Apply older hardening presets. Prefer `isolate`. |
 | `read_write_paths` | Escape hatch | Raw writable paths. Prefer `writable :storage`. |
 | `every` | Canonical | Timer calendar shorthand. |
+| `daily` | Canonical | Typed daily timer calendar helper with `at:` time. |
+| `weekly` | Canonical | Typed weekly timer calendar helper with weekday and `at:` time. |
+| `monthly` | Canonical | Typed monthly timer calendar helper with `day:` and `at:`. |
+| `jitter` | Reference | Set timer `RandomizedDelaySec`. |
+| `repeat_after` | Reference | Set timer `OnUnitActiveSec`. |
 | `persistent` | Reference | Timer persistence. |
-| `on_boot` | Reference | Timer boot delay. |
+| `after_boot` | Reference | Timer boot delay. |
+| `on_boot` | Reference | Timer boot delay alias. |
 | `private_network` | Reference | Override private network behavior inside `isolate`. |
 | `network_policy` | Reference | Explicit network policy. Prefer `network` inside `isolate` for simple cases. |
 

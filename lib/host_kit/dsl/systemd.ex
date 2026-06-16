@@ -95,6 +95,53 @@ defmodule HostKit.DSL.Systemd do
     end
   end
 
+  defmacro daily(opts) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_timer(
+        :on_calendar,
+        HostKit.Systemd.Calendar.daily_at(Keyword.fetch!(unquote(opts), :at))
+      )
+    end
+  end
+
+  defmacro weekly(day, opts) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_timer(
+        :on_calendar,
+        HostKit.Systemd.Calendar.weekly_at(unquote(day), Keyword.fetch!(unquote(opts), :at))
+      )
+    end
+  end
+
+  defmacro monthly(opts) do
+    quote do
+      opts = unquote(opts)
+
+      HostKit.DSL.Systemd.Scope.put_timer(
+        :on_calendar,
+        HostKit.Systemd.Calendar.monthly_at(Keyword.fetch!(opts, :day), Keyword.fetch!(opts, :at))
+      )
+    end
+  end
+
+  defmacro jitter(value) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_timer(:randomized_delay_sec, unquote(value))
+    end
+  end
+
+  defmacro repeat_after(value) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_timer(:on_unit_active_sec, unquote(value))
+    end
+  end
+
+  defmacro after_boot(value) do
+    quote do
+      HostKit.DSL.Systemd.Scope.put_timer(:on_boot_sec, unquote(value))
+    end
+  end
+
   defmacro persistent(value) do
     quote do
       HostKit.DSL.Systemd.Scope.put_timer(:persistent, unquote(value))

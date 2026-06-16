@@ -6,6 +6,7 @@
 - Added provider-neutral endpoint projection for HTTP monitor metadata and a thin Gatus provider DSL that emits ordinary structured YAML config resources, including `gatus_monitor_endpoints/1` for rendering previously declared monitors.
 - Added `release/2`, a small service DSL helper that emits plain version-directory and current-symlink resources for binary release layouts.
 - Added down-plan coverage summaries to generated down plans and `mix host_kit.down` output.
+- Added typed systemd timer schedule helpers: `daily`, `weekly`, `monthly`, `jitter`, `repeat_after`, and `after_boot`.
 
 ## v0.1.0-beta.4 - 2026-06-15
 

@@ -22,8 +22,9 @@ project :prod do
     end
 
     schedule "backup.timer" do
-      description "Run backups every hour"
-      every "hourly"
+      description "Run backups daily"
+      daily at: ~T[02:30:00]
+      jitter "15m"
       persistent true
       wanted_by :timers
     end
@@ -53,9 +54,15 @@ end
 
 Convenience helpers:
 
-- `every "hourly"` sets a calendar interval.
+- `every "hourly"` or `every :hour` sets a simple systemd calendar interval.
+- `daily at: ~T[02:30:00]` sets `OnCalendar=*-*-* 02:30:00`.
+- `weekly :monday, at: "02:30"` sets a weekday calendar expression.
+- `monthly day: 1, at: "02:30"` sets a day-of-month calendar expression.
+- `jitter "15m"` sets `RandomizedDelaySec`.
+- `repeat_after "1h"` sets `OnUnitActiveSec`.
+- `after_boot "5m"` and `on_boot "5m"` set `OnBootSec`.
 - `persistent true` asks systemd to catch up missed runs.
-- `on_boot "5m"` schedules relative to boot.
 - `wanted_by :timers` installs into `timers.target`.
 
+Raw `timer on_calendar: ...` remains available for full systemd calendar syntax.
 Timers compile to normal `HostKit.Systemd.Timer` structs and can be planned/applied like other resources.
