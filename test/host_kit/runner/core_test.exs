@@ -43,4 +43,33 @@ defmodule HostKit.RunnerTest do
   test "local runner delegates to System.cmd" do
     assert {"hello\n", 0} = HostKit.Runner.Local.cmd("printf", ["hello\n"], [])
   end
+
+  test "local runner creates directories through sudo when requested" do
+    cmd_fun = fn command, args, _opts ->
+      send(self(), {:local_cmd, command, args})
+      {"", 0}
+    end
+
+    assert :ok = HostKit.Runner.Local.mkdir_p("/root/demo", sudo: true, cmd_fun: cmd_fun)
+    assert_received {:local_cmd, "sudo", ["mkdir", "-p", "/root/demo"]}
+  end
+
+  test "local runner writes files through sudo install when requested" do
+    cmd_fun = fn command, args, _opts ->
+      send(self(), {:local_cmd, command, args})
+
+      case {command, args} do
+        {"sudo", ["install", "-m", "0644", temp_path, "/root/demo"]} ->
+          send(self(), {:temp_content, File.read!(temp_path)})
+          {"", 0}
+      end
+    end
+
+    assert :ok =
+             HostKit.Runner.Local.write_file("/root/demo", "hello", sudo: true, cmd_fun: cmd_fun)
+
+    assert_received {:local_cmd, "sudo", ["install", "-m", "0644", temp_path, "/root/demo"]}
+    assert_received {:temp_content, "hello"}
+    refute File.exists?(temp_path)
+  end
 end

@@ -7,6 +7,7 @@
 - Added `release/2`, a small service DSL helper that emits plain version-directory and current-symlink resources for binary release layouts.
 - Added down-plan coverage summaries to generated down plans and `mix host_kit.down` output.
 - Added typed systemd timer schedule helpers: `daily`, `weekly`, `monthly`, `jitter`, `repeat_after`, and `after_boot`.
+- Fixed local `--sudo` apply writes so root-owned directories/files use sudo-aware local runner operations.
 
 ## v0.1.0-beta.4 - 2026-06-15
 
