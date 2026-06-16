@@ -11,6 +11,7 @@ defmodule HostKit.Plan do
     ConfigFile,
     Directory,
     EnvFile,
+    Exs,
     File,
     Package,
     Source,
@@ -228,6 +229,7 @@ defmodule HostKit.Plan do
   defp delete_supported?(%Directory{}), do: false
   defp delete_supported?(%Symlink{}), do: true
   defp delete_supported?(%Template{}), do: true
+  defp delete_supported?(%Exs{}), do: true
   defp delete_supported?(%HostKit.Firewall{}), do: true
   defp delete_supported?(%HostKit.Proxy{}), do: true
   defp delete_supported?(%HostKit.Instance{lifecycle: :ephemeral}), do: true
@@ -327,6 +329,17 @@ defmodule HostKit.Plan do
       case Template.render(template) do
         {:ok, _content} -> {:ok, template}
         {:error, reason} -> {:error, {:template_render_failed, Template.id(template), reason}}
+      end
+    end
+  end
+
+  defp resolve_resource(%Exs{} = exs, _opts) do
+    if Exs.secret?(exs) do
+      {:ok, exs}
+    else
+      case Exs.render(exs) do
+        {:ok, _content} -> {:ok, exs}
+        {:error, reason} -> {:error, {:exs_render_failed, Exs.id(exs), reason}}
       end
     end
   end
@@ -573,6 +586,21 @@ defmodule HostKit.Plan do
       false
     else
       case Template.render(desired) do
+        {:ok, content} ->
+          comparable(desired, actual, [:path, :owner, :group, :mode]) and
+            Map.get(actual.meta, :content) == content
+
+        {:error, _reason} ->
+          false
+      end
+    end
+  end
+
+  defp equivalent?(%Exs{} = desired, actual) do
+    if Exs.secret?(desired) do
+      false
+    else
+      case Exs.render(desired) do
         {:ok, content} ->
           comparable(desired, actual, [:path, :owner, :group, :mode]) and
             Map.get(actual.meta, :content) == content

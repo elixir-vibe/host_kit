@@ -1006,6 +1006,22 @@ yaml path(:config, "gatus.yaml"),
   mode: 0o640
 ```
 
+## Elixir `.exs` files
+
+Use `exs/2` when the desired file is Elixir configuration code and should be represented as quoted AST rather than an EEx string template.
+
+```elixir
+exs path(:config, "runtime.exs"), owner: "root", group: service_user(), mode: 0o640 do
+  import Config
+
+  config :my_app,
+    url: unquote(value("https://example.com")),
+    secret_key_base: unquote(secret("SECRET_KEY_BASE", env: "SECRET_KEY_BASE"))
+end
+```
+
+The block is captured and rendered; it is not evaluated. HostKit currently interprets only strict placeholder forms inside `unquote(...)`: `value(literal)` and `secret(literal, literal_opts)`. Use templates for free-form text generation.
+
 ## Templates
 
 Use `template/2` for deterministic EEx-rendered text resources. Templates are first-class resources in plans and render to ordinary managed files during read/apply.
@@ -1077,6 +1093,17 @@ argv("cmd", opts: [foo_bar: "baz"], style: :underscore)  # --foo_bar baz
 ```
 
 Booleans with `true` emit flags, `false`/`nil` are omitted, and list values repeat the option.
+
+BEAM command builders wrap the same argv structure:
+
+```elixir
+mix("ecto.migrate", opts: [quiet: true])
+mix("exograph.web", command: path(:bin, "mix"), opts: [port: 4200])
+elixir("script.exs", opts: [name: "demo"])
+elixir(args: ["--version"])
+```
+
+These return `%HostKit.CommandLine{}` and can be used anywhere `exec:` or `exec_start` accepts command lines.
 
 ## Systemd unit names
 

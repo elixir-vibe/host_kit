@@ -9,6 +9,7 @@ defmodule HostKit.Local do
     Command,
     Directory,
     EnvFile,
+    Exs,
     File,
     Mise,
     Package,
@@ -181,6 +182,10 @@ defmodule HostKit.Local do
 
   def read(%HostKit.Resources.Template{} = desired, context) do
     Helpers.read_template(desired, &read(&1, context))
+  end
+
+  def read(%Exs{} = desired, context) do
+    Helpers.read_exs(desired, &read(&1, context))
   end
 
   def read(%Symlink{} = desired, context) do

@@ -103,6 +103,28 @@ defmodule HostKit.MonitorTest do
     assert %HostKit.CommandLine{command: "/usr/local/sbin/check", args: ["--fast"]} = check.exec
   end
 
+  test "mix and elixir DSL helpers build command lines" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      service :ops do
+        command :migrate, exec: mix("ecto.migrate", opts: [quiet: true])
+        monitor :command, name: :script, exec: elixir("script.exs", opts: [name: "demo"])
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    assert [service] = project.services
+    assert [%HostKit.Resources.Command{} = command] = service.resources
+    assert command.exec == {"mix", ["ecto.migrate", "--quiet"]}
+    assert [check] = HostKit.Monitor.checks(project)
+
+    assert %HostKit.CommandLine{command: "elixir", args: ["script.exs", "--name", "demo"]} =
+             check.exec
+  end
+
   test "monitor after a resource attaches to the last resource" do
     source = """
     use HostKit.DSL

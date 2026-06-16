@@ -979,6 +979,16 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro exs(path, opts \\ [], do: block) do
+    ast = Macro.escape(block)
+
+    quote do
+      HostKit.DSL.Scope.add_resource(
+        HostKit.Resources.Exs.new(unquote(path), unquote(ast), unquote(opts))
+      )
+    end
+  end
+
   defmacro section(name, do: block) do
     quote do
       HostKit.DSL.ConfigFile.Scope.start_section(unquote(name))
@@ -1045,6 +1055,24 @@ defmodule HostKit.DSL do
   defmacro argv(command, opts \\ []) do
     quote do
       HostKit.CommandLine.argv(unquote(command), unquote(opts))
+    end
+  end
+
+  defmacro mix(task, opts \\ []) do
+    quote do
+      HostKit.CommandLine.mix(unquote(task), unquote(opts))
+    end
+  end
+
+  defmacro elixir(opts \\ []) do
+    quote do
+      HostKit.CommandLine.elixir(unquote(opts))
+    end
+  end
+
+  defmacro elixir(script_or_args, opts) do
+    quote do
+      HostKit.CommandLine.elixir(unquote(script_or_args), unquote(opts))
     end
   end
 

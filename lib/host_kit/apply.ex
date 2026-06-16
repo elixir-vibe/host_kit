@@ -11,6 +11,7 @@ defmodule HostKit.Apply do
     ConfigFile,
     Directory,
     EnvFile,
+    Exs,
     File,
     Mise,
     Package,
@@ -266,6 +267,10 @@ defmodule HostKit.Apply do
     apply_or_dry_run(change, opts, fn -> delete_path(template.path, [:file], opts) end)
   end
 
+  defp apply_change(%Change{action: :delete, before: %Exs{} = exs} = change, opts) do
+    apply_or_dry_run(change, opts, fn -> delete_path(exs.path, [:file], opts) end)
+  end
+
   defp apply_change(%Change{action: :delete, before: %Instance{} = instance} = change, opts) do
     apply_or_dry_run(change, opts, fn -> HostKit.Instance.Backend.delete(instance, opts) end)
   end
@@ -302,6 +307,11 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %Template{} = template} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn -> apply_template(template, opts) end)
+  end
+
+  defp apply_change(%Change{action: action, after: %Exs{} = exs} = change, opts)
+       when action in [:create, :update] do
+    apply_or_dry_run(change, opts, fn -> apply_exs(exs, opts) end)
   end
 
   defp apply_change(%Change{action: action, after: %Command{} = command} = change, opts)
@@ -493,6 +503,15 @@ defmodule HostKit.Apply do
          :ok <- HostKit.Runner.Files.write_file(path, content, opts),
          :ok <- Ops.chown(path, template.owner, template.group, opts) do
       Ops.chmod(path, template.mode, opts)
+    end
+  end
+
+  defp apply_exs(%Exs{path: path} = exs, opts) do
+    with {:ok, content} <- Exs.render(exs),
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
+         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
+         :ok <- Ops.chown(path, exs.owner, exs.group, opts) do
+      Ops.chmod(path, exs.mode, opts)
     end
   end
 

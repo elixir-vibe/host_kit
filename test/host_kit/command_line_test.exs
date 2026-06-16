@@ -46,6 +46,31 @@ defmodule HostKit.CommandLineTest do
              CommandLine.argv("cmd", opts: [include: ["a", "b"]])
   end
 
+  test "builds mix task command lines" do
+    assert %CommandLine{command: "mix", args: ["ecto.migrate", "--quiet"]} =
+             CommandLine.mix("ecto.migrate", opts: [quiet: true])
+
+    assert %CommandLine{command: "mix", args: ["phx.server", "--port", "4000", "--", "tail"]} =
+             CommandLine.mix(:"phx.server",
+               opts: [port: 4000],
+               trailing: ["--", "tail"]
+             )
+
+    assert %CommandLine{command: "/opt/mise/shims/mix", args: ["test"]} =
+             CommandLine.mix("test", command: "/opt/mise/shims/mix")
+  end
+
+  test "builds elixir command lines" do
+    assert %CommandLine{command: "elixir", args: ["--version"]} =
+             CommandLine.elixir(args: ["--version"])
+
+    assert %CommandLine{command: "elixir", args: ["script.exs", "--name", "demo"]} =
+             CommandLine.elixir("script.exs", opts: [name: "demo"])
+
+    assert %CommandLine{command: "/opt/mise/shims/elixir", args: ["--version"]} =
+             CommandLine.elixir(command: "/opt/mise/shims/elixir", args: ["--version"])
+  end
+
   test "supports trailing arguments after structured options" do
     assert %CommandLine{args: ["task", "--mode", "latest", "--no-bm25"]} =
              CommandLine.argv("mix",

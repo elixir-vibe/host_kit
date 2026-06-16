@@ -46,6 +46,7 @@ defmodule HostKit.Resource do
                       HostKit.Resources.ConfigFile,
                       HostKit.Resources.Directory,
                       HostKit.Resources.EnvFile,
+                      HostKit.Resources.Exs,
                       HostKit.Resources.File,
                       HostKit.Resources.Mise,
                       HostKit.Resources.Package,

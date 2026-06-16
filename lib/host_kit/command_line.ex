@@ -22,6 +22,29 @@ defmodule HostKit.CommandLine do
     %__MODULE__{command: command, args: Enum.map(args ++ option_args ++ trailing, &to_string/1)}
   end
 
+  @doc "Builds a Mix task command line."
+  @spec mix(String.t() | atom(), keyword()) :: t()
+  def mix(task, opts \\ []) when is_binary(task) or is_atom(task) do
+    {command, opts} = Keyword.pop(opts, :command, "mix")
+    argv(command, prepend_arg(opts, task))
+  end
+
+  @doc "Builds an Elixir command line."
+  @spec elixir(keyword() | String.t() | [String.t()], keyword()) :: t()
+  def elixir(opts \\ [])
+
+  def elixir(opts) when is_list(opts) do
+    {command, opts} = Keyword.pop(opts, :command, "elixir")
+    argv(command, opts)
+  end
+
+  def elixir(script) when is_binary(script), do: elixir(script, [])
+
+  def elixir(script_or_args, opts) when is_binary(script_or_args) or is_list(script_or_args) do
+    {command, opts} = Keyword.pop(opts, :command, "elixir")
+    argv(command, prepend_args(opts, List.wrap(script_or_args)))
+  end
+
   @doc "Normalizes a HostKit command shape into `{command, args}` argv form."
   @spec to_exec(t() | String.t() | {term(), [term()]} | [term()]) :: {String.t(), [String.t()]}
   def to_exec(%__MODULE__{command: command, args: args}), do: {command, args}
@@ -52,6 +75,13 @@ defmodule HostKit.CommandLine do
       {:error, reason} ->
         raise ArgumentError, "invalid HostKit ~SH command: #{format_error(reason)}"
     end
+  end
+
+  defp prepend_arg(opts, arg), do: prepend_args(opts, [arg])
+
+  defp prepend_args(opts, args) do
+    args = Enum.map(args, &to_string/1)
+    Keyword.update(opts, :args, args, fn existing -> args ++ List.wrap(existing) end)
   end
 
   defp option_args(opts, style) do

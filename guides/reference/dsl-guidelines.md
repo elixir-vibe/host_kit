@@ -354,6 +354,7 @@ Legend:
 | `template` | Reference | Declare an explicit EEx-rendered file resource; secret assigns are allowed as references and redacted in template assign diffs. |
 | `ini` | Reference | Declare a structured INI config file resource with public and redacted entries. |
 | `yaml` | Reference | Declare a structured YAML config file resource with ordered keyword data and public-path secret comparison. |
+| `exs` | Reference | Declare a quoted Elixir `.exs` file resource with strict placeholders. |
 | `section` | Reference | Declare an INI section inside `ini do ... end`. |
 | `symlink` | Reference | Declare an explicit symbolic link resource. |
 | `source` | Reference | Declare a source artifact/repository. |
@@ -361,6 +362,9 @@ Legend:
 | `run` | Reference | Command resource helper; also systemd service-option helper in systemd scope. |
 | `git` | Reference | Git command resource helper. |
 | `bash` | Reference | Bash command resource helper. |
+| `argv` | Reference | Structured argv command builder. |
+| `mix` | Reference | Mix task command builder. |
+| `elixir` | Reference | Elixir CLI command builder. |
 
 ### Service conventions, storage, env
 
