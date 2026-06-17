@@ -402,6 +402,7 @@ Legend:
 | `secret` | Canonical | Add a secret entry inside env/dotenv or structured INI config. Use `env: :redacted` for existing generated secrets that must not render. |
 | `set` | Canonical | Add non-secret config inside env/dotenv, provider config, or structured INI config. |
 | `service_name` | Reference | Return current service name. |
+| `service_path` | Reference | Return convention-derived service path segment for the current service. |
 | `service_user` | Reference | Return convention-derived service user; systemd setter in systemd scope. |
 | `unit_name` | Reference | Return convention-derived systemd unit name. |
 | `path` | Reference | Resolve a path under a project root; inside services, conventional service roots (`:source`, `:data`, `:state`, `:cache`, `:config`) include the service path. |
@@ -536,8 +537,8 @@ Legend:
 | `repo` | Reference | Ecto repo entry. |
 | `mix` | Reference | Mix command entry for recipe operations. |
 
-### Xamal release recipe
+### OTP release recipe
 
 | Directive | Level | Purpose |
 | --- | --- | --- |
-| `xamal_release` | Reference | Consume a Xamal HostKit ETF artifact manifest and emit ordinary deployment resources. |
+| `otp_release` | Reference | Consume a BEAM-native OTP release ETF artifact manifest and emit ordinary deployment resources. |

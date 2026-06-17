@@ -1,15 +1,17 @@
-defmodule HostKit.XamalReleaseRecipeTest do
+defmodule HostKit.OTPReleaseRecipeTest do
   use HostKit.Case, async: true
 
-  test "xamal_release recipe expands artifact manifest to ordinary resources" do
+  test "otp_release recipe expands artifact manifest to ordinary resources" do
     manifest_path = write_manifest!("demo_app", "abc123")
 
-    defmodule XamalReleaseRecipeProject do
-      use HostKit.DSL, recipes: [HostKit.Recipes.XamalRelease]
+    defmodule OTPReleaseRecipeProject do
+      use HostKit.DSL, recipes: [HostKit.Recipes.OTPRelease]
 
       def project(manifest_path) do
         project :demo do
-          xamal_release(:demo_app,
+          roots(opt: "/opt/example", config: "/etc/example")
+
+          otp_release(:demo_app,
             manifest: manifest_path,
             port: 4100,
             base_dir: "/opt/example/demo_app",
@@ -19,7 +21,7 @@ defmodule HostKit.XamalReleaseRecipeTest do
       end
     end
 
-    project = XamalReleaseRecipeProject.project(manifest_path)
+    project = OTPReleaseRecipeProject.project(manifest_path)
     resources = HostKit.Project.resources(project)
     assert [service] = project.services
 
@@ -39,9 +41,10 @@ defmodule HostKit.XamalReleaseRecipeTest do
     assert Enum.any?(resources, fn
              %HostKit.Resources.Command{
                name: "demo_app_unpack",
-               exec: {"sh", ["-c", command]},
+               exec: {"bash", ["-euo", "pipefail", "-c", command]},
                creates: "/opt/example/demo_app/releases/abc123/bin/demo_app",
-               down: :irreversible
+               down: :irreversible,
+               meta: %{otp_release_artifact: ^manifest_path}
              } ->
                command =~ "tar -xzf '/tmp/demo_app-abc123.tar.gz'"
 
@@ -85,31 +88,32 @@ defmodule HostKit.XamalReleaseRecipeTest do
            end)
   end
 
-  test "xamal_release rejects non-Xamal manifests" do
+  test "otp_release rejects non-OTP release manifests" do
     path =
       Path.join(System.tmp_dir!(), "hostkit-invalid-#{System.unique_integer([:positive])}.etf")
 
     File.write!(path, :erlang.term_to_binary(%{format: :other}))
 
-    assert_raise ArgumentError, ~r/not a Xamal HostKit artifact/, fn ->
-      HostKit.Recipes.XamalRelease.load_manifest!(path)
+    assert_raise ArgumentError, ~r/not an OTP release artifact/, fn ->
+      HostKit.Recipes.OTPRelease.load_manifest!(path)
     end
   end
 
   defp write_manifest!(release_name, version) do
-    path = Path.join(System.tmp_dir!(), "hostkit-xamal-#{System.unique_integer([:positive])}.etf")
+    path = Path.join(System.tmp_dir!(), "hostkit-otp-#{System.unique_integer([:positive])}.etf")
 
     manifest = %{
-      tool: :xamal,
-      format: :xamal_hostkit_artifact,
+      tool: "example",
+      format: :beam_release_artifact,
       format_version: 1,
-      service: release_name,
+      app: release_name,
       version: version,
-      release: %{name: release_name, mix_env: "prod"},
+      release: release_name,
+      mix_env: "prod",
       tarball: "/tmp/#{release_name}-#{version}.tar.gz",
-      hostkit: %{project: "example", service: release_name},
+      runtime: %{command: ["bin/#{release_name}", "start"]},
       env: %{clear: %{"PHX_HOST" => "app.example.com"}, secret: ["SECRET_KEY_BASE"]},
-      health_check: %{path: "/health", interval: 1, timeout: 30}
+      health_check: %{path: "/health", port: 4100, url: "http://127.0.0.1:4100/health"}
     }
 
     File.write!(path, :erlang.term_to_binary(manifest))

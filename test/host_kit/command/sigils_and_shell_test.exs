@@ -1,6 +1,8 @@
 defmodule HostKit.SigilsAndShellTest do
   use ExUnit.Case, async: true
 
+  import HostKit.Sigils
+
   test "use HostKit imports DSL and sigils by default" do
     defmodule SigilProject do
       use HostKit, providers: [HostKit.Providers.Caddy], recipes: [HostKit.Recipes.ElixirApp]
@@ -21,6 +23,13 @@ defmodule HostKit.SigilsAndShellTest do
              plan.resources,
              &match?(%HostKit.Resources.Command{exec: {"wget", ["https://example.com/file"]}}, &1)
            )
+  end
+
+  test "bash macro escapes interpolated values" do
+    path = "/tmp/a path/with'quote"
+
+    assert %HostKit.ShellScript{source: source} = bash("rm -rf #{path}")
+    assert source == "rm -rf '/tmp/a path/with'\\''quote'"
   end
 
   test "~SH rejects shell features and points users to ~BASH" do

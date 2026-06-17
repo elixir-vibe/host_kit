@@ -169,22 +169,22 @@ Shop.Release.rollback(Shop.Repo)
 
 Use `:migrate` and `:rollback` for custom release functions when the defaults do not fit.
 
-## Xamal release artifacts
+## OTP release artifacts
 
-The Xamal release recipe consumes a Xamal HostKit artifact manifest written as ETF and expands it into ordinary HostKit resources. Xamal remains responsible for building the release artifact; HostKit remains responsible for accounts, directories, env files, systemd, readiness, planning, apply, and down plans.
+The OTP release recipe consumes a BEAM-native release artifact manifest written as ETF and expands it into ordinary HostKit resources. The app repository remains responsible for building the Mix release tarball; HostKit remains responsible for accounts, directories, env files, systemd, readiness, planning, apply, and down plans.
 
 Import the recipe explicitly:
 
 ```elixir
-use HostKit.DSL, recipes: [HostKit.Recipes.XamalRelease]
+use HostKit.DSL, recipes: [HostKit.Recipes.OTPRelease]
 ```
 
 Then reference the manifest:
 
 ```elixir
 project :example do
-  xamal_release :demo_app,
-    manifest: "_build/prod/demo_app-hostkit.etf",
+  otp_release :demo_app,
+    manifest: "_build/prod/demo_app.etf",
     port: 4000,
     base_dir: "/opt/example/demo_app",
     config_dir: "/etc/example/demo_app"

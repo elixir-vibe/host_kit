@@ -428,6 +428,12 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro service_path do
+    quote do
+      HostKit.DSL.Scope.service_path()
+    end
+  end
+
   defmacro service_user do
     quote do
       HostKit.DSL.Scope.service_user()
