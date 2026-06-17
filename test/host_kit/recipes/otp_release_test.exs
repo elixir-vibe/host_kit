@@ -16,7 +16,9 @@ defmodule HostKit.OTPReleaseRecipeTest do
             port: 4100,
             base_dir: "/opt/example/demo_app",
             config_dir: "/etc/example/demo_app"
-          )
+          ) do
+            listen(:rpc, protocol: :rpc)
+          end
         end
       end
     end
@@ -27,6 +29,8 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert %HostKit.Endpoint{port: 4100, protocol: :http, health: "/health"} =
              service.meta.endpoints.http
+
+    assert %HostKit.Listener{protocol: :rpc} = service.meta.listeners.rpc
 
     assert Enum.any?(resources, &match?(%HostKit.Resources.Account{name: "demo-app"}, &1))
 

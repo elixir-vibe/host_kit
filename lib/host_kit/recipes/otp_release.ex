@@ -15,71 +15,84 @@ defmodule HostKit.Recipes.OTPRelease do
   @format :beam_release_artifact
   @format_version 1
 
-  defrecipe otp_release(name, opts) do
-    artifact = __MODULE__.assigns(name, opts)
+  defmacro otp_release(name, opts \\ []) do
+    otp_release_body(name, opts, nil)
+  end
 
-    service artifact.service_name do
-      base_dir = Keyword.get(opts, :base_dir, path(:opt, service_path()))
-      config_dir = Keyword.get(opts, :config_dir, path(:config))
-      release_dir = Path.join([base_dir, "releases", artifact.version])
-      current_dir = Path.join(base_dir, "current")
-      env_path = Keyword.get(opts, :env_path, Path.join(config_dir, "env"))
-      release_bin = Path.join([release_dir, "bin", artifact.release.name])
-      current_bin = Path.join([current_dir, "bin", artifact.release.name])
-      unit = Keyword.get(opts, :unit, unit_name())
+  defmacro otp_release(name, opts, do: block) do
+    otp_release_body(name, opts, block)
+  end
 
-      account(system: true, home: base_dir)
+  defp otp_release_body(name, opts, block) do
+    quote do
+      recipe_opts = unquote(opts)
+      artifact = HostKit.Recipes.OTPRelease.assigns(unquote(name), recipe_opts)
 
-      directory(base_dir, owner: service_user(), group: service_user(), mode: 0o755)
+      service artifact.service_name do
+        base_dir = Keyword.get(recipe_opts, :base_dir, path(:opt, service_path()))
+        config_dir = Keyword.get(recipe_opts, :config_dir, path(:config))
+        release_dir = Path.join([base_dir, "releases", artifact.version])
+        current_dir = Path.join(base_dir, "current")
+        env_path = Keyword.get(recipe_opts, :env_path, Path.join(config_dir, "env"))
+        release_bin = Path.join([release_dir, "bin", artifact.release.name])
+        current_bin = Path.join([current_dir, "bin", artifact.release.name])
+        unit = Keyword.get(recipe_opts, :unit, unit_name())
 
-      directory(Path.join(base_dir, "releases"),
-        owner: service_user(),
-        group: service_user(),
-        mode: 0o755
-      )
+        account(system: true, home: base_dir)
 
-      directory(config_dir, owner: "root", group: service_user(), mode: 0o750)
+        unquote(block)
 
-      dotenv env_path, owner: "root", group: service_user(), mode: 0o640 do
-        for {key, value} <- artifact.env.clear do
-          set(key, value)
+        directory(base_dir, owner: service_user(), group: service_user(), mode: 0o755)
+
+        directory(Path.join(base_dir, "releases"),
+          owner: service_user(),
+          group: service_user(),
+          mode: 0o755
+        )
+
+        directory(config_dir, owner: "root", group: service_user(), mode: 0o750)
+
+        dotenv env_path, owner: "root", group: service_user(), mode: 0o640 do
+          for {key, value} <- artifact.env.clear do
+            set(key, value)
+          end
         end
-      end
 
-      command(artifact.commands.unpack,
-        exec: HostKit.Recipes.OTPRelease.unpack_exec(artifact.tarball, release_dir),
-        creates: release_bin,
-        timeout: artifact.timeout,
-        down: :irreversible,
-        meta: %{otp_release_artifact: artifact.manifest_path}
-      )
+        command(artifact.commands.unpack,
+          exec: HostKit.Recipes.OTPRelease.unpack_exec(artifact.tarball, release_dir),
+          creates: release_bin,
+          timeout: artifact.timeout,
+          down: :irreversible,
+          meta: %{otp_release_artifact: artifact.manifest_path}
+        )
 
-      symlink(current_dir,
-        to: release_dir,
-        owner: service_user(),
-        group: service_user(),
-        depends_on: [{:command, artifact.commands.unpack}]
-      )
+        symlink(current_dir,
+          to: release_dir,
+          owner: service_user(),
+          group: service_user(),
+          depends_on: [{:command, artifact.commands.unpack}]
+        )
 
-      endpoint(:http,
-        port: artifact.http.port,
-        protocol: :http,
-        health: artifact.health.path
-      )
+        endpoint(:http,
+          port: artifact.http.port,
+          protocol: :http,
+          health: artifact.health.path
+        )
 
-      daemon unit do
-        description("#{artifact.name} OTP release")
-        environment_file(env_path)
-        working_directory(current_dir)
-        exec_start([current_bin, "start"])
-        service(kill_mode: :mixed, timeout_stop_sec: 10)
-        restart(:on_failure)
-        wanted_by(:multi_user)
-      end
+        daemon unit do
+          description("#{artifact.name} OTP release")
+          environment_file(env_path)
+          working_directory(current_dir)
+          exec_start([current_bin, "start"])
+          service(kill_mode: :mixed, timeout_stop_sec: 10)
+          restart(:on_failure)
+          wanted_by(:multi_user)
+        end
 
-      ready artifact.commands.ready, timeout: artifact.health.timeout * 1000 do
-        systemd(unit, restart: true, kill: true)
-        http(artifact.health.url)
+        ready artifact.commands.ready, timeout: artifact.health.timeout * 1000 do
+          systemd(unit, restart: true, kill: true)
+          http(artifact.health.url)
+        end
       end
     end
   end
