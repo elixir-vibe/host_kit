@@ -15,7 +15,8 @@ defmodule HostKit.OTPReleaseRecipeTest do
             manifest: manifest_path,
             port: 4100,
             base_dir: "/opt/example/demo_app",
-            config_dir: "/etc/example/demo_app"
+            config_dir: "/etc/example/demo_app",
+            env: %{"EXTRA_SETTING" => "enabled"}
           ) do
             listen(:rpc, protocol: :rpc)
           end
@@ -36,7 +37,8 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert Enum.any?(resources, fn
              %HostKit.Resources.EnvFile{path: "/etc/example/demo_app/env", entries: entries} ->
-               {:set, "PHX_HOST", "app.example.com"} in entries
+               {:set, "PHX_HOST", "app.example.com"} in entries and
+                 {:set, "EXTRA_SETTING", "enabled"} in entries
 
              _resource ->
                false

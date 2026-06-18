@@ -114,7 +114,12 @@ defmodule HostKit.Recipes.OTPRelease do
       tarball: fetch_string!(manifest, :tarball),
       timeout: Keyword.get(opts, :timeout, 300_000),
       env: %{
-        clear: manifest |> fetch_map!(:env) |> Map.get(:clear, %{}) |> stringify_env()
+        clear:
+          manifest
+          |> fetch_map!(:env)
+          |> Map.get(:clear, %{})
+          |> Map.merge(Keyword.get(opts, :env, %{}))
+          |> stringify_env()
       },
       http: %{port: port},
       health: health,

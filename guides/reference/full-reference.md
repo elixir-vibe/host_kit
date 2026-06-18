@@ -191,6 +191,14 @@ project :example do
 end
 ```
 
+Use the `:env` option to add deployment-specific clear environment variables to the generated service env file without rebuilding the artifact manifest:
+
+```elixir
+otp_release :demo_app,
+  manifest: "_build/prod/demo_app.etf",
+  env: %{"APP_DATA_DIR" => "/srv/demo"}
+```
+
 The manifest is decoded with:
 
 ```elixir
