@@ -3,7 +3,7 @@ defmodule HostKit.Readiness do
 
   alias HostKit.Readiness.{HTTP, Systemd}
   alias HostKit.Resources.Readiness
-  alias HostKit.Runner.Ops
+  alias HostKit.{Runner.Ops, SystemdRuntime}
 
   @spec current?(Readiness.t(), keyword()) :: boolean()
   def current?(%Readiness{} = readiness, opts) do
@@ -51,21 +51,7 @@ defmodule HostKit.Readiness do
         :ok
 
       units ->
-        Enum.each(units, &emit_service_restart(opts, readiness, &1, :service_restart_started))
-
-        case Ops.cmd(opts, "sh", ["-c", restart_script(units)]) do
-          :ok ->
-            Enum.each(
-              units,
-              &emit_service_restart(opts, readiness, &1, :service_restart_finished)
-            )
-
-            :ok
-
-          {:error, reason} = error ->
-            Enum.each(units, &emit_service_restart(opts, readiness, &1, :service_failed, reason))
-            error
-        end
+        restart_units(units, readiness, opts)
     end
   end
 
@@ -92,46 +78,51 @@ defmodule HostKit.Readiness do
 
   defp check_all(%Readiness{checks: []}, _opts), do: :ok
 
-  defp check_all(%Readiness{} = readiness, opts) do
-    case Ops.cmd(opts, "sh", ["-c", check_script(readiness)]) do
-      :ok -> :ok
-      {:error, reason} -> {:error, [{readiness, {:error, reason}}]}
-    end
+  defp check_all(%Readiness{checks: checks}, opts) do
+    errors =
+      checks
+      |> Enum.map(&check_one(&1, opts))
+      |> Enum.reject(&match?(:ok, &1))
+
+    if errors == [], do: :ok, else: {:error, errors}
   end
 
-  defp restart_script(units) do
-    Enum.map_join(units, "\n", fn %Systemd{unit: unit, kill: kill} ->
-      escaped = HostKit.Shell.escape(unit)
-      kill_script = if kill, do: "systemctl kill --kill-who=all #{escaped} || true\n", else: ""
-      "#{kill_script}systemctl reset-failed #{escaped} || true\nsystemctl restart #{escaped}"
+  defp restart_units(units, readiness, opts) do
+    Enum.reduce_while(units, :ok, fn unit, :ok ->
+      emit_service_restart(opts, readiness, unit, :service_restart_started)
+
+      case SystemdRuntime.restart(unit, opts) do
+        :ok ->
+          emit_service_restart(opts, readiness, unit, :service_restart_finished)
+          {:cont, :ok}
+
+        {:error, reason} = error ->
+          emit_service_restart(opts, readiness, unit, :service_failed, reason)
+          {:halt, error}
+      end
     end)
   end
 
-  defp check_script(%Readiness{checks: checks}) do
-    [
-      "set +e",
-      "hostkit_readiness_failed=0",
-      Enum.map_join(checks, "\n", &check_script/1),
-      "exit $hostkit_readiness_failed"
-    ]
-    |> Enum.join("\n")
+  defp check_one(%Systemd{unit: unit, state: :active}, opts) do
+    case SystemdRuntime.active?(unit, opts) do
+      :ok -> :ok
+      {:error, reason} -> {%Systemd{unit: unit, state: :active}, {:error, reason}}
+    end
   end
 
-  defp check_script(%Systemd{unit: unit, state: :active}) do
-    escaped = HostKit.Shell.escape(unit)
-
-    """
-    if ! systemctl is-active --quiet #{escaped}; then
-      echo #{HostKit.Shell.escape("systemd #{unit} is not active")}
-      hostkit_readiness_failed=1
-    fi
-    """
+  defp check_one(%HTTP{} = http, opts) do
+    case Ops.cmd(opts, "sh", ["-c", http_check_script(http)]) do
+      :ok -> :ok
+      {:error, reason} -> {http, {:error, reason}}
+    end
   end
 
-  defp check_script(%HTTP{} = http) do
+  defp http_check_script(%HTTP{} = http) do
     body_check = http_body_check_script(http)
 
     """
+    set +e
+    hostkit_readiness_failed=0
     hostkit_readiness_body=$(mktemp /tmp/hostkit-readiness-body.XXXXXX)
     hostkit_readiness_status=$(curl -sS -w '%{http_code}' -o "$hostkit_readiness_body" #{HostKit.Shell.escape(http.url)})
     hostkit_readiness_curl_status=$?
@@ -147,6 +138,7 @@ defmodule HostKit.Readiness do
     fi
 
     rm -f "$hostkit_readiness_body"
+    exit $hostkit_readiness_failed
     """
   end
 

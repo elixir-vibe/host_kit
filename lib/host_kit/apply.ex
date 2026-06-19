@@ -726,7 +726,7 @@ defmodule HostKit.Apply do
 
   defp daemon_reload(opts) do
     if Keyword.get(opts, :systemd_daemon_reload, true) do
-      Ops.cmd(opts, "systemctl", ["daemon-reload"])
+      HostKit.SystemdRuntime.reload(opts)
     else
       :ok
     end
