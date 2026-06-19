@@ -16,6 +16,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
             port: 4100,
             base_dir: "/opt/example/demo_app",
             config_dir: "/etc/example/demo_app",
+            account_home: "/var/lib/demo_app/home",
             env: %{"EXTRA_SETTING" => "enabled"}
           ) do
             listen(:rpc, protocol: :rpc)
@@ -33,7 +34,13 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert %HostKit.Listener{protocol: :rpc} = service.meta.listeners.rpc
 
-    assert Enum.any?(resources, &match?(%HostKit.Resources.Account{name: "demo-app"}, &1))
+    assert Enum.any?(
+             resources,
+             &match?(
+               %HostKit.Resources.Account{name: "demo-app", home: "/var/lib/demo_app/home"},
+               &1
+             )
+           )
 
     assert Enum.any?(resources, fn
              %HostKit.Resources.EnvFile{path: "/etc/example/demo_app/env", entries: entries} ->

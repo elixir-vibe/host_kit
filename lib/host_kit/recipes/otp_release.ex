@@ -38,7 +38,7 @@ defmodule HostKit.Recipes.OTPRelease do
         current_bin = Path.join([current_dir, "bin", artifact.release.name])
         unit = Keyword.get(recipe_opts, :unit, unit_name())
 
-        account(system: true, home: base_dir)
+        account(system: true, home: Keyword.get(recipe_opts, :account_home, base_dir))
 
         unquote(block)
 

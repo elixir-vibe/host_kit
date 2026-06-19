@@ -191,11 +191,12 @@ project :example do
 end
 ```
 
-Use the `:env` option to add deployment-specific clear environment variables to the generated service env file without rebuilding the artifact manifest:
+Use the `:account_home` option when an existing service account should keep a home directory outside the release base. Use the `:env` option to add deployment-specific clear environment variables to the generated service env file without rebuilding the artifact manifest:
 
 ```elixir
 otp_release :demo_app,
   manifest: "_build/prod/demo_app.etf",
+  account_home: "/var/lib/demo_app/home",
   env: %{"APP_DATA_DIR" => "/srv/demo"}
 ```
 
