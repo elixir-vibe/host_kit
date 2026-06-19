@@ -342,8 +342,9 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %Systemd.Service{} = service} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn ->
-      with {:ok, content} <- rendered_content(service, Systemd.Service.render(service), opts) do
-        apply_systemd_unit(service.name, content, opts)
+      with {:ok, content} <- rendered_content(service, Systemd.Service.render(service), opts),
+           :ok <- apply_systemd_unit(service.name, content, opts) do
+        daemon_reload(opts)
       end
     end)
   end
@@ -351,8 +352,9 @@ defmodule HostKit.Apply do
   defp apply_change(%Change{action: action, after: %Systemd.Timer{} = timer} = change, opts)
        when action in [:create, :update] do
     apply_or_dry_run(change, opts, fn ->
-      with {:ok, content} <- rendered_content(timer, Systemd.Timer.render(timer), opts) do
-        apply_systemd_unit(timer.name, content, opts)
+      with {:ok, content} <- rendered_content(timer, Systemd.Timer.render(timer), opts),
+           :ok <- apply_systemd_unit(timer.name, content, opts) do
+        daemon_reload(opts)
       end
     end)
   end

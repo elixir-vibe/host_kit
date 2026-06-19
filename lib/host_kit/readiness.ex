@@ -100,15 +100,11 @@ defmodule HostKit.Readiness do
   end
 
   defp restart_script(units) do
-    [
-      "systemctl daemon-reload",
-      Enum.map_join(units, "\n", fn %Systemd{unit: unit, kill: kill} ->
-        escaped = HostKit.Shell.escape(unit)
-        kill_script = if kill, do: "systemctl kill --kill-who=all #{escaped} || true\n", else: ""
-        "#{kill_script}systemctl reset-failed #{escaped} || true\nsystemctl restart #{escaped}"
-      end)
-    ]
-    |> Enum.join("\n")
+    Enum.map_join(units, "\n", fn %Systemd{unit: unit, kill: kill} ->
+      escaped = HostKit.Shell.escape(unit)
+      kill_script = if kill, do: "systemctl kill --kill-who=all #{escaped} || true\n", else: ""
+      "#{kill_script}systemctl reset-failed #{escaped} || true\nsystemctl restart #{escaped}"
+    end)
   end
 
   defp check_script(%Readiness{checks: checks}) do
