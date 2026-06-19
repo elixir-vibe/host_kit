@@ -152,7 +152,7 @@ defmodule HostKit.Recipes.OTPRelease do
   end
 
   defp preload_schema_atoms do
-    _schema_atoms = [
+    [
       :app,
       :clear,
       :command,
@@ -172,8 +172,7 @@ defmodule HostKit.Recipes.OTPRelease do
       :version,
       :beam_release_artifact
     ]
-
-    :ok
+    |> Enum.each(&:erlang.atom_to_binary/1)
   end
 
   defp validate_manifest!(%{} = manifest, path) do
