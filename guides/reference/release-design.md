@@ -1,6 +1,6 @@
 # Release design notes
 
-This note records the intended boundary for HostKit `release` work before adding artifact download, activation, cleanup, or rollback behavior.
+This note records the intended boundary for HostKit `release` work before adding artifact download, activation, cleanup, or rollback behavior. For BEAM applications, [ReleaseKit](https://hex.pm/packages/release_kit) produces the deployment-neutral OTP release tarball and ETF manifest consumed by `HostKit.Recipes.OTPRelease`.
 
 ## Current scope
 
