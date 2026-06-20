@@ -1,6 +1,6 @@
 # Release design notes
 
-This note records the intended boundary for HostKit `release` work before adding artifact download, activation, cleanup, or rollback behavior. For BEAM applications, [ReleaseKit](https://hex.pm/packages/release_kit) produces the deployment-neutral OTP release tarball and ETF manifest consumed by `HostKit.Recipes.OTPRelease`.
+This note records the intended boundary for HostKit `release` work before adding artifact download, activation, cleanup, or rollback behavior. For BEAM applications, [ReleaseKit](https://hex.pm/packages/release_kit) produces the deployment-neutral OTP release tarball and ETF manifest consumed by `HostKit.Recipes.OTPRelease`. Applications configure ReleaseKit prebuild steps, such as `ReleaseKit.Step.Volt`, in application config and run `mix release_kit.artifact` directly; HostKit consumes the resulting manifest.
 
 ## Current scope
 
@@ -10,7 +10,7 @@ Today `release/2` is intentionally small. It is a DSL helper that emits plain, i
 - a current symlink, by default `path(:opt, "current/<name>")`,
 - the symlink target `<versions_dir>/<version>`.
 
-It does not fetch artifacts, unpack archives, manage services, restart daemons, run readiness checks, prune old versions, or hide apply-time behavior.
+It does not fetch artifacts, build application artifacts, manage services, restart daemons, run readiness checks, prune old versions, or hide apply-time behavior.
 
 ```elixir
 service :gatus do
@@ -54,7 +54,9 @@ Keep these concerns separate:
 
 ## Future shape
 
-A fuller release declaration may grow into artifact preparation and activation, but it should still compile to plain resources and commands:
+A fuller release declaration may grow into artifact preparation and activation, but it should still compile to plain resources and commands. For OTP release manifests, this needs a design that respects planning: `HostKit.Recipes.OTPRelease` currently decodes the manifest while evaluating the project DSL, so a producer that creates the manifest during apply cannot be consumed by the same already-built plan without a first-class producer/consumer model.
+
+A fuller release declaration for downloadable artifacts may look like:
 
 ```elixir
 service :gatus do

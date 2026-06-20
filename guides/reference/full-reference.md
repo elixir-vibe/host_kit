@@ -173,7 +173,7 @@ Use `:migrate` and `:rollback` for custom release functions when the defaults do
 
 The OTP release recipe consumes a BEAM-native release artifact manifest written as ETF and expands it into ordinary HostKit resources. The app repository remains responsible for building the Mix release tarball; HostKit remains responsible for accounts, directories, env files, systemd, readiness, planning, apply, and down plans.
 
-[ReleaseKit](https://hex.pm/packages/release_kit) is the reference producer for this manifest format. Applications may use `mix release_kit.artifact` directly or wrap it in app-specific tasks when they need prebuild steps such as frontend asset compilation.
+[ReleaseKit](https://hex.pm/packages/release_kit) is the reference producer for this manifest format. Applications should configure ReleaseKit artifact defaults and prebuild steps in application config, then run `mix release_kit.artifact` directly. For example, frontend assets belong in ReleaseKit prebuild steps such as `ReleaseKit.Step.Volt`, not in HostKit or app-specific artifact wrapper tasks.
 
 Import the recipe explicitly:
 
