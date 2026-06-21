@@ -172,6 +172,46 @@ defmodule HostKit.OTPReleaseRecipeTest do
     assert Keyword.fetch!(opts, :env) == %{"MIX_ENV" => "prod"}
   end
 
+  test "ReleaseKit build failures include command context" do
+    test_pid = self()
+    runner = Module.concat(__MODULE__, "FailingReleaseKitRunner")
+
+    unless Code.ensure_loaded?(runner) do
+      Module.create(
+        runner,
+        quote do
+          @behaviour HostKit.Runner
+
+          def cmd(command, args, opts) do
+            send(unquote(Macro.escape(test_pid)), {:failing_release_kit_cmd, command, args, opts})
+            {"boom", 17}
+          end
+
+          def mkdir_p(_path, _opts), do: :ok
+          def write_file(_path, _content, _opts), do: :ok
+        end,
+        Macro.Env.location(__ENV__)
+      )
+    end
+
+    artifact = %{
+      name: :demo_app,
+      cwd: "/srv/demo_app",
+      manifest: "/srv/demo_app/_build/prod/artifacts/demo_app.etf",
+      user: nil,
+      mix_env: "prod",
+      out_dir: "_build/prod/artifacts",
+      timeout: 300_000,
+      skip_prebuild?: false
+    }
+
+    assert_raise ArgumentError, ~r/ReleaseKit artifact build failed for demo_app/, fn ->
+      HostKit.Recipes.OTPRelease.build_release_kit_artifact!(artifact, runner: runner)
+    end
+
+    assert_receive {:failing_release_kit_cmd, "mix", ["release_kit.artifact" | _], _opts}
+  end
+
   test "otp_release rejects non-OTP release manifests" do
     path =
       Path.join(System.tmp_dir!(), "hostkit-invalid-#{System.unique_integer([:positive])}.etf")

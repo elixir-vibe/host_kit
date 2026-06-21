@@ -149,11 +149,19 @@ defmodule HostKit.Recipes.OTPRelease do
     Process.put(:hostkit_collect_release_kit?, true)
     Process.put(:hostkit_release_kit_artifacts, [])
 
+    previous_compiler_options = Code.compiler_options()
+    files = collection_files(path, Keyword.get(opts, :require, []))
+    modules_to_purge = modules_defined_in_files(files)
+    loaded_before = loaded_modules()
+
     try do
-      require_files(path, Keyword.get(opts, :require, []))
-      Code.eval_file(Path.expand(path))
+      Code.compiler_options(ignore_module_conflict: true)
+      Enum.each(Enum.drop(files, 1), &Code.require_file/1)
+      Code.eval_file(hd(files))
       Process.get(:hostkit_release_kit_artifacts, []) |> Enum.reverse()
     after
+      purge_eval_modules(modules_to_purge, loaded_before)
+      Code.compiler_options(previous_compiler_options)
       restore_process(:hostkit_collect_release_kit?, previous_collecting)
       restore_process(:hostkit_release_kit_artifacts, previous_artifacts)
     end
@@ -163,14 +171,12 @@ defmodule HostKit.Recipes.OTPRelease do
     Enum.each(artifacts, &build_release_kit_artifact!(&1, opts))
   end
 
-  defp build_release_kit_artifact!(artifact, opts) do
+  def build_release_kit_artifact!(artifact, opts \\ []) do
     cwd = Map.fetch!(artifact, :cwd)
     mix_env = Map.fetch!(artifact, :mix_env)
-    out_dir = Map.fetch!(artifact, :out_dir)
     timeout = Map.fetch!(artifact, :timeout)
 
-    args = ["release_kit.artifact", "--out-dir", out_dir]
-    args = if artifact.skip_prebuild?, do: args ++ ["--skip-prebuild"], else: args
+    args = release_kit_command(artifact)
 
     result =
       case artifact.user do
@@ -196,8 +202,30 @@ defmodule HostKit.Recipes.OTPRelease do
         :ok
 
       {:error, reason} ->
-        raise ArgumentError, "release_kit artifact build failed: #{inspect(reason)}"
+        raise ArgumentError, release_kit_failure_message(artifact, reason)
     end
+  end
+
+  def release_kit_label(%{name: name}), do: "release_kit.#{name}"
+
+  def release_kit_command(%{out_dir: out_dir, skip_prebuild?: skip_prebuild?}) do
+    args = ["release_kit.artifact", "--out-dir", out_dir]
+    if skip_prebuild?, do: args ++ ["--skip-prebuild"], else: args
+  end
+
+  def release_kit_command_text(%{} = artifact) do
+    command = ["mix" | release_kit_command(artifact)] |> Enum.join(" ")
+    "MIX_ENV=#{artifact.mix_env} #{command}"
+  end
+
+  defp release_kit_failure_message(artifact, reason) do
+    """
+    ReleaseKit artifact build failed for #{artifact.name}
+    cwd: #{artifact.cwd}
+    user: #{artifact.user || "current"}
+    command: #{release_kit_command_text(artifact)}
+    reason: #{inspect(reason)}
+    """
   end
 
   defp manifest_path(_name, opts, nil), do: Keyword.fetch!(opts, :manifest)
@@ -259,14 +287,59 @@ defmodule HostKit.Recipes.OTPRelease do
     }
   end
 
-  defp require_files(path, files) do
-    base = path |> Path.expand() |> Path.dirname()
-
-    files
-    |> List.wrap()
-    |> Enum.map(&Path.expand(&1, base))
-    |> Enum.each(&Code.require_file/1)
+  defp loaded_modules do
+    :code.all_loaded()
+    |> Enum.map(fn {module, _path} -> module end)
+    |> MapSet.new()
   end
+
+  defp purge_eval_modules(modules, loaded_before) do
+    modules
+    |> Enum.reject(&MapSet.member?(loaded_before, &1))
+    |> Enum.each(fn module ->
+      :code.purge(module)
+      :code.delete(module)
+    end)
+  end
+
+  defp collection_files(path, files) do
+    path = Path.expand(path)
+    base = Path.dirname(path)
+
+    [path | files |> List.wrap() |> Enum.map(&Path.expand(&1, base))]
+  end
+
+  defp modules_defined_in_files(files) do
+    files
+    |> Enum.flat_map(&modules_defined_in_file/1)
+    |> Enum.uniq()
+  end
+
+  defp modules_defined_in_file(path) do
+    path
+    |> File.read!()
+    |> Code.string_to_quoted!()
+    |> then(fn ast ->
+      {_ast, modules} =
+        Macro.prewalk(ast, [], fn
+          {:defmodule, _meta, [module_ast, _body]} = node, modules ->
+            {node, collect_module(module_ast, modules)}
+
+          node, modules ->
+            {node, modules}
+        end)
+
+      modules
+    end)
+  rescue
+    _ -> []
+  end
+
+  defp collect_module({:__aliases__, _meta, parts}, modules),
+    do: [Module.concat(parts) | modules]
+
+  defp collect_module(module, modules) when is_atom(module), do: [module | modules]
+  defp collect_module(_module, modules), do: modules
 
   defp restore_process(key, nil), do: Process.delete(key)
   defp restore_process(key, value), do: Process.put(key, value)

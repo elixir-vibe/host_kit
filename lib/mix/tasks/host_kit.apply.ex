@@ -120,10 +120,34 @@ defmodule Mix.Tasks.HostKit.Apply do
         require: Keyword.get_values(opts, :require)
       )
 
-    HostKit.Recipes.OTPRelease.build_release_kit_artifacts!(
-      artifacts,
-      apply_opts(opts, target_opts)
-    )
+    build_opts = apply_opts(opts, target_opts)
+
+    Enum.each(artifacts, fn artifact ->
+      build_release_kit_artifact!(artifact, build_opts, opts)
+    end)
+  end
+
+  defp build_release_kit_artifact!(artifact, build_opts, cli_opts) do
+    label = HostKit.Recipes.OTPRelease.release_kit_label(artifact)
+
+    unless Keyword.get(cli_opts, :quiet, false) do
+      Mix.shell().info("▶ #{label} build")
+    end
+
+    try do
+      HostKit.Recipes.OTPRelease.build_release_kit_artifact!(artifact, build_opts)
+
+      unless Keyword.get(cli_opts, :quiet, false) do
+        Mix.shell().info("✓ #{label} build")
+      end
+    rescue
+      exception ->
+        unless Keyword.get(cli_opts, :quiet, false) do
+          Mix.shell().error("✗ #{label} build failed")
+        end
+
+        reraise exception, __STACKTRACE__
+    end
   end
 
   defp validate_artifact_target(%HostKit.Plan.Artifact{target: target}, target_opts)
