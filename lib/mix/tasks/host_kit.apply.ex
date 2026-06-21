@@ -71,6 +71,7 @@ defmodule Mix.Tasks.HostKit.Apply do
       nil
     else
       path = List.first(positional) || "infra/config.exs"
+      maybe_build_release_kit_artifacts!(path, opts, [])
       HostKit.load!(path, require: Keyword.get_values(opts, :require))
     end
   end
@@ -103,6 +104,26 @@ defmodule Mix.Tasks.HostKit.Apply do
             Mix.raise("could not load HostKit plan artifact: #{inspect(reason)}")
         end
     end
+  end
+
+  defp maybe_build_release_kit_artifacts!(path, opts, target_opts) do
+    if Keyword.get(opts, :dry_run, false) do
+      :ok
+    else
+      do_build_release_kit_artifacts!(path, opts, target_opts)
+    end
+  end
+
+  defp do_build_release_kit_artifacts!(path, opts, target_opts) do
+    artifacts =
+      HostKit.Recipes.OTPRelease.collect_release_kit(path,
+        require: Keyword.get_values(opts, :require)
+      )
+
+    HostKit.Recipes.OTPRelease.build_release_kit_artifacts!(
+      artifacts,
+      apply_opts(opts, target_opts)
+    )
   end
 
   defp validate_artifact_target(%HostKit.Plan.Artifact{target: target}, target_opts)

@@ -98,8 +98,19 @@ defmodule HostKit.Recipes.OTPRelease do
   end
 
   def assigns(name, opts) when is_atom(name) do
-    manifest_path = Keyword.fetch!(opts, :manifest)
-    manifest = load_manifest!(manifest_path)
+    release_kit = Keyword.get(opts, :release_kit)
+    manifest_path = manifest_path(name, opts, release_kit)
+
+    if collecting_release_kit?() and release_kit do
+      collect_release_kit!(name, release_kit, manifest_path)
+      placeholder_assigns(name, opts, manifest_path)
+    else
+      manifest = load_manifest!(manifest_path)
+      assigns_from_manifest(name, opts, manifest_path, manifest)
+    end
+  end
+
+  defp assigns_from_manifest(name, opts, manifest_path, manifest) do
     release_name = fetch_string!(manifest, :release)
     version = fetch_string!(manifest, :version)
     app_name = Naming.identity_segment(name)
@@ -130,6 +141,135 @@ defmodule HostKit.Recipes.OTPRelease do
       }
     }
   end
+
+  def collect_release_kit(path, opts \\ []) do
+    previous_collecting = Process.get(:hostkit_collect_release_kit?)
+    previous_artifacts = Process.get(:hostkit_release_kit_artifacts)
+
+    Process.put(:hostkit_collect_release_kit?, true)
+    Process.put(:hostkit_release_kit_artifacts, [])
+
+    try do
+      require_files(path, Keyword.get(opts, :require, []))
+      Code.eval_file(Path.expand(path))
+      Process.get(:hostkit_release_kit_artifacts, []) |> Enum.reverse()
+    after
+      restore_process(:hostkit_collect_release_kit?, previous_collecting)
+      restore_process(:hostkit_release_kit_artifacts, previous_artifacts)
+    end
+  end
+
+  def build_release_kit_artifacts!(artifacts, opts \\ []) do
+    Enum.each(artifacts, &build_release_kit_artifact!(&1, opts))
+  end
+
+  defp build_release_kit_artifact!(artifact, opts) do
+    cwd = Map.fetch!(artifact, :cwd)
+    mix_env = Map.fetch!(artifact, :mix_env)
+    out_dir = Map.fetch!(artifact, :out_dir)
+    timeout = Map.fetch!(artifact, :timeout)
+
+    args = ["release_kit.artifact", "--out-dir", out_dir]
+    args = if artifact.skip_prebuild?, do: args ++ ["--skip-prebuild"], else: args
+
+    result =
+      case artifact.user do
+        nil ->
+          HostKit.Runner.Ops.cmd(opts, "mix", args,
+            cd: cwd,
+            env: %{"MIX_ENV" => mix_env},
+            timeout: timeout
+          )
+
+        user ->
+          HostKit.Runner.Ops.cmd(
+            Keyword.put(opts, :sudo, false),
+            "sudo",
+            ["-u", user, "-H", "env", "MIX_ENV=#{mix_env}", "mix" | args],
+            cd: cwd,
+            timeout: timeout
+          )
+      end
+
+    case result do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        raise ArgumentError, "release_kit artifact build failed: #{inspect(reason)}"
+    end
+  end
+
+  defp manifest_path(_name, opts, nil), do: Keyword.fetch!(opts, :manifest)
+
+  defp manifest_path(name, opts, release_kit) when is_list(release_kit) do
+    case Keyword.get(opts, :manifest) do
+      nil ->
+        cwd = Keyword.fetch!(release_kit, :cwd)
+        out_dir = Keyword.get(release_kit, :out_dir, "_build/prod/artifacts")
+        release = release_kit |> Keyword.get(:release, name) |> to_string()
+        Path.expand(Path.join(out_dir, "#{release}.etf"), cwd)
+
+      path ->
+        path
+    end
+  end
+
+  defp collecting_release_kit?, do: Process.get(:hostkit_collect_release_kit?, false)
+
+  defp collect_release_kit!(name, release_kit, manifest_path) do
+    artifact = %{
+      name: name,
+      cwd: Keyword.fetch!(release_kit, :cwd),
+      manifest: manifest_path,
+      user: Keyword.get(release_kit, :user),
+      mix_env: release_kit |> Keyword.get(:mix_env, "prod") |> to_string(),
+      out_dir: Keyword.get(release_kit, :out_dir, "_build/prod/artifacts"),
+      timeout: Keyword.get(release_kit, :timeout, 300_000),
+      skip_prebuild?: Keyword.get(release_kit, :skip_prebuild, false)
+    }
+
+    artifacts = Process.get(:hostkit_release_kit_artifacts, [])
+    Process.put(:hostkit_release_kit_artifacts, [artifact | artifacts])
+  end
+
+  defp placeholder_assigns(name, opts, manifest_path) do
+    app_name = Naming.identity_segment(name)
+    port = Keyword.get(opts, :port, 4000)
+
+    %{
+      name: app_name,
+      service_name: Keyword.get(opts, :service, name),
+      manifest_path: manifest_path,
+      version: "pending",
+      tarball: "/tmp/#{app_name}-pending.tar.gz",
+      timeout: Keyword.get(opts, :timeout, 300_000),
+      env: %{clear: stringify_env(Keyword.get(opts, :env, %{}))},
+      http: %{port: port},
+      health: %{
+        path: "/health",
+        timeout: Keyword.get(opts, :health_timeout, 30),
+        url: "http://127.0.0.1:#{port}/health"
+      },
+      release: %{name: to_string(name)},
+      commands: %{
+        unpack: Naming.resource([app_name, :unpack]),
+        ready: Naming.resource([app_name, :ready])
+      }
+    }
+  end
+
+  defp require_files(path, files) do
+    base = path |> Path.expand() |> Path.dirname()
+
+    files
+    |> List.wrap()
+    |> Enum.map(&Path.expand(&1, base))
+    |> Enum.each(&Code.require_file/1)
+  end
+
+  defp restore_process(key, nil), do: Process.delete(key)
+  defp restore_process(key, value), do: Process.put(key, value)
 
   def unpack_exec(tarball, release_dir) do
     script =

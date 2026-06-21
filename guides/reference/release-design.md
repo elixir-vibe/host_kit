@@ -1,6 +1,6 @@
 # Release design notes
 
-This note records the intended boundary for HostKit `release` work before adding artifact download, activation, cleanup, or rollback behavior. For BEAM applications, [ReleaseKit](https://hex.pm/packages/release_kit) produces the deployment-neutral OTP release tarball and ETF manifest consumed by `HostKit.Recipes.OTPRelease`. Applications configure ReleaseKit prebuild steps, such as `ReleaseKit.Step.Volt`, in application config and run `mix release_kit.artifact` directly; HostKit consumes the resulting manifest.
+This note records the intended boundary for HostKit `release` work before adding artifact download, activation, cleanup, or rollback behavior. For BEAM applications, [ReleaseKit](https://hex.pm/packages/release_kit) produces the deployment-neutral OTP release tarball and ETF manifest consumed by `HostKit.Recipes.OTPRelease`. Applications configure ReleaseKit prebuild steps, such as `ReleaseKit.Step.Volt`, in application config. HostKit can either consume an already-built manifest or, for local apply workflows, run the standard ReleaseKit artifact build before loading the manifest via `otp_release ... release_kit: [...]`.
 
 ## Current scope
 
@@ -54,7 +54,19 @@ Keep these concerns separate:
 
 ## Future shape
 
-A fuller release declaration may grow into artifact preparation and activation, but it should still compile to plain resources and commands. For OTP release manifests, this needs a design that respects planning: `HostKit.Recipes.OTPRelease` currently decodes the manifest while evaluating the project DSL, so a producer that creates the manifest during apply cannot be consumed by the same already-built plan without a first-class producer/consumer model.
+A fuller release declaration may grow into artifact preparation and activation, but it should still compile to plain resources and commands. For OTP release manifests, HostKit provides a narrow built-in ReleaseKit path on `otp_release` instead of a separate producer entity:
+
+```elixir
+otp_release :my_app,
+  release_kit: [
+    cwd: "/opt/apps/my_app",
+    user: "my-app",
+    out_dir: "_build/prod/artifacts"
+  ],
+  manifest: "/opt/apps/my_app/_build/prod/artifacts/my_app.etf"
+```
+
+During `host_kit.apply`, HostKit first collects these ReleaseKit build specs, runs `mix release_kit.artifact` through the HostKit runner boundary, then reloads the project and consumes the generated manifest normally. Dry runs do not build artifacts. Plain `manifest:` remains supported for workflows that build artifacts outside HostKit.
 
 A fuller release declaration for downloadable artifacts may look like:
 

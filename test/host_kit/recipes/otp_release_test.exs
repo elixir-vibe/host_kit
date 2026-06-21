@@ -101,6 +101,77 @@ defmodule HostKit.OTPReleaseRecipeTest do
            end)
   end
 
+  test "collects and builds ReleaseKit artifacts through HostKit runner boundary" do
+    tmp =
+      Path.join(System.tmp_dir!(), "hostkit-release-kit-#{System.unique_integer([:positive])}")
+
+    on_exit(fn -> File.rm_rf(tmp) end)
+
+    app = Path.join(tmp, "app")
+    File.mkdir_p!(app)
+
+    manifest_path = Path.join(app, "_build/prod/artifacts/demo_app.etf")
+    File.mkdir_p!(Path.dirname(manifest_path))
+    File.write!(manifest_path, :erlang.term_to_binary(valid_manifest("demo_app", "built123")))
+
+    config = Path.join(tmp, "config.exs")
+
+    File.write!(config, """
+    defmodule ReleaseKitCollectProject do
+      use HostKit.DSL, recipes: [HostKit.Recipes.OTPRelease]
+
+      project :demo do
+        roots opt: "/opt/example", config: "/etc/example"
+
+        otp_release :demo_app,
+          release_kit: [cwd: #{inspect(app)}],
+          base_dir: "/opt/example/demo_app",
+          config_dir: "/etc/example/demo_app"
+      end
+    end
+    """)
+
+    artifacts = HostKit.Recipes.OTPRelease.collect_release_kit(config)
+
+    assert [artifact] = artifacts
+    assert artifact.cwd == app
+    assert artifact.out_dir == "_build/prod/artifacts"
+    assert artifact.mix_env == "prod"
+    assert artifact.manifest == manifest_path
+
+    test_pid = self()
+
+    runner =
+      Module.concat(
+        __MODULE__,
+        "ReleaseKitRunner#{System.unique_integer([:positive]) |> abs()}"
+      )
+
+    Module.create(
+      runner,
+      quote do
+        @behaviour HostKit.Runner
+
+        def cmd(command, args, opts) do
+          send(unquote(Macro.escape(test_pid)), {:release_kit_cmd, command, args, opts})
+          {"", 0}
+        end
+
+        def mkdir_p(_path, _opts), do: :ok
+        def write_file(_path, _content, _opts), do: :ok
+      end,
+      Macro.Env.location(__ENV__)
+    )
+
+    HostKit.Recipes.OTPRelease.build_release_kit_artifacts!(artifacts, runner: runner)
+
+    assert_receive {:release_kit_cmd, "mix",
+                    ["release_kit.artifact", "--out-dir", "_build/prod/artifacts"], opts}
+
+    assert Keyword.fetch!(opts, :cd) == app
+    assert Keyword.fetch!(opts, :env) == %{"MIX_ENV" => "prod"}
+  end
+
   test "otp_release rejects non-OTP release manifests" do
     path =
       Path.join(System.tmp_dir!(), "hostkit-invalid-#{System.unique_integer([:positive])}.etf")
@@ -115,7 +186,12 @@ defmodule HostKit.OTPReleaseRecipeTest do
   defp write_manifest!(release_name, version) do
     path = Path.join(System.tmp_dir!(), "hostkit-otp-#{System.unique_integer([:positive])}.etf")
 
-    manifest = %{
+    File.write!(path, :erlang.term_to_binary(valid_manifest(release_name, version)))
+    path
+  end
+
+  defp valid_manifest(release_name, version) do
+    %{
       tool: "example",
       format: :beam_release_artifact,
       format_version: 1,
@@ -128,8 +204,5 @@ defmodule HostKit.OTPReleaseRecipeTest do
       env: %{clear: %{"PHX_HOST" => "app.example.com"}, secret: ["SECRET_KEY_BASE"]},
       health_check: %{path: "/health", port: 4100, url: "http://127.0.0.1:4100/health"}
     }
-
-    File.write!(path, :erlang.term_to_binary(manifest))
-    path
   end
 end
