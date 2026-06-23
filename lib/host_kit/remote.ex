@@ -116,12 +116,8 @@ defmodule HostKit.Remote do
 
   def read(_resource, _context), do: {:ok, nil}
 
-  defp read_readiness(%Readiness{checks: checks} = desired, opts) do
-    if Enum.any?(checks, &match?(%HostKit.Readiness.Systemd{restart: true}, &1)) do
-      {:ok, nil}
-    else
-      read_current_readiness(desired, opts)
-    end
+  defp read_readiness(%Readiness{} = desired, opts) do
+    read_current_readiness(desired, opts)
   end
 
   defp read_current_readiness(desired, opts) do

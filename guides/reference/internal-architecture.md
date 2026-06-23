@@ -286,7 +286,7 @@ ready :app_ready, timeout: 60_000 do
 end
 ```
 
-Recipes such as `elixir_app` can emit readiness automatically. During apply, readiness emits progress events for restarts, active services, waiting checks, pass/fail, and timeout.
+Recipes such as `elixir_app` can emit readiness automatically. Readiness planning checks current health like any other resource: healthy checks are no-op, unhealthy checks are active. Healthy readiness is also re-triggered when the dependency graph shows that an upstream resource changed, for example a release symlink or systemd unit that feeds the checked service. During apply, readiness emits progress events for restarts, active services, waiting checks, pass/fail, and timeout.
 
 ### `HostKit.RunRecord`
 

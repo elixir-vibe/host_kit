@@ -11,10 +11,10 @@ defmodule HostKit.Plan.ExecutionGraph.Build do
   @active_actions [:create, :update, :delete]
 
   @spec build(Plan.t(), keyword()) :: ExecutionGraph.t()
-  def build(%Plan{} = plan, _opts \\ []) do
+  def build(%Plan{} = plan, opts \\ []) do
     nodes =
       plan.changes
-      |> Enum.filter(&(&1.action in @active_actions))
+      |> Enum.filter(&include_change?(&1, opts))
       |> Enum.map(&graph_node/1)
 
     indexes = %{
@@ -35,6 +35,13 @@ defmodule HostKit.Plan.ExecutionGraph.Build do
     cycles = cycles(nodes, layers)
 
     %ExecutionGraph{nodes: nodes, edges: edges, layers: layers, cycles: cycles}
+  end
+
+  defp include_change?(%Change{action: action}, opts) do
+    case Keyword.get(opts, :include, :active) do
+      :all -> true
+      :active -> action in @active_actions
+    end
   end
 
   defp resource_index(nodes) do

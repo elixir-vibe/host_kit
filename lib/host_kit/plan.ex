@@ -84,7 +84,7 @@ defmodule HostKit.Plan do
          :ok <- HostKit.CommandAnalysis.validate(resources),
          :ok <- maybe_write_package_lock(resources, opts) do
       opts = Keyword.put(opts, :resources, resources)
-      changes = Enum.map(resources, &change_for(&1, project, opts))
+      changes = resources |> Enum.map(&change_for(&1, project, opts)) |> trigger_readiness()
       diagnostics = HostKit.Source.Diagnostics.for_plan(resources, changes)
 
       if HostKit.Diagnostics.ok?(diagnostics) do
@@ -255,6 +255,67 @@ defmodule HostKit.Plan do
       hint:
         "HostKit keeps rollback as a plan; unsupported resources are omitted from the down plan."
     }
+  end
+
+  defp trigger_readiness(changes) do
+    plan = %__MODULE__{changes: changes}
+    graph = HostKit.Plan.ExecutionGraph.build(plan, include: :all)
+    active = active_resource_ids(changes)
+    incoming = incoming_edges(graph.edges)
+
+    Enum.map(changes, &trigger_readiness_change(&1, active, incoming))
+  end
+
+  defp active_resource_ids(changes) do
+    changes
+    |> Enum.filter(&(&1.action in [:create, :update, :delete]))
+    |> MapSet.new(& &1.resource_id)
+  end
+
+  defp incoming_edges(edges) do
+    Enum.group_by(edges, & &1.to, & &1.from)
+  end
+
+  defp trigger_readiness_change(
+         %Change{action: :no_op, after: %HostKit.Resources.Readiness{}} = change,
+         active,
+         incoming
+       ) do
+    case active_dependencies(change.resource_id, active, incoming) do
+      [] -> change
+      dependencies -> %Change{change | action: :update, reason: {:triggered_by, dependencies}}
+    end
+  end
+
+  defp trigger_readiness_change(change, _active, _incoming), do: change
+
+  defp active_dependencies(resource_id, active, incoming) do
+    resource_id
+    |> collect_active_dependencies(active, incoming, MapSet.new())
+    |> MapSet.to_list()
+    |> Enum.sort_by(&inspect/1)
+  end
+
+  defp collect_active_dependencies(resource_id, active, incoming, visited) do
+    if MapSet.member?(visited, resource_id) do
+      MapSet.new()
+    else
+      visited = MapSet.put(visited, resource_id)
+
+      incoming
+      |> Map.get(resource_id, [])
+      |> Enum.reduce(MapSet.new(), fn dependency, dependencies ->
+        dependencies =
+          if MapSet.member?(active, dependency),
+            do: MapSet.put(dependencies, dependency),
+            else: dependencies
+
+        MapSet.union(
+          dependencies,
+          collect_active_dependencies(dependency, active, incoming, visited)
+        )
+      end)
+    end
   end
 
   defp maybe_put_package_manager(resources, opts) do
