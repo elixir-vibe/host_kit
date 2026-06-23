@@ -34,6 +34,7 @@ defmodule HostKit.MixProject do
   defp deps do
     [
       {:pi_bridge, "== 0.6.21", only: :dev},
+      {:release_kit, "~> 0.2.1", optional: true},
       {:systemdkit, "~> 0.1.4"},
       {:unitctl, "~> 0.1.0"},
       {:jason, "~> 1.4"},

@@ -208,8 +208,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
       user: nil,
       mix_env: "prod",
       out_dir: "_build/prod/artifacts",
-      timeout: 300_000,
-      skip_prebuild?: false
+      timeout: 300_000
     }
 
     assert_raise ArgumentError, ~r/ReleaseKit artifact build failed for demo_app/, fn ->
@@ -225,7 +224,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     File.write!(path, :erlang.term_to_binary(%{format: :other}))
 
-    assert_raise ArgumentError, ~r/not an OTP release artifact/, fn ->
+    assert_raise ArgumentError, ~r/expected %ReleaseKit.Manifest{}/, fn ->
       HostKit.Recipes.OTPRelease.load_manifest!(path)
     end
   end
@@ -238,18 +237,16 @@ defmodule HostKit.OTPReleaseRecipeTest do
   end
 
   defp valid_manifest(release_name, version) do
-    %{
-      tool: "example",
-      format: :beam_release_artifact,
-      format_version: 1,
+    ReleaseKit.Manifest.new(
       app: release_name,
       version: version,
       release: release_name,
       mix_env: "prod",
       tarball: "/tmp/#{release_name}-#{version}.tar.gz",
-      runtime: %{command: ["bin/#{release_name}", "start"]},
-      env: %{clear: %{"PHX_HOST" => "app.example.com"}, secret: ["SECRET_KEY_BASE"]},
-      health_check: %{path: "/health", port: 4100, url: "http://127.0.0.1:4100/health"}
-    }
+      port: 4100,
+      health_path: "/health",
+      env_clear: %{"PHX_HOST" => "app.example.com"},
+      env_secret: ["SECRET_KEY_BASE"]
+    )
   end
 end

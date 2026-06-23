@@ -13,7 +13,7 @@ defmodule HostKit.Recipes.OTPRelease do
   alias HostKit.Naming
 
   @format :beam_release_artifact
-  @format_version 1
+  @format_version 2
 
   defmacro otp_release(name, opts \\ []) do
     otp_release_body(name, opts, nil)
@@ -223,9 +223,8 @@ defmodule HostKit.Recipes.OTPRelease do
 
   def release_kit_label(%{name: name}), do: "release_kit.#{name}"
 
-  def release_kit_command(%{out_dir: out_dir, skip_prebuild?: skip_prebuild?}) do
-    args = ["release_kit.artifact", "--out-dir", out_dir]
-    if skip_prebuild?, do: args ++ ["--skip-prebuild"], else: args
+  def release_kit_command(%{out_dir: out_dir}) do
+    ["release_kit.artifact", "--out-dir", out_dir]
   end
 
   def release_kit_command_text(%{} = artifact) do
@@ -268,8 +267,7 @@ defmodule HostKit.Recipes.OTPRelease do
       user: Keyword.get(release_kit, :user),
       mix_env: release_kit |> Keyword.get(:mix_env, "prod") |> to_string(),
       out_dir: Keyword.get(release_kit, :out_dir, "_build/prod/artifacts"),
-      timeout: Keyword.get(release_kit, :timeout, 300_000),
-      skip_prebuild?: Keyword.get(release_kit, :skip_prebuild, false)
+      timeout: Keyword.get(release_kit, :timeout, 300_000)
     }
 
     artifacts = Process.get(:hostkit_release_kit_artifacts, [])
@@ -371,52 +369,27 @@ defmodule HostKit.Recipes.OTPRelease do
   end
 
   def load_manifest!(path) when is_binary(path) do
-    preload_schema_atoms()
+    unless Code.ensure_loaded?(ReleaseKit.Manifest) do
+      raise ArgumentError,
+            "ReleaseKit OTP artifact manifests require adding {:release_kit, \"~> 0.2.1\"}"
+    end
 
-    path
-    |> File.read!()
-    |> :erlang.binary_to_term([:safe])
+    ReleaseKit.Manifest
+    |> apply(:read!, [path])
     |> validate_manifest!(path)
   end
 
-  defp preload_schema_atoms do
-    [
-      :app,
-      :clear,
-      :command,
-      :env,
-      :format,
-      :format_version,
-      :health_check,
-      :mix_env,
-      :path,
-      :port,
-      :release,
-      :runtime,
-      :secret,
-      :tarball,
-      :tool,
-      :url,
-      :version,
-      :beam_release_artifact
-    ]
-    |> Enum.each(&:erlang.atom_to_binary/1)
-  end
-
-  defp validate_manifest!(%{} = manifest, path) do
-    unless Map.get(manifest, :format) == @format do
+  defp validate_manifest!(%{__struct__: module} = manifest, path)
+       when module == ReleaseKit.Manifest do
+    unless manifest.format == @format do
       raise ArgumentError, "#{path} is not an OTP release artifact manifest"
     end
 
-    unless Map.get(manifest, :format_version) == @format_version do
+    unless manifest.format_version == @format_version do
       raise ArgumentError, "unsupported OTP release artifact version in #{path}"
     end
 
     manifest
-  end
-
-  defp validate_manifest!(_manifest, path) do
-    raise ArgumentError, "#{path} does not contain a valid OTP release artifact manifest"
   end
 
   defp health(raw, port, opts) do
