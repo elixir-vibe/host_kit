@@ -45,6 +45,7 @@ defmodule Mix.Tasks.HostKit.Audit do
         sudo: :boolean,
         require: :keep,
         format: :string,
+        service: :keep,
         ignore: :keep,
         package_lock: :string,
         repology_cache: :string,
@@ -58,6 +59,7 @@ defmodule Mix.Tasks.HostKit.Audit do
     target_opts
     |> Options.expand_target_opts()
     |> Keyword.put(:ignore, Options.ignored_resources(opts))
+    |> put_present(:services, Options.selected_services(opts))
     |> put_present(:package_lock, Keyword.get(opts, :package_lock))
     |> Options.put_repology_cache(opts)
   end

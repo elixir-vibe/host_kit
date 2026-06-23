@@ -67,8 +67,10 @@ defmodule HostKit.Plan do
 
   @spec build(Project.t(), keyword()) :: {:ok, t()} | {:error, HostKit.Diagnostics.t() | term()}
   def build(%Project{} = project, opts \\ []) do
-    with :ok <- HostKit.RPC.validate(project) do
-      resources = Project.resources(project)
+    with :ok <- HostKit.RPC.validate(project),
+         {:ok, services} <- Project.resolve_services(project, Keyword.get(opts, :services)) do
+      opts = Keyword.put(opts, :services, services)
+      resources = Project.resources(project, opts)
       opts = maybe_put_package_manager(resources, opts)
 
       build_resources(project, resources, opts)

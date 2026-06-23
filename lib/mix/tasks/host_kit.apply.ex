@@ -32,6 +32,7 @@ defmodule Mix.Tasks.HostKit.Apply do
           silently_accept_hosts: :boolean,
           sudo: :boolean,
           require: :keep,
+          service: :keep,
           ignore: :keep,
           package_lock: :string,
           plan: :string,
@@ -117,7 +118,8 @@ defmodule Mix.Tasks.HostKit.Apply do
   defp do_build_release_kit_artifacts!(path, opts, target_opts) do
     artifacts =
       HostKit.Recipes.OTPRelease.collect_release_kit(path,
-        require: Keyword.get_values(opts, :require)
+        require: Keyword.get_values(opts, :require),
+        services: Options.selected_services(opts)
       )
 
     build_opts = apply_opts(opts, target_opts)
@@ -247,6 +249,7 @@ defmodule Mix.Tasks.HostKit.Apply do
   defp plan_opts(opts, target_opts) do
     target_opts
     |> Keyword.put(:ignore, Options.ignored_resources(opts))
+    |> put_present(:services, Options.selected_services(opts))
     |> put_present(:package_lock, Keyword.get(opts, :package_lock))
     |> Options.put_repology_cache(opts)
   end

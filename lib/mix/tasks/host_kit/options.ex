@@ -37,7 +37,14 @@ defmodule Mix.Tasks.HostKit.Options do
   def ignored_resources(opts) do
     opts
     |> Keyword.get_values(:ignore)
-    |> Enum.map(&parse_resource_id/1)
+    |> Enum.map(&parse_resource_id(&1, "--ignore"))
+  end
+
+  def selected_services(opts) do
+    case Keyword.get_values(opts, :service) do
+      [] -> nil
+      services -> services
+    end
   end
 
   def put_repology_cache(plan_opts, opts) do
@@ -142,16 +149,16 @@ defmodule Mix.Tasks.HostKit.Options do
   defp put_present(opts, _key, nil), do: opts
   defp put_present(opts, key, value), do: Keyword.put(opts, key, value)
 
-  defp parse_resource_id(resource) do
+  defp parse_resource_id(resource, option) do
     case String.split(resource, ":", parts: 2) do
-      [type, name] -> {resource_type(type), name}
-      _ -> Mix.raise("invalid --ignore #{inspect(resource)}, expected type:name")
+      [type, name] -> {resource_type(type, option), name}
+      _ -> Mix.raise("invalid #{option} #{inspect(resource)}, expected type:name")
     end
   end
 
-  defp resource_type(type) do
+  defp resource_type(type, option) do
     String.to_existing_atom(type)
   rescue
-    ArgumentError -> Mix.raise("unknown resource type in --ignore: #{inspect(type)}")
+    ArgumentError -> Mix.raise("unknown resource type in #{option}: #{inspect(type)}")
   end
 end

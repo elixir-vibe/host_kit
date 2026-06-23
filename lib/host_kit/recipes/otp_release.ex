@@ -158,7 +158,10 @@ defmodule HostKit.Recipes.OTPRelease do
       Code.compiler_options(ignore_module_conflict: true)
       Enum.each(Enum.drop(files, 1), &Code.require_file/1)
       Code.eval_file(hd(files))
-      Process.get(:hostkit_release_kit_artifacts, []) |> Enum.reverse()
+
+      Process.get(:hostkit_release_kit_artifacts, [])
+      |> Enum.reverse()
+      |> filter_release_kit_artifacts(opts)
     after
       purge_eval_modules(modules_to_purge, loaded_before)
       Code.compiler_options(previous_compiler_options)
@@ -169,6 +172,20 @@ defmodule HostKit.Recipes.OTPRelease do
 
   def build_release_kit_artifacts!(artifacts, opts \\ []) do
     Enum.each(artifacts, &build_release_kit_artifact!(&1, opts))
+  end
+
+  defp filter_release_kit_artifacts(artifacts, opts) do
+    case Keyword.get(opts, :services) do
+      nil ->
+        artifacts
+
+      [] ->
+        artifacts
+
+      services ->
+        selectors = services |> List.wrap() |> Enum.map(&to_string/1) |> MapSet.new()
+        Enum.filter(artifacts, &MapSet.member?(selectors, to_string(&1.name)))
+    end
   end
 
   def build_release_kit_artifact!(artifact, opts \\ []) do

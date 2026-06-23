@@ -127,11 +127,16 @@ defmodule HostKit.OTPReleaseRecipeTest do
           release_kit: [cwd: #{inspect(app)}],
           base_dir: "/opt/example/demo_app",
           config_dir: "/etc/example/demo_app"
+
+        otp_release :other_app,
+          release_kit: [cwd: #{inspect(app)}],
+          base_dir: "/opt/example/other_app",
+          config_dir: "/etc/example/other_app"
       end
     end
     """)
 
-    artifacts = HostKit.Recipes.OTPRelease.collect_release_kit(config)
+    artifacts = HostKit.Recipes.OTPRelease.collect_release_kit(config, services: [:demo_app])
 
     assert [artifact] = artifacts
     assert artifact.cwd == app

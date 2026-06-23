@@ -31,6 +31,7 @@ Common options:
 - `--format text|inspect` — output format.
 - `--show-graph` — append the derived execution dependency graph.
 - `--graph-format text|json` — graph output format; implies `--show-graph`.
+- `--service NAME` — restrict the plan to one declared HostKit service; repeat for multiple services.
 - `--ignore type:name` — ignore a resource.
 - `--require PATH` — load project-local DSL/support code before config.
 
@@ -42,6 +43,7 @@ mix host_kit.plan --host prod --write-package-lock host_kit.package.lock infra/c
 mix host_kit.plan --host prod --package-lock host_kit.package.lock --out host_kit.plan.json infra/config.exs
 mix host_kit.plan --host prod --show-graph infra/config.exs
 mix host_kit.plan --host prod --graph-format json infra/config.exs
+mix host_kit.plan --host prod --service exograph infra/config.exs
 ```
 
 `--show-graph` appends dependency reasons and topological layers for active create/update/delete changes:
@@ -106,6 +108,7 @@ Common options:
 - `--confirm` — apply changes.
 - `--dry-run` — exercise apply without changing the target.
 - `--package-lock PATH` — read deterministic package resolutions when planning inline.
+- `--service NAME` — when planning inline, restrict apply to one declared HostKit service; repeat for multiple services.
 - `--local`, `--remote`, `--user`, `--port`, `--identity-file`, `--password`, `--password-env`, `--silently-accept-hosts`, `--sudo` — same target options as `plan`.
 - `--require PATH` — load project-local DSL/support code before config.
 - `--track` — write a minimal run record after apply.
@@ -119,6 +122,7 @@ Examples:
 ```sh
 mix host_kit.apply --host prod --plan host_kit.plan.json --confirm infra/config.exs
 mix host_kit.apply --host prod --package-lock host_kit.package.lock --dry-run infra/config.exs
+mix host_kit.apply --host prod --service exograph --confirm infra/config.exs
 ```
 
 ## `mix host_kit.read`
@@ -154,6 +158,7 @@ mix host_kit.audit [options] [config.exs]
 Useful options:
 
 - target flags shared with `plan`
+- `--service NAME` — restrict the plan to one declared HostKit service; repeat for multiple services
 - `--ignore type:name`
 - `--package-lock PATH`
 - Repology cache flags shared with `plan`

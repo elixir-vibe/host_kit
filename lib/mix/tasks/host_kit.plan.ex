@@ -35,6 +35,7 @@ defmodule Mix.Tasks.HostKit.Plan do
           require: :keep,
           format: :string,
           out: :string,
+          service: :keep,
           ignore: :keep,
           package_lock: :string,
           write_package_lock: :string,
@@ -138,6 +139,7 @@ defmodule Mix.Tasks.HostKit.Plan do
     target_opts
     |> Options.expand_target_opts()
     |> Keyword.put(:ignore, Options.ignored_resources(opts))
+    |> put_present(:services, Options.selected_services(opts))
     |> put_package_lock(opts)
   end
 

@@ -146,21 +146,111 @@ defmodule HostKit.Project do
     HostKit.plan(project, opts)
   end
 
-  @spec resources(t()) :: [struct()]
-  def resources(%__MODULE__{} = project) do
+  @doc "Returns project resources, optionally scoped to selected services."
+  @spec resources(t(), keyword()) :: [struct()]
+  def resources(%__MODULE__{} = project, opts \\ []) do
+    selected_services = selected_services!(project, opts)
+    services = selected_services || project.services
+
     resources =
-      project.resources
-      |> Kernel.++(Enum.flat_map(project.instances, &instance_resources/1))
-      |> Kernel.++(project.proxies)
-      |> Kernel.++(project.services |> Enum.flat_map(&service_resources(project, &1)))
+      if selected_services do
+        services |> Enum.flat_map(&service_resources(project, &1))
+      else
+        project.resources
+        |> Kernel.++(Enum.flat_map(project.instances, &instance_resources/1))
+        |> Kernel.++(project.proxies)
+        |> Kernel.++(services |> Enum.flat_map(&service_resources(project, &1)))
+      end
 
     resources = HostKit.RPC.apply_permissions(project, resources)
 
     resources
-    |> Kernel.++(HostKit.RPC.binding_resources(project))
-    |> Kernel.++(Firewall.policies(project))
-    |> Kernel.++(workspace_egress(project))
+    |> Kernel.++(
+      HostKit.RPC.binding_resources(project, services: service_names(selected_services))
+    )
+    |> Kernel.++(if(selected_services, do: [], else: Firewall.policies(project)))
+    |> Kernel.++(workspace_egress(project, selected_services))
   end
+
+  @doc "Resolves service selectors against service name, identity, or path."
+  @spec resolve_services(t(), [atom() | String.t()] | nil) ::
+          {:ok, [atom()] | nil} | {:error, term()}
+  def resolve_services(%__MODULE__{} = project, selectors) do
+    case resolve_selected_services(project, selectors) do
+      {:ok, services} -> {:ok, service_names(services)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc "Resolves service selectors or raises on unknown/ambiguous selectors."
+  @spec resolve_services!(t(), [atom() | String.t()] | nil) :: [atom()] | nil
+  def resolve_services!(%__MODULE__{} = project, selectors) do
+    case resolve_services(project, selectors) do
+      {:ok, services} -> services
+      {:error, reason} -> raise ArgumentError, format_service_selection_error(reason)
+    end
+  end
+
+  defp selected_services!(%__MODULE__{} = project, opts) do
+    case resolve_selected_services(project, Keyword.get(opts, :services)) do
+      {:ok, services} -> services
+      {:error, reason} -> raise ArgumentError, format_service_selection_error(reason)
+    end
+  end
+
+  defp resolve_selected_services(%__MODULE__{} = project, selectors) do
+    case List.wrap(selectors) do
+      [] ->
+        {:ok, nil}
+
+      selectors ->
+        Enum.reduce_while(selectors, {:ok, []}, fn selector, {:ok, services} ->
+          case resolve_service(project, selector) do
+            {:ok, service} -> {:cont, {:ok, [service | services]}}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+        end)
+        |> case do
+          {:ok, services} -> {:ok, services |> Enum.reverse() |> Enum.uniq_by(& &1.name)}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
+  defp resolve_service(%__MODULE__{} = project, selector) do
+    matches = Enum.filter(project.services, &service_matches?(&1, selector))
+
+    case matches do
+      [service] ->
+        {:ok, service}
+
+      [] ->
+        {:error, {:unknown_service, selector}}
+
+      services ->
+        {:error, {:ambiguous_service, selector, Enum.map(services, & &1.name)}}
+    end
+  end
+
+  defp format_service_selection_error({:unknown_service, selector}),
+    do: "unknown HostKit service #{inspect(selector)}"
+
+  defp format_service_selection_error({:ambiguous_service, selector, services}) do
+    names = Enum.map_join(services, ", ", &inspect/1)
+    "ambiguous HostKit service #{inspect(selector)} matches #{names}"
+  end
+
+  defp service_matches?(%Service{name: name}, selector) when is_atom(selector),
+    do: name == selector
+
+  defp service_matches?(%Service{} = service, selector) when is_binary(selector) do
+    selector in [Atom.to_string(service.name), service.identity, service.path]
+  end
+
+  defp service_matches?(_service, _selector), do: false
+
+  defp service_names(nil), do: nil
+  defp service_names(services), do: Enum.map(services, & &1.name)
 
   defp instance_resources(%Instance{} = instance) do
     [instance | instance_content_resources(instance)]
@@ -212,8 +302,10 @@ defmodule HostKit.Project do
     end)
   end
 
-  defp workspace_egress(project) do
-    project.services
+  defp workspace_egress(project, nil), do: workspace_egress(project, project.services)
+
+  defp workspace_egress(_project, services) do
+    services
     |> Enum.map(& &1.meta[:egress])
     |> Enum.reject(&is_nil/1)
   end

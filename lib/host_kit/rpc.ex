@@ -73,14 +73,19 @@ defmodule HostKit.RPC do
     end
   end
 
-  @spec binding_resources(Project.t()) :: [File.t()]
-  def binding_resources(%Project{} = project) do
+  @spec binding_resources(Project.t(), keyword()) :: [File.t()]
+  def binding_resources(%Project{} = project, opts \\ []) do
     service_index = service_index(project)
+    selected = opts |> Keyword.get(:services) |> selected_service_set()
 
     project.services
+    |> Enum.filter(&(selected == nil or MapSet.member?(selected, &1.name)))
     |> Enum.filter(&(rpc(&1).bindings != []))
     |> Enum.map(&binding_file(project, &1, service_index))
   end
+
+  defp selected_service_set(nil), do: nil
+  defp selected_service_set(services), do: services |> List.wrap() |> MapSet.new()
 
   defp caller_rpc_groups(project) do
     service_index = service_index(project)
