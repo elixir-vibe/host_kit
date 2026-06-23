@@ -467,7 +467,65 @@ defmodule HostKit.Apply do
 
   defp symlink_chown(path, owner, group, opts) do
     spec = [owner || "", group || ""] |> Enum.join(":") |> String.trim_trailing(":")
-    Ops.cmd(opts, "chown", ["-h", spec, path])
+
+    with :ok <- Ops.cmd(opts, "chown", ["-h", spec, path]) do
+      verify_symlink_owner(path, owner, group, opts)
+    end
+  end
+
+  defp verify_symlink_owner(path, owner, group, opts) do
+    with {:ok, actual} <- symlink_owner(path, opts) do
+      cond do
+        owner && actual.owner != owner ->
+          {:error, {:symlink_ownership_not_applied, path, %{owner: owner, group: group}, actual}}
+
+        group && actual.group != group ->
+          {:error, {:symlink_ownership_not_applied, path, %{owner: owner, group: group}, actual}}
+
+        true ->
+          :ok
+      end
+    end
+  end
+
+  defp symlink_owner(path, opts) do
+    escaped_path = HostKit.Shell.escape(path)
+
+    case runner_cmd(opts, "sh", ["-c", "stat -c '%F:%U:%G' #{escaped_path}"]) do
+      {output, 0} -> parse_symlink_owner(path, output)
+      {_output, _status} -> bsd_symlink_owner(path, opts)
+    end
+  end
+
+  defp bsd_symlink_owner(path, opts) do
+    escaped_path = HostKit.Shell.escape(path)
+
+    case runner_cmd(opts, "sh", ["-c", "stat -f '%HT:%Su:%Sg' #{escaped_path}"]) do
+      {output, 0} -> parse_symlink_owner(path, output)
+      {output, status} -> {:error, {:symlink_stat_failed, path, status, output}}
+    end
+  end
+
+  defp parse_symlink_owner(path, output) do
+    case output |> String.trim() |> String.split(":", parts: 3) do
+      [type, owner, group] when type in ["symbolic link", "Symbolic Link"] ->
+        {:ok, %{owner: owner, group: group}}
+
+      [type, _owner, _group] ->
+        {:error, {:not_symlink, path, type}}
+
+      _other ->
+        {:error, {:invalid_symlink_stat, path, output}}
+    end
+  end
+
+  defp runner_cmd(opts, command, args) do
+    {command, args} = maybe_sudo(command, args, opts)
+    Runner.cmd(Ops.runner(opts), command, args, stderr_to_stdout: true)
+  end
+
+  defp maybe_sudo(command, args, opts) do
+    if Keyword.get(opts, :sudo, false), do: {"sudo", [command | args]}, else: {command, args}
   end
 
   defp rendered_content(%{meta: %{content: %HostKit.BackupRef{} = ref}}, _default, opts),

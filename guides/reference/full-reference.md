@@ -103,6 +103,8 @@ account :app, system: true, rollback: :keep
 package :caddy, rollback: :keep
 ```
 
+Symlink ownership is unmanaged unless `owner:` or `group:` is explicitly set. This keeps release/current links reproducible across platforms where changing symlink inode ownership is unsupported or unreliable. When explicit symlink ownership is requested, apply verifies it and fails if the target cannot enforce it.
+
 CLI usage mirrors this:
 
 ```sh

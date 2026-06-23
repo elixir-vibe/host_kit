@@ -65,6 +65,22 @@ defmodule HostKit.Resources.SymlinkTest do
     assert {:ok, ^target} = File.read_link(link)
   end
 
+  test "apply verifies explicit symlink ownership" do
+    symlink = %Symlink{path: "/tmp/current", to: "/tmp/releases/v1", owner: "app", group: "app"}
+
+    plan = %HostKit.Plan{
+      changes: [%Change{action: :create, resource_id: Symlink.id(symlink), after: symlink}]
+    }
+
+    runner = fake_runner("SymlinkOwnershipRunner")
+
+    assert {:error,
+            {{:symlink, "/tmp/current"},
+             {:symlink_ownership_not_applied, "/tmp/current", %{owner: "app", group: "app"},
+              %{owner: "root", group: "root"}}}} =
+             HostKit.Apply.run(plan, confirm: true, runner: runner)
+  end
+
   defp tmp_dir! do
     tmp = Path.join(System.tmp_dir!(), "host-kit-symlink-#{System.unique_integer([:positive])}")
     File.mkdir_p!(tmp)
@@ -83,5 +99,28 @@ defmodule HostKit.Resources.SymlinkTest do
       end
     )
     |> elem(0)
+  end
+
+  defp fake_runner(name) do
+    runner = Module.concat(__MODULE__, name)
+
+    Module.create(
+      runner,
+      quote do
+        @behaviour HostKit.Runner
+
+        def cmd("ln", ["-sfnT", _target, _path], _opts), do: {"", 0}
+        def cmd("chown", ["-h", "app:app", "/tmp/current"], _opts), do: {"", 0}
+
+        def cmd("sh", ["-c", "stat -c '%F:%U:%G' '/tmp/current'"], _opts),
+          do: {"symbolic link:root:root\n", 0}
+
+        def mkdir_p(_path, _opts), do: :ok
+        def write_file(_path, _content, _opts), do: :ok
+      end,
+      Macro.Env.location(__ENV__)
+    )
+
+    runner
   end
 end

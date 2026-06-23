@@ -139,8 +139,8 @@ defmodule HostKit.DSL.CoreTest do
              %HostKit.Resources.Symlink{
                path: "/opt/apps/current/gatus",
                to: "/opt/apps/releases/gatus/5.36.0",
-               owner: "root",
-               group: "root"
+               owner: nil,
+               group: nil
              },
              %HostKit.Resources.File{
                path: "/opt/apps/current/gatus/VERSION",

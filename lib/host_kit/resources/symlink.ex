@@ -1,5 +1,5 @@
 defmodule HostKit.Resources.Symlink do
-  @moduledoc "Desired symbolic link target with optional ownership."
+  @moduledoc "Desired symbolic link target with optional, explicitly verified ownership."
 
   @type t :: %__MODULE__{
           path: String.t(),

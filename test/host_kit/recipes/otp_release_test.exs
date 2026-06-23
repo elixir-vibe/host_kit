@@ -69,6 +69,8 @@ defmodule HostKit.OTPReleaseRecipeTest do
              %HostKit.Resources.Symlink{
                path: "/opt/example/demo_app/current",
                to: "/opt/example/demo_app/releases/abc123",
+               owner: nil,
+               group: nil,
                depends_on: [{:command, "demo_app_unpack"}]
              } ->
                true

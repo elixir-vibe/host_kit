@@ -488,8 +488,8 @@ defmodule HostKit.DSL.Scope do
     release_owner = Keyword.get(opts, :owner, "root")
     release_group = Keyword.get(opts, :group, release_owner)
     release_mode = Keyword.get(opts, :mode, 0o755)
-    current_owner = Keyword.get(opts, :current_owner, "root")
-    current_group = Keyword.get(opts, :current_group, "root")
+    current_owner = Keyword.get(opts, :current_owner)
+    current_group = Keyword.get(opts, :current_group)
 
     releases_dir =
       Keyword.get(opts, :releases_dir) || path(:opt, Path.join("releases", release_name))

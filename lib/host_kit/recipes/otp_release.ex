@@ -68,8 +68,6 @@ defmodule HostKit.Recipes.OTPRelease do
 
         symlink(current_dir,
           to: release_dir,
-          owner: service_user(),
-          group: service_user(),
           depends_on: [{:command, artifact.commands.unpack}]
         )
 
