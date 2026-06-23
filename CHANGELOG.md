@@ -2,9 +2,15 @@
 
 ## Unreleased
 
+## v0.1.0-beta.6 - 2026-06-23
+
 - Added command monitor execution with `monitor :command, exec: ...`, reusing the same command shapes as command resources.
 - Added `mix/2`, `elixir/1,2`, and `eval/1,2` command-line builders for first-class BEAM CLI commands, with DSL defaults from the `:bin` convention root.
 - Added quoted `.exs` file resources via `exs PATH do ... end`, with strict `unquote(value(...))` and `unquote(secret(...))` placeholders.
+- Added `otp_release` support for ReleaseKit artifact builds and typed ReleaseKit v2 manifests.
+- Added service-scoped `plan`, `audit`, and `apply` selection with `--service`.
+- Made symlink ownership unmanaged by default unless `owner:` or `group:` is explicit.
+- Triggered readiness checks from dependency changes while keeping healthy readiness converged.
 
 ## v0.1.0-beta.5 - 2026-06-16
 
