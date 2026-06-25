@@ -28,7 +28,13 @@ defmodule HostKit.Recipes.OTPRelease do
       recipe_opts = unquote(opts)
       artifact = HostKit.Recipes.OTPRelease.assigns(unquote(name), recipe_opts)
 
-      service artifact.service_name do
+      service_opts =
+        case Keyword.get(recipe_opts, :path) do
+          nil -> []
+          path -> [path: path]
+        end
+
+      service artifact.service_name, service_opts do
         base_dir = Keyword.get(recipe_opts, :base_dir, path(:opt, service_path()))
         config_dir = Keyword.get(recipe_opts, :config_dir, path(:config))
         release_dir = Path.join([base_dir, "releases", artifact.version])
