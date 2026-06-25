@@ -35,30 +35,24 @@ defmodule HostKit.ReadinessTest do
   end
 
   test "readiness waits until checks pass" do
+    {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
+    {:ok, port} = :inet.port(listen_socket)
+
+    server =
+      Task.async(fn ->
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        {:ok, _request} = :gen_tcp.recv(socket, 0)
+        :ok = :gen_tcp.send(socket, "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+        :gen_tcp.close(socket)
+        :gen_tcp.close(listen_socket)
+      end)
+
     readiness =
       HostKit.Resources.Readiness.new(:demo,
-        checks: [HostKit.Readiness.HTTP.new("http://example.test", body: "ok")]
+        checks: [HostKit.Readiness.HTTP.new("http://127.0.0.1:#{port}", body: "ok")]
       )
 
-    defmodule ReadyRunner do
-      @behaviour HostKit.Runner
-
-      @impl true
-      def cmd("sh", ["-c", script], opts) do
-        send(opts[:test_pid], {:readiness_script, script})
-        {"", 0}
-      end
-
-      @impl true
-      def mkdir_p(_path, _opts), do: :ok
-
-      @impl true
-      def write_file(_path, _content, _opts), do: :ok
-    end
-
-    assert :ok = HostKit.Readiness.wait(readiness, runner: {ReadyRunner, test_pid: self()})
-    assert_received {:readiness_script, script}
-    assert script =~ "curl"
-    assert script =~ "grep -F 'ok'"
+    assert :ok = HostKit.Readiness.wait(readiness, [])
+    assert :ok = Task.await(server)
   end
 end

@@ -36,8 +36,9 @@ defmodule HostKit.Providers.Caddy do
     with {:ok, content} <- rendered_content(site, render_site(site), opts),
          :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), file_opts),
          :ok <- HostKit.Runner.Files.write_file(path, content, file_opts),
-         :ok <- Ops.chown(path, Map.get(config, :owner), Map.get(config, :group), opts) do
-      Ops.chmod(path, Map.get(config, :mode, 0o644), opts)
+         :ok <- Ops.chown(path, Map.get(config, :owner), Map.get(config, :group), opts),
+         :ok <- Ops.chmod(path, Map.get(config, :mode, 0o644), opts) do
+      activate_site(site, config)
     end
   end
 
@@ -88,6 +89,90 @@ defmodule HostKit.Providers.Caddy do
   end
 
   defp provider_config(_context), do: %{}
+
+  defp activate_site(%Site{} = site, config) do
+    if activate?(config) do
+      admin_url = Map.get(config, :admin_url, "http://127.0.0.1:2019")
+      route = site |> HostKit.Caddy.JSON.route_for_site() |> HostKit.Caddy.JSON.to_map()
+
+      with {:ok, routes, etag} <- fetch_routes(admin_url),
+           :ok <- put_route(admin_url, routes, etag, site.host, route) do
+        :ok
+      end
+    else
+      :ok
+    end
+  end
+
+  defp activate?(config) do
+    Map.get(config, :activate, default_activate?(config))
+  end
+
+  defp default_activate?(config) do
+    Map.get(config, :sites_dir) == "/etc/caddy/sites"
+  end
+
+  defp fetch_routes(admin_url) do
+    url = admin_url <> "/config/apps/http/servers/srv0/routes"
+
+    case Req.get(url, retry: false, receive_timeout: 5_000) do
+      {:ok, %Req.Response{status: 200, body: routes, headers: headers}} when is_list(routes) ->
+        {:ok, routes, List.first(headers["etag"] || [])}
+
+      {:ok, %Req.Response{status: status, body: body}} ->
+        {:error, {:caddy_admin_fetch_routes_failed, status, body}}
+
+      {:error, reason} ->
+        {:error, {:caddy_admin_request_failed, url, reason}}
+    end
+  end
+
+  defp put_route(admin_url, routes, etag, host, route) do
+    headers = [{"content-type", "application/json"}]
+    headers = if etag, do: [{"if-match", etag} | headers], else: headers
+
+    case Enum.find_index(routes, &route_matches_host?(&1, host)) do
+      nil ->
+        request(:post, admin_url <> "/config/apps/http/servers/srv0/routes", route, headers)
+
+      index ->
+        request(
+          :patch,
+          admin_url <> "/config/apps/http/servers/srv0/routes/#{index}",
+          route,
+          headers
+        )
+    end
+  end
+
+  defp request(method, url, json, headers) do
+    case Req.request(
+           method: method,
+           url: url,
+           json: json,
+           headers: headers,
+           retry: false,
+           receive_timeout: 5_000
+         ) do
+      {:ok, %Req.Response{status: status}} when status in 200..299 ->
+        :ok
+
+      {:ok, %Req.Response{status: status, body: body}} ->
+        {:error, {:caddy_admin_update_route_failed, status, body}}
+
+      {:error, reason} ->
+        {:error, {:caddy_admin_request_failed, url, reason}}
+    end
+  end
+
+  defp route_matches_host?(%{"match" => matches}, host) when is_list(matches) do
+    Enum.any?(matches, fn
+      %{"host" => hosts} when is_list(hosts) -> host in hosts
+      _other -> false
+    end)
+  end
+
+  defp route_matches_host?(_route, _host), do: false
 
   defp render_directive(%Root{matcher: matcher, path: path}) do
     ["\troot ", matcher, " ", path, "\n"]
