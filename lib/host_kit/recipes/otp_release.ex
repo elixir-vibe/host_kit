@@ -46,7 +46,31 @@ defmodule HostKit.Recipes.OTPRelease do
 
         account(system: true, home: Keyword.get(recipe_opts, :account_home, base_dir))
 
+        lifecycle_context =
+          HostKit.DSL.Lifecycle.Scope.start_context(%{
+            collect?: true,
+            name: &HostKit.Recipes.OTPRelease.lifecycle_command_name(artifact.name, &1),
+            eval:
+              &HostKit.Recipes.OTPRelease.release_eval_exec(
+                current_bin,
+                env_path,
+                &1,
+                &2
+                |> Keyword.put_new(:user, service_user())
+                |> Keyword.put_new(:stop_unit, unit)
+              ),
+            timeout: artifact.timeout,
+            down: :irreversible,
+            inputs: [release_dir],
+            depends_on: [
+              {:command, artifact.commands.unpack},
+              {:symlink, current_dir}
+            ]
+          })
+
         unquote(block)
+
+        lifecycle_commands = HostKit.DSL.Lifecycle.Scope.finish_context(lifecycle_context)
 
         directory(base_dir, owner: service_user(), group: service_user(), mode: 0o755)
 
@@ -81,6 +105,10 @@ defmodule HostKit.Recipes.OTPRelease do
           depends_on: [{:command, artifact.commands.unpack}]
         )
 
+        for lifecycle_command <- lifecycle_commands do
+          HostKit.DSL.Scope.add_resource(lifecycle_command)
+        end
+
         endpoint(:http,
           port: artifact.http.port,
           protocol: :http,
@@ -97,7 +125,9 @@ defmodule HostKit.Recipes.OTPRelease do
           wanted_by(:multi_user)
         end
 
-        ready artifact.commands.ready, timeout: artifact.health.timeout * 1000 do
+        ready artifact.commands.ready,
+          timeout: artifact.health.timeout * 1000,
+          depends_on: Enum.map(lifecycle_commands, &HostKit.Resource.id/1) do
           systemd(unit, restart: true, kill: true)
           http(artifact.health.url)
         end
@@ -237,6 +267,33 @@ defmodule HostKit.Recipes.OTPRelease do
   end
 
   def release_kit_label(%{name: name}), do: "release_kit.#{name}"
+
+  def lifecycle_command_name(app_name, step), do: Naming.resource([app_name, step])
+
+  def release_eval_exec(release_bin, env_path, expression, opts \\ []) do
+    env_path = HostKit.Shell.escape(env_path)
+    release_bin = HostKit.Shell.escape(release_bin)
+    expression = HostKit.Shell.escape(expression)
+
+    eval_script = "set -a && . #{env_path} && set +a && exec #{release_bin} eval #{expression}"
+
+    user_script =
+      case Keyword.get(opts, :user) do
+        nil ->
+          eval_script
+
+        user ->
+          "exec sudo -u #{HostKit.Shell.escape(user)} -H sh -c #{HostKit.Shell.escape(eval_script)}"
+      end
+
+    script =
+      case Keyword.get(opts, :stop_unit) do
+        nil -> user_script
+        unit -> "systemctl stop #{HostKit.Shell.escape(unit)} || true; #{user_script}"
+      end
+
+    {"sh", ["-c", script]}
+  end
 
   def release_kit_command(%{out_dir: out_dir}) do
     ["release_kit.artifact", "--out-dir", out_dir]

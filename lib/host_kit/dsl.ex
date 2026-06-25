@@ -1027,6 +1027,38 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro before_start(name, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Lifecycle.Scope.start(unquote(name), :before_start, unquote(opts))
+      unquote(block)
+      HostKit.DSL.Lifecycle.Scope.finish()
+    end
+  end
+
+  defmacro after_start(name, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Lifecycle.Scope.start(unquote(name), :after_start, unquote(opts))
+      unquote(block)
+      HostKit.DSL.Lifecycle.Scope.finish()
+    end
+  end
+
+  defmacro before_stop(name, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Lifecycle.Scope.start(unquote(name), :before_stop, unquote(opts))
+      unquote(block)
+      HostKit.DSL.Lifecycle.Scope.finish()
+    end
+  end
+
+  defmacro after_stop(name, opts \\ [], do: block) do
+    quote do
+      HostKit.DSL.Lifecycle.Scope.start(unquote(name), :after_stop, unquote(opts))
+      unquote(block)
+      HostKit.DSL.Lifecycle.Scope.finish()
+    end
+  end
+
   defmacro command(name, opts) do
     source = HostKit.SourceLocation.from_caller(__CALLER__)
 
@@ -1104,9 +1136,22 @@ defmodule HostKit.DSL do
   end
 
   defmacro eval(expression, opts \\ []) do
+    expression =
+      case expression do
+        expression when is_binary(expression) -> expression
+        expression -> Macro.to_string(expression)
+      end
+
     quote do
       opts = Keyword.put_new(unquote(opts), :command, path(:bin, "elixir"))
-      HostKit.CommandLine.eval(unquote(expression), opts)
+
+      if HostKit.DSL.Lifecycle.Scope.active?() do
+        HostKit.DSL.Lifecycle.Scope.put_exec(
+          HostKit.DSL.Lifecycle.Scope.eval_exec(unquote(expression), opts)
+        )
+      else
+        HostKit.CommandLine.eval(unquote(expression), opts)
+      end
     end
   end
 

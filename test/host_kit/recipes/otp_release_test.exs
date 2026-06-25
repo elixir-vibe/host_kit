@@ -19,6 +19,10 @@ defmodule HostKit.OTPReleaseRecipeTest do
             account_home: "/var/lib/demo_app/home",
             env: %{"EXTRA_SETTING" => "enabled"}
           ) do
+            before_start :migrate do
+              eval(DemoApp.ReleaseTasks.migrate())
+            end
+
             listen(:rpc, protocol: :rpc)
           end
         end
@@ -81,6 +85,26 @@ defmodule HostKit.OTPReleaseRecipeTest do
            end)
 
     assert Enum.any?(resources, fn
+             %HostKit.Resources.Command{
+               name: "demo_app_migrate",
+               phase: :before_start,
+               depends_on: [
+                 {:command, "demo_app_unpack"},
+                 {:symlink, "/opt/example/demo_app/current"}
+               ],
+               inputs: ["/opt/example/demo_app/releases/abc123"],
+               exec: {"sh", ["-c", migrate]}
+             } ->
+               migrate =~ "systemctl stop 'demo-app.service'" and
+                 migrate =~ "sudo -u 'demo-app' -H sh -c" and
+                 migrate =~ "'/opt/example/demo_app/current/bin/demo_app'" and
+                 migrate =~ "DemoApp.ReleaseTasks.migrate()"
+
+             _resource ->
+               false
+           end)
+
+    assert Enum.any?(resources, fn
              %HostKit.Systemd.Service{name: "demo-app.service", service: service} ->
                service |> Keyword.fetch!(:exec_start) |> List.wrap() |> hd() ==
                  "/opt/example/demo_app/current/bin/demo_app start"
@@ -90,7 +114,11 @@ defmodule HostKit.OTPReleaseRecipeTest do
            end)
 
     assert Enum.any?(resources, fn
-             %HostKit.Resources.Readiness{name: "demo_app_ready", checks: checks} ->
+             %HostKit.Resources.Readiness{
+               name: "demo_app_ready",
+               checks: checks,
+               depends_on: [{:command, "demo_app_migrate"}]
+             } ->
                match?(
                  [
                    %HostKit.Readiness.Systemd{unit: "demo-app.service", restart: true},
