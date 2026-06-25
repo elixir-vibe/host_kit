@@ -52,6 +52,49 @@ defmodule HostKit.FirewallTest do
     assert Enum.map(firewall.rules, & &1.action) == [:allow, :deny]
   end
 
+  test "project resources include a default systemd firewall loader" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      prefixes unit: "demo-"
+
+      firewall do
+        allow tcp: 22, from: :any
+        deny :all
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    resources = HostKit.Project.resources(project)
+
+    assert [%HostKit.Firewall{} = firewall] =
+             Enum.filter(resources, &match?(%HostKit.Firewall{}, &1))
+
+    assert [%HostKit.Systemd.Service{} = loader] =
+             Enum.filter(resources, &match?(%HostKit.Systemd.Service{}, &1))
+
+    assert loader.name == "demo-firewall.service"
+    assert loader.service[:exec_start] == "/usr/bin/env nft -f /etc/nftables.d/hostkit.nft"
+    assert loader.depends_on == [HostKit.Firewall.id(firewall)]
+  end
+
+  test "firewall activation can be disabled" do
+    source = """
+    use HostKit.DSL
+
+    project :demo do
+      firewall activate: false do
+        allow tcp: 22, from: :any
+      end
+    end
+    """
+
+    {%HostKit.Project{} = project, _binding} = Code.eval_string(source)
+    assert [%HostKit.Firewall{}] = HostKit.Project.resources(project)
+  end
+
   test "renders nftables policy" do
     firewall = %HostKit.Firewall{
       rules: [

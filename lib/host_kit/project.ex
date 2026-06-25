@@ -168,7 +168,7 @@ defmodule HostKit.Project do
     |> Kernel.++(
       HostKit.RPC.binding_resources(project, services: service_names(selected_services))
     )
-    |> Kernel.++(if(selected_services, do: [], else: Firewall.policies(project)))
+    |> Kernel.++(if(selected_services, do: [], else: Firewall.resources(project)))
     |> Kernel.++(workspace_egress(project, selected_services))
   end
 

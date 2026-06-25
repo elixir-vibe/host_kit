@@ -77,9 +77,16 @@ defmodule HostKit.DSL.Scope do
   def start_firewall(opts \\ []) do
     scope = if Process.get(@host_key), do: :host, else: :project
 
+    activation_opts =
+      opts
+      |> Keyword.take([:unit, :nft, :description, :after, :before, :wants, :wanted_by])
+      |> Map.new()
+
     Process.put(@firewall_key, %HostKit.Firewall{
       scope: scope,
-      path: Keyword.get(opts, :path, "/etc/nftables.d/hostkit.nft")
+      path: Keyword.get(opts, :path, "/etc/nftables.d/hostkit.nft"),
+      activate: Keyword.get(opts, :activate, :systemd),
+      meta: activation_opts
     })
   end
 

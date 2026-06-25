@@ -1,14 +1,15 @@
 defmodule HostKit.Firewall do
   @moduledoc "Declarative host firewall policy."
 
+  alias HostKit.{Conventions, Naming, Project, Systemd}
   alias HostKit.Firewall.Rule
-  alias HostKit.Project
 
   @type t :: %__MODULE__{
           rules: [Rule.t()],
           scope: :project | :host,
           name: atom() | nil,
           path: String.t(),
+          activate: false | :systemd,
           depends_on: [term()],
           meta: map()
         }
@@ -17,6 +18,7 @@ defmodule HostKit.Firewall do
             scope: :project,
             name: nil,
             path: "/etc/nftables.d/hostkit.nft",
+            activate: :systemd,
             depends_on: [],
             meta: %{}
 
@@ -48,6 +50,12 @@ defmodule HostKit.Firewall do
     }
   end
 
+  @spec resources(Project.t()) :: [struct()]
+  def resources(%Project{} = project) do
+    firewalls = policies(project)
+    firewalls ++ Enum.flat_map(firewalls, &activation_resources(&1, project))
+  end
+
   @spec policies(Project.t()) :: [t()]
   def policies(%Project{} = project) do
     project_policy =
@@ -66,6 +74,50 @@ defmodule HostKit.Firewall do
 
     project_policy ++ host_policies
   end
+
+  defp activation_resources(%__MODULE__{activate: :systemd} = firewall, %Project{} = project) do
+    [
+      Systemd.Service.new(systemd_unit_name(firewall, project),
+        unit: [
+          description:
+            Map.get(firewall.meta, :description, "Load HostKit nftables firewall policy"),
+          after: Map.get(firewall.meta, :after, ["network-pre.target"]),
+          before: Map.get(firewall.meta, :before, ["network.target"]),
+          wants: Map.get(firewall.meta, :wants, ["network-pre.target"])
+        ],
+        service: [
+          type: :oneshot,
+          exec_start: nft_command(firewall) ++ ["-f", firewall.path],
+          remain_after_exit: true
+        ],
+        install: [wanted_by: Map.get(firewall.meta, :wanted_by, :multi_user)],
+        depends_on: [id(firewall)]
+      )
+    ]
+  end
+
+  defp activation_resources(%__MODULE__{activate: false}, %Project{}), do: []
+  defp activation_resources(%__MODULE__{activate: nil}, %Project{}), do: []
+
+  defp systemd_unit_name(%__MODULE__{meta: %{unit: unit}}, _project) when not is_nil(unit),
+    do: Naming.systemd_unit(unit)
+
+  defp systemd_unit_name(%__MODULE__{scope: :host, name: name}, %Project{} = project)
+       when not is_nil(name) do
+    project.conventions
+    |> Conventions.prefixed(:unit, "#{Naming.identity_segment(name)}-firewall")
+    |> Naming.systemd_unit()
+  end
+
+  defp systemd_unit_name(%__MODULE__{}, %Project{} = project) do
+    project.conventions
+    |> Conventions.prefixed(:unit, "firewall")
+    |> Naming.systemd_unit()
+  end
+
+  defp nft_command(%__MODULE__{meta: %{nft: nft}}) when is_binary(nft), do: [nft]
+  defp nft_command(%__MODULE__{meta: %{nft: nft}}) when is_list(nft), do: nft
+  defp nft_command(%__MODULE__{}), do: ["/usr/bin/env", "nft"]
 
   defp protocol_ports(opts) do
     cond do
