@@ -15,7 +15,13 @@ defmodule HostKit.Runner.Ops do
   def chmod(_path, nil, _opts), do: :ok
 
   def chmod(path, mode, opts) do
-    cmd(opts, "chmod", [Integer.to_string(mode, 8), path])
+    cmd(opts, "chmod", [format_mode(mode), path])
+  end
+
+  defp format_mode(mode) do
+    mode
+    |> Integer.to_string(8)
+    |> String.pad_leading(4, "0")
   end
 
   @spec cmd(keyword(), String.t(), [String.t()], keyword()) :: :ok | {:error, term()}

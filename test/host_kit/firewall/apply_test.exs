@@ -51,7 +51,7 @@ defmodule HostKit.FirewallApplyTest do
     assert content =~ "table inet hostkit"
     assert content =~ "tcp dport { 80, 443 } accept"
     assert_received {:cmd, "chown", ["root:root", "/etc/nftables.d/hostkit.nft"]}
-    assert_received {:cmd, "chmod", ["644", "/etc/nftables.d/hostkit.nft"]}
+    assert_received {:cmd, "chmod", ["0644", "/etc/nftables.d/hostkit.nft"]}
     assert_received {:cmd, "nft", ["-c", "-f", "/etc/nftables.d/hostkit.nft"]}
     assert_received {:cmd, "nft", ["-f", "/etc/nftables.conf"]}
   end
