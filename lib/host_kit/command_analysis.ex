@@ -41,9 +41,7 @@ defmodule HostKit.CommandAnalysis do
 
   def required_command_refs(%Source{type: :git}), do: [%{name: "git"}]
 
-  def required_command_refs(%Readiness{checks: checks}) do
-    if Enum.any?(checks, &match?(%HostKit.Readiness.HTTP{}, &1)), do: [%{name: "curl"}], else: []
-  end
+  def required_command_refs(%Readiness{}), do: []
 
   def required_command_refs(_resource), do: []
 

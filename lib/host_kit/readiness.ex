@@ -3,7 +3,7 @@ defmodule HostKit.Readiness do
 
   alias HostKit.Readiness.{HTTP, Systemd}
   alias HostKit.Resources.Readiness
-  alias HostKit.{Runner.Ops, SystemdRuntime}
+  alias HostKit.SystemdRuntime
 
   @spec current?(Readiness.t(), keyword()) :: boolean()
   def current?(%Readiness{} = readiness, opts) do
@@ -110,47 +110,27 @@ defmodule HostKit.Readiness do
     end
   end
 
-  defp check_one(%HTTP{} = http, opts) do
-    case Ops.cmd(opts, "sh", ["-c", http_check_script(http)]) do
-      :ok -> :ok
-      {:error, reason} -> {http, {:error, reason}}
+  defp check_one(%HTTP{} = http, _opts) do
+    case Req.get(http.url, retry: false, receive_timeout: 5_000) do
+      {:ok, %{status: status, body: body}} when status == http.expect_status ->
+        check_http_body(http, body)
+
+      {:ok, %{status: status}} ->
+        {http, {:error, {:unexpected_http_status, http.url, http.expect_status, status}}}
+
+      {:error, reason} ->
+        {http, {:error, {:http_request_failed, http.url, reason}}}
     end
   end
 
-  defp http_check_script(%HTTP{} = http) do
-    body_check = http_body_check_script(http)
+  defp check_http_body(%HTTP{expect_body: nil}, _body), do: :ok
 
-    """
-    set +e
-    hostkit_readiness_failed=0
-    hostkit_readiness_body=$(mktemp /tmp/hostkit-readiness-body.XXXXXX)
-    hostkit_readiness_status=$(curl -sS -w '%{http_code}' -o "$hostkit_readiness_body" #{HostKit.Shell.escape(http.url)})
-    hostkit_readiness_curl_status=$?
-
-    if [ "$hostkit_readiness_curl_status" -ne 0 ]; then
-      echo #{HostKit.Shell.escape("http #{http.url} curl failed")} status="$hostkit_readiness_status" exit="$hostkit_readiness_curl_status"
-      hostkit_readiness_failed=1
-    elif [ "$hostkit_readiness_status" != #{HostKit.Shell.escape(to_string(http.expect_status))} ]; then
-      echo #{HostKit.Shell.escape("http #{http.url} unexpected status")} expected=#{HostKit.Shell.escape(to_string(http.expect_status))} actual="$hostkit_readiness_status"
-      hostkit_readiness_failed=1
+  defp check_http_body(%HTTP{url: url, expect_body: expected} = http, body) do
+    if body |> to_string() |> String.contains?(expected) do
+      :ok
     else
-    #{indent(body_check, 2)}
-    fi
-
-    rm -f "$hostkit_readiness_body"
-    exit $hostkit_readiness_failed
-    """
-  end
-
-  defp http_body_check_script(%HTTP{expect_body: nil}), do: ":"
-
-  defp http_body_check_script(%HTTP{url: url, expect_body: body}) do
-    """
-    if ! grep -F #{HostKit.Shell.escape(body)} "$hostkit_readiness_body" >/dev/null; then
-      echo #{HostKit.Shell.escape("http #{url} body did not contain expected text")}
-      hostkit_readiness_failed=1
-    fi
-    """
+      {http, {:error, {:http_body_missing_text, url, expected}}}
+    end
   end
 
   defp effective_interval(%Readiness{interval: 500}, opts) do
@@ -256,12 +236,4 @@ defmodule HostKit.Readiness do
   defp remote_runner?({HostKit.Runner.SSH, _opts}), do: true
   defp remote_runner?({HostKit.Runner.SSH.Connection, _opts}), do: true
   defp remote_runner?(_runner), do: false
-
-  defp indent(text, spaces) do
-    prefix = String.duplicate(" ", spaces)
-
-    text
-    |> String.split("\n")
-    |> Enum.map_join("\n", &(prefix <> &1))
-  end
 end
