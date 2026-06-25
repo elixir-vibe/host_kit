@@ -9,9 +9,11 @@ defmodule HostKit.Firewall.Nftables do
     rules = Enum.map_join(firewall.rules, "\n", &render_rule/1)
 
     """
+    destroy table inet hostkit
+
     table inet hostkit {
       chain input {
-        type filter hook input priority 0; policy drop;
+        type filter hook input priority -100; policy drop;
 
         ct state established,related accept
         iif lo accept
@@ -73,8 +75,13 @@ defmodule HostKit.Firewall.Nftables do
   defp source_match(from), do: "ip saddr #{HostKit.Net.Addr.to_string(from)}"
 
   defp ports_match(:icmp, _ports), do: "icmp type echo-request"
-  defp ports_match(protocol, [port]), do: "#{protocol} dport #{port}"
-  defp ports_match(protocol, ports), do: "#{protocol} dport { #{Enum.join(ports, ", ")} }"
+  defp ports_match(protocol, [port]), do: "#{protocol} dport #{format_port(port)}"
+
+  defp ports_match(protocol, ports),
+    do: "#{protocol} dport { #{Enum.map_join(ports, ", ", &format_port/1)} }"
+
+  defp format_port(%Range{first: first, last: last}), do: "#{first}-#{last}"
+  defp format_port(port), do: to_string(port)
 
   defp indent("", _spaces), do: ""
 

@@ -58,15 +58,19 @@ defmodule HostKit.FirewallTest do
         HostKit.Firewall.allow(tcp: 22, from: :any),
         HostKit.Firewall.allow(tcp: [80, 443], from: :any),
         HostKit.Firewall.allow(tcp: 9100, from: {10, 44, 0, 0, 24}),
+        HostKit.Firewall.allow(udp: 60000..61000, from: :any),
         HostKit.Firewall.deny(:all)
       ]
     }
 
     rendered = HostKit.Firewall.Nftables.render(firewall)
+    assert rendered =~ "destroy table inet hostkit"
     assert rendered =~ "table inet hostkit"
+    assert rendered =~ "type filter hook input priority -100; policy drop"
     assert rendered =~ "tcp dport 22 accept"
     assert rendered =~ "tcp dport { 80, 443 } accept"
     assert rendered =~ "ip saddr 10.44.0.0/24 tcp dport 9100 accept"
+    assert rendered =~ "udp dport 60000-61000 accept"
     assert rendered =~ "drop"
   end
 end
