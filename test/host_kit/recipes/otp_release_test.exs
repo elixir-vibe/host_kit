@@ -45,7 +45,8 @@ defmodule HostKit.OTPReleaseRecipeTest do
     assert Enum.any?(resources, fn
              %HostKit.Resources.EnvFile{path: "/etc/example/demo_app/env", entries: entries} ->
                {:set, "PHX_HOST", "app.example.com"} in entries and
-                 {:set, "EXTRA_SETTING", "enabled"} in entries
+                 {:set, "EXTRA_SETTING", "enabled"} in entries and
+                 {:secret, "SECRET_KEY_BASE", :redacted} in entries
 
              _resource ->
                false

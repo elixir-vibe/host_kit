@@ -56,6 +56,10 @@ defmodule HostKit.Recipes.OTPRelease do
           for {key, value} <- artifact.env.clear do
             set(key, value)
           end
+
+          for key <- artifact.env.secret do
+            secret(key, env: :redacted)
+          end
         end
 
         command(artifact.commands.unpack,
@@ -128,7 +132,12 @@ defmodule HostKit.Recipes.OTPRelease do
           |> fetch_map!(:env)
           |> Map.get(:clear, %{})
           |> Map.merge(Keyword.get(opts, :env, %{}))
-          |> stringify_env()
+          |> stringify_env(),
+        secret:
+          manifest
+          |> fetch_map!(:env)
+          |> Map.get(:secret, [])
+          |> Enum.map(&to_string/1)
       },
       http: %{port: port},
       health: health,
@@ -285,7 +294,7 @@ defmodule HostKit.Recipes.OTPRelease do
       version: "pending",
       tarball: "/tmp/#{app_name}-pending.tar.gz",
       timeout: Keyword.get(opts, :timeout, 300_000),
-      env: %{clear: stringify_env(Keyword.get(opts, :env, %{}))},
+      env: %{clear: stringify_env(Keyword.get(opts, :env, %{})), secret: []},
       http: %{port: port},
       health: %{
         path: "/health",
