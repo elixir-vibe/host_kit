@@ -240,14 +240,18 @@ defmodule HostKit.Project do
     "ambiguous HostKit service #{inspect(selector)} matches #{names}"
   end
 
-  defp service_matches?(%Service{name: name}, selector) when is_atom(selector),
-    do: name == selector
+  defp service_matches?(%Service{name: name} = service, selector) when is_atom(selector),
+    do: name == selector or selector in service_aliases(service)
 
   defp service_matches?(%Service{} = service, selector) when is_binary(selector) do
-    selector in [Atom.to_string(service.name), service.identity, service.path]
+    selector in [Atom.to_string(service.name), service.identity, service.path] or
+      selector in Enum.map(service_aliases(service), &to_string/1)
   end
 
   defp service_matches?(_service, _selector), do: false
+
+  defp service_aliases(%Service{meta: %{aliases: aliases}}), do: List.wrap(aliases)
+  defp service_aliases(_service), do: []
 
   defp service_names(nil), do: nil
   defp service_names(services), do: Enum.map(services, & &1.name)

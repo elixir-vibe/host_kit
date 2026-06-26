@@ -28,11 +28,7 @@ defmodule HostKit.Recipes.OTPRelease do
       recipe_opts = unquote(opts)
       artifact = HostKit.Recipes.OTPRelease.assigns(unquote(name), recipe_opts)
 
-      service_opts =
-        case Keyword.get(recipe_opts, :path) do
-          nil -> []
-          path -> [path: path]
-        end
+      service_opts = HostKit.Recipes.OTPRelease.service_opts(unquote(name), recipe_opts)
 
       service artifact.service_name, service_opts do
         base_dir = Keyword.get(recipe_opts, :base_dir, path(:opt, service_path()))
@@ -135,12 +131,30 @@ defmodule HostKit.Recipes.OTPRelease do
     end
   end
 
+  def service_opts(release_name, recipe_opts)
+      when is_atom(release_name) and is_list(recipe_opts) do
+    base_opts =
+      case Keyword.get(recipe_opts, :path) do
+        nil -> []
+        path -> [path: path]
+      end
+
+    meta =
+      recipe_opts
+      |> Keyword.get(:meta, %{})
+      |> Map.update(:aliases, [release_name], fn aliases ->
+        aliases |> List.wrap() |> Kernel.++([release_name]) |> Enum.uniq()
+      end)
+
+    Keyword.put(base_opts, :meta, meta)
+  end
+
   def assigns(name, opts) when is_atom(name) do
     release_kit = Keyword.get(opts, :release_kit)
     manifest_path = manifest_path(name, opts, release_kit)
 
     if collecting_release_kit?() and release_kit do
-      collect_release_kit!(name, release_kit, manifest_path)
+      collect_release_kit!(name, opts, release_kit, manifest_path)
       placeholder_assigns(name, opts, manifest_path)
     else
       manifest = load_manifest!(manifest_path)
@@ -227,7 +241,11 @@ defmodule HostKit.Recipes.OTPRelease do
 
       services ->
         selectors = services |> List.wrap() |> Enum.map(&to_string/1) |> MapSet.new()
-        Enum.filter(artifacts, &MapSet.member?(selectors, to_string(&1.name)))
+
+        Enum.filter(artifacts, fn artifact ->
+          MapSet.member?(selectors, to_string(artifact.name)) or
+            MapSet.member?(selectors, to_string(artifact.service_name))
+        end)
     end
   end
 
@@ -331,9 +349,10 @@ defmodule HostKit.Recipes.OTPRelease do
 
   defp collecting_release_kit?, do: Process.get(:hostkit_collect_release_kit?, false)
 
-  defp collect_release_kit!(name, release_kit, manifest_path) do
+  defp collect_release_kit!(name, opts, release_kit, manifest_path) do
     artifact = %{
       name: name,
+      service_name: Keyword.get(opts, :service, name),
       cwd: Keyword.fetch!(release_kit, :cwd),
       manifest: manifest_path,
       user: Keyword.get(release_kit, :user),

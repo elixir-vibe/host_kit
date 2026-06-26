@@ -132,6 +132,35 @@ defmodule HostKit.OTPReleaseRecipeTest do
            end)
   end
 
+  test "otp_release service selectors match release name aliases" do
+    manifest_path = write_manifest!("incant", "abc123")
+
+    defmodule OTPReleaseAliasProject do
+      use HostKit.DSL, recipes: [HostKit.Recipes.OTPRelease]
+
+      def project(manifest_path) do
+        project :demo do
+          roots(opt: "/opt/example", config: "/etc/example")
+
+          otp_release(:incant,
+            service: :incant_admin,
+            manifest: manifest_path,
+            path: "incant-admin"
+          )
+        end
+      end
+    end
+
+    project = OTPReleaseAliasProject.project(manifest_path)
+
+    assert {:ok, [:incant_admin]} = HostKit.Project.resolve_services(project, [:incant])
+    assert {:ok, [:incant_admin]} = HostKit.Project.resolve_services(project, [:incant_admin])
+    assert {:ok, [:incant_admin]} = HostKit.Project.resolve_services(project, ["incant"])
+    assert {:ok, [:incant_admin]} = HostKit.Project.resolve_services(project, ["incant-admin"])
+
+    assert [_resource | _] = HostKit.Project.resources(project, services: [:incant])
+  end
+
   test "collects and builds ReleaseKit artifacts through HostKit runner boundary" do
     tmp =
       Path.join(System.tmp_dir!(), "hostkit-release-kit-#{System.unique_integer([:positive])}")
@@ -163,6 +192,12 @@ defmodule HostKit.OTPReleaseRecipeTest do
           release_kit: [cwd: #{inspect(app)}],
           base_dir: "/opt/example/other_app",
           config_dir: "/etc/example/other_app"
+
+        otp_release :incant,
+          service: :incant_admin,
+          release_kit: [cwd: #{inspect(app)}],
+          base_dir: "/opt/example/incant-admin",
+          config_dir: "/etc/example/incant-admin"
       end
     end
     """)
@@ -171,6 +206,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert [artifact] = artifacts
     assert artifact.cwd == app
+    assert artifact.service_name == :demo_app
     assert artifact.out_dir == "_build/prod/artifacts"
     assert artifact.mix_env == "prod"
     assert artifact.manifest == manifest_path
@@ -198,6 +234,12 @@ defmodule HostKit.OTPReleaseRecipeTest do
       end,
       Macro.Env.location(__ENV__)
     )
+
+    assert [%{name: :incant, service_name: :incant_admin}] =
+             HostKit.Recipes.OTPRelease.collect_release_kit(config, services: [:incant])
+
+    assert [%{name: :incant, service_name: :incant_admin}] =
+             HostKit.Recipes.OTPRelease.collect_release_kit(config, services: [:incant_admin])
 
     HostKit.Recipes.OTPRelease.build_release_kit_artifacts!(artifacts, runner: runner)
 
