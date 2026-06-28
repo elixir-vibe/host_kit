@@ -255,16 +255,16 @@ defmodule HostKit.DSL.Scope do
       raise "ssh/1 must be declared inside host/2"
     end
 
-    Process.put(@ssh_key, true)
+    DSLCore.start(@ssh_key, :ssh, true)
     put_ssh_opts(opts)
   end
 
   def finish_ssh do
-    Process.delete(@ssh_key) || raise "no HostKit ssh in scope"
+    DSLCore.finish(@ssh_key, :ssh)
     :ok
   end
 
-  def ssh_active?, do: Process.get(@ssh_key) == true
+  def ssh_active?, do: DSLCore.active?(@ssh_key)
 
   def put_ssh(key, value), do: put_ssh_opts([{key, value}])
 
@@ -277,11 +277,11 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_bootstrap do
-    Process.put(@bootstrap_key, true)
+    DSLCore.start(@bootstrap_key, :bootstrap, true)
   end
 
   def finish_bootstrap do
-    Process.delete(@bootstrap_key) || raise "no HostKit bootstrap in scope"
+    DSLCore.finish(@bootstrap_key, :bootstrap)
     :ok
   end
 
@@ -386,15 +386,15 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_inside do
-    Process.put(@inside_key, true)
+    DSLCore.start(@inside_key, :inside, true)
   end
 
   def finish_inside do
-    Process.delete(@inside_key) || raise "no HostKit inside scope"
+    DSLCore.finish(@inside_key, :inside)
     :ok
   end
 
-  def inside_active?, do: Process.get(@inside_key) == true
+  def inside_active?, do: DSLCore.active?(@inside_key)
 
   def add_inside_monitor(type, opts) do
     service_active?() || raise "inside monitors must be declared inside service/2"
@@ -621,14 +621,14 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_rpc do
-    Process.put(@rpc_key, true)
+    DSLCore.start(@rpc_key, :rpc, true)
   end
 
   def finish_rpc do
-    Process.delete(@rpc_key) || raise "no HostKit rpc in scope"
+    DSLCore.finish(@rpc_key, :rpc)
   end
 
-  def rpc_active?, do: Process.get(@rpc_key) == true
+  def rpc_active?, do: DSLCore.active?(@rpc_key)
 
   def put_listener(name, opts) do
     listener = HostKit.Listener.new(name, default_listener_opts(name, opts))
