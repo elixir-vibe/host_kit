@@ -1,6 +1,8 @@
 defmodule HostKit.DSL.Scope do
   @moduledoc false
 
+  alias HostKit.DSLCore
+
   alias HostKit.{
     Conventions,
     Host,
@@ -56,7 +58,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_observability do
-    scope = if Process.get(@service_key), do: :service, else: :project
+    scope = if service_active?(), do: :service, else: :project
     Process.put(@observability_key, scope)
   end
 
@@ -349,11 +351,11 @@ defmodule HostKit.DSL.Scope do
 
     meta = service.meta |> maybe_put_workspace()
 
-    Process.put(@service_key, %{service | meta: meta})
+    DSLCore.start(@service_key, :service, %{service | meta: meta})
   end
 
   def finish_service do
-    service = Process.delete(@service_key) || raise "no HostKit service in scope"
+    service = DSLCore.finish(@service_key, :service)
 
     case Process.get(@instance_key) do
       nil -> update_project(&Project.add_service(&1, service))
@@ -389,12 +391,15 @@ defmodule HostKit.DSL.Scope do
   def inside_active?, do: Process.get(@inside_key) == true
 
   def add_inside_monitor(type, opts) do
-    service =
-      Process.get(@service_key) || raise "inside monitors must be declared inside service/2"
+    service_active?() || raise "inside monitors must be declared inside service/2"
 
     check = HostKit.Monitor.check(type, opts)
-    monitors = service.meta |> Map.get(:inside_monitor, []) |> Kernel.++([check])
-    Process.put(@service_key, %{service | meta: Map.put(service.meta, :inside_monitor, monitors)})
+
+    update_current(:service, fn service ->
+      monitors = service.meta |> Map.get(:inside_monitor, []) |> Kernel.++([check])
+      %{service | meta: Map.put(service.meta, :inside_monitor, monitors)}
+    end)
+
     :ok
   end
 
@@ -404,12 +409,12 @@ defmodule HostKit.DSL.Scope do
     do: update_project(&Project.put_convention_prefix(&1, name, prefix))
 
   def service_name do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = DSLCore.current!(@service_key)
     service.name
   end
 
   def service_path do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = DSLCore.current!(@service_key)
     service.path
   end
 
@@ -418,7 +423,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def service_account do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = DSLCore.current!(@service_key)
     Map.get(service.meta, :account)
   end
 
@@ -433,7 +438,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def service_identity do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = DSLCore.current!(@service_key)
     service.identity
   end
 
@@ -454,7 +459,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp service_scoped_path?(root) when root in [:source, :data, :state, :cache, :config, :run],
-    do: Process.get(@service_key) != nil
+    do: service_active?()
 
   defp service_scoped_path?(_root), do: false
 
@@ -483,7 +488,8 @@ defmodule HostKit.DSL.Scope do
   end
 
   def env_path!(name) do
-    service = Process.get(@service_key) || raise "env/1 must be used inside service/2"
+    service_active?() || raise "env/1 must be used inside service/2"
+    service = DSLCore.current!(@service_key)
     service.meta |> Map.get(:env_files, %{}) |> Map.fetch!(name)
   end
 
@@ -588,19 +594,19 @@ defmodule HostKit.DSL.Scope do
   end
 
   def storage_volume(name) do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = DSLCore.current!(@service_key)
     service.meta |> Map.get(:storage, %{}) |> Map.fetch!(name)
   end
 
   def storage_path(name), do: storage_volume(name).path
 
   def writable_storage_paths do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = DSLCore.current!(@service_key)
     service.meta |> Map.get(:storage, %{}) |> Map.values() |> Storage.read_write_paths()
   end
 
   def backup_storage do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = DSLCore.current!(@service_key)
 
     service.meta
     |> Map.get(:storage, %{})
@@ -640,10 +646,10 @@ defmodule HostKit.DSL.Scope do
     endpoint
   end
 
-  def service_active?, do: Process.get(@service_key) != nil
+  def service_active?, do: DSLCore.active?(@service_key)
 
   def listener(name) do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = DSLCore.current!(@service_key)
     service.meta |> Map.get(:listeners, %{}) |> Map.fetch!(name)
   end
 
@@ -751,23 +757,23 @@ defmodule HostKit.DSL.Scope do
   end
 
   def update_current(:service, fun) do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
-    Process.put(@service_key, fun.(service))
+    DSLCore.update(@service_key, fun)
     :ok
   end
 
   def add_resource(resource) do
-    case {Process.get(@service_key), Process.get(@instance_key)} do
-      {nil, nil} -> update_project(&Project.add_resource(&1, resource))
-      {nil, instance} -> Process.put(@instance_key, Instance.add_resource(instance, resource))
-      {service, _instance} -> Process.put(@service_key, Service.add_resource(service, resource))
+    case {service_active?(), Process.get(@instance_key)} do
+      {false, nil} -> update_project(&Project.add_resource(&1, resource))
+      {false, instance} -> Process.put(@instance_key, Instance.add_resource(instance, resource))
+      {true, _instance} -> DSLCore.update(@service_key, &Service.add_resource(&1, resource))
     end
 
     :ok
   end
 
   def update_last_resource(fun) do
-    service = Process.get(@service_key) || raise "resources must be declared inside service/2"
+    service_active?() || raise "resources must be declared inside service/2"
+    service = DSLCore.current!(@service_key)
 
     case service.resources do
       [] ->
@@ -776,10 +782,9 @@ defmodule HostKit.DSL.Scope do
       resources ->
         {last, rest_reversed} = resources |> Enum.reverse() |> List.pop_at(0)
 
-        Process.put(@service_key, %{
-          service
-          | resources: Enum.reverse(rest_reversed, [fun.(last)])
-        })
+        DSLCore.update(@service_key, fn service ->
+          %{service | resources: Enum.reverse(rest_reversed, [fun.(last)])}
+        end)
 
         :ok
     end
