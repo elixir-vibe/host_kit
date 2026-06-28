@@ -77,7 +77,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_firewall(opts \\ []) do
-    scope = if Process.get(@host_key), do: :host, else: :project
+    scope = if host_active?(), do: :host, else: :project
 
     activation_opts =
       opts
@@ -239,17 +239,19 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_host(name, opts) do
-    Process.put(@host_key, %Host{
+    host = %Host{
       name: name,
       hostname: Keyword.fetch!(opts, :at),
       user: nil,
       sudo: false,
       meta: Keyword.get(opts, :meta, %{})
-    })
+    }
+
+    DSLCore.start(@host_key, :host, host)
   end
 
   def start_ssh(opts \\ []) do
-    unless Process.get(@host_key) do
+    unless host_active?() do
       raise "ssh/1 must be declared inside host/2"
     end
 
@@ -267,7 +269,7 @@ defmodule HostKit.DSL.Scope do
   def put_ssh(key, value), do: put_ssh_opts([{key, value}])
 
   def put_ssh_opts(opts) do
-    if Process.get(@host_key) do
+    if host_active?() do
       update_current(:host, &put_host_ssh_opts(&1, opts))
     else
       raise "ssh directive used outside host block"
@@ -284,7 +286,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def finish_host do
-    host = Process.delete(@host_key) || raise "no HostKit host in scope"
+    host = DSLCore.finish(@host_key, :host)
 
     if instance_active?() do
       DSLCore.update(@instance_key, &Instance.add_host(&1, host))
@@ -292,6 +294,8 @@ defmodule HostKit.DSL.Scope do
       update_project(&Project.add_host(&1, host))
     end
   end
+
+  def host_active?, do: DSLCore.active?(@host_key)
 
   def start_instance(name, opts) do
     DSLCore.start(@instance_key, :instance, Instance.new(name, opts))
@@ -754,8 +758,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def update_current(:host, fun) do
-    host = Process.get(@host_key) || raise "no HostKit host in scope"
-    Process.put(@host_key, fun.(host))
+    DSLCore.update(@host_key, fun)
     :ok
   end
 
