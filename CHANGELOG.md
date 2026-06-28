@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.1.0-beta.7 - 2026-06-28
+
+- Added TOML structured config support through `toml/2`, including deterministic rendering and public-path drift comparison.
+- Added `mix host_kit.clean` for explicit, inspectable release-retention cleanup from existing release metadata.
+- Recorded release metadata from `release/2` and `otp_release` declarations for cleanup planning.
+
 ## v0.1.0-beta.6 - 2026-06-23
 
 - Added command monitor execution with `monitor :command, exec: ...`, reusing the same command shapes as command resources.
