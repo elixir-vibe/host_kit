@@ -286,22 +286,23 @@ defmodule HostKit.DSL.Scope do
   def finish_host do
     host = Process.delete(@host_key) || raise "no HostKit host in scope"
 
-    case Process.get(@instance_key) do
-      nil -> update_project(&Project.add_host(&1, host))
-      instance -> Process.put(@instance_key, Instance.add_host(instance, host))
+    if instance_active?() do
+      DSLCore.update(@instance_key, &Instance.add_host(&1, host))
+    else
+      update_project(&Project.add_host(&1, host))
     end
   end
 
   def start_instance(name, opts) do
-    Process.put(@instance_key, Instance.new(name, opts))
+    DSLCore.start(@instance_key, :instance, Instance.new(name, opts))
   end
 
   def finish_instance do
-    instance = Process.delete(@instance_key) || raise "no HostKit instance in scope"
+    instance = DSLCore.finish(@instance_key, :instance)
     update_project(&Project.add_instance(&1, instance))
   end
 
-  def instance_active?, do: Process.get(@instance_key) != nil
+  def instance_active?, do: DSLCore.active?(@instance_key)
 
   def put_instance_backend(backend), do: update_instance(&Instance.put_backend(&1, backend))
 
@@ -357,9 +358,10 @@ defmodule HostKit.DSL.Scope do
   def finish_service do
     service = DSLCore.finish(@service_key, :service)
 
-    case Process.get(@instance_key) do
-      nil -> update_project(&Project.add_service(&1, service))
-      instance -> Process.put(@instance_key, Instance.add_service(instance, service))
+    if instance_active?() do
+      DSLCore.update(@instance_key, &Instance.add_service(&1, service))
+    else
+      update_project(&Project.add_service(&1, service))
     end
   end
 
@@ -728,10 +730,11 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp update_instance(fun) do
-    instance =
-      Process.get(@instance_key) || raise "instance directive used outside instance block"
+    unless instance_active?() do
+      raise "instance directive used outside instance block"
+    end
 
-    Process.put(@instance_key, fun.(instance))
+    DSLCore.update(@instance_key, fun)
     :ok
   end
 
@@ -762,9 +765,9 @@ defmodule HostKit.DSL.Scope do
   end
 
   def add_resource(resource) do
-    case {service_active?(), Process.get(@instance_key)} do
-      {false, nil} -> update_project(&Project.add_resource(&1, resource))
-      {false, instance} -> Process.put(@instance_key, Instance.add_resource(instance, resource))
+    case {service_active?(), instance_active?()} do
+      {false, false} -> update_project(&Project.add_resource(&1, resource))
+      {false, true} -> DSLCore.update(@instance_key, &Instance.add_resource(&1, resource))
       {true, _instance} -> DSLCore.update(@service_key, &Service.add_resource(&1, resource))
     end
 
