@@ -7,9 +7,11 @@ defmodule HostKit.DSLCore.StackTest do
     key = {:test_scope, self()}
 
     refute Stack.active?(key)
+    assert Stack.current(key) == nil
 
     Stack.start(key, :outer, %{items: []}, %{file: "test.exs", line: 10})
     assert Stack.active?(key)
+    assert Stack.current(key) == %{items: []}
     assert Stack.current!(key) == %{items: []}
     assert Stack.current_scope!(key).location.file == "test.exs"
 
@@ -22,6 +24,7 @@ defmodule HostKit.DSLCore.StackTest do
     assert Stack.finish(key, :inner) == %{items: [:inner]}
     assert Stack.finish(key, :outer) == %{items: [:outer]}
     refute Stack.active?(key)
+    assert Stack.current(key) == nil
   end
 
   test "raises when finishing the wrong scope" do

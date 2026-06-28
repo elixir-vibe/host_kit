@@ -9,6 +9,7 @@ defmodule HostKit.DSLCore.Stack do
   @spec start(key(), atom(), term(), Macro.Env.t() | Scope.location() | nil) :: :ok
   def start(key, name, state, location \\ nil) when is_atom(name) do
     put_stack(key, [Scope.new(name, state, location) | stack(key)])
+    push_active_key(key)
     :ok
   end
 
@@ -25,6 +26,7 @@ defmodule HostKit.DSLCore.Stack do
 
       [%Scope{state: state} | rest] ->
         put_stack(key, rest)
+        pop_active_key(key)
         state
     end
   end
@@ -32,6 +34,15 @@ defmodule HostKit.DSLCore.Stack do
   @doc "Return true when a scope stack has an active scope."
   @spec active?(key()) :: boolean()
   def active?(key), do: stack(key) != []
+
+  @doc "Return the active scope state, or nil when inactive."
+  @spec current(key()) :: term() | nil
+  def current(key) do
+    case stack(key) do
+      [%Scope{state: state} | _rest] -> state
+      [] -> nil
+    end
+  end
 
   @doc "Return the active scope state or raise."
   @spec current!(key()) :: term()
@@ -62,10 +73,15 @@ defmodule HostKit.DSLCore.Stack do
     :ok
   end
 
+  @doc "Return active keys for an owning module from nearest to farthest."
+  @spec active_keys(module()) :: [key()]
+  def active_keys(owner) when is_atom(owner), do: Process.get(active_key(owner), [])
+
   @doc "Delete all scopes under a key. Intended for test cleanup and loader boundaries."
   @spec reset(key()) :: :ok
   def reset(key) do
     Process.delete(process_key(key))
+    Process.put(active_key(owner(key)), Enum.reject(active_keys(owner(key)), &(&1 == key)))
     :ok
   end
 
@@ -73,4 +89,16 @@ defmodule HostKit.DSLCore.Stack do
   defp put_stack(key, []), do: Process.delete(process_key(key))
   defp put_stack(key, scopes), do: Process.put(process_key(key), scopes)
   defp process_key(key), do: {__MODULE__, key}
+  defp active_key(owner), do: {__MODULE__, :active, owner}
+  defp owner({owner, _name}) when is_atom(owner), do: owner
+
+  defp push_active_key(key),
+    do: Process.put(active_key(owner(key)), [key | active_keys(owner(key))])
+
+  defp pop_active_key(key) do
+    case active_keys(owner(key)) do
+      [^key | rest] -> Process.put(active_key(owner(key)), rest)
+      keys -> Process.put(active_key(owner(key)), List.delete(keys, key))
+    end
+  end
 end
