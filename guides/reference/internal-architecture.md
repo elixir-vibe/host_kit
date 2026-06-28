@@ -356,7 +356,7 @@ A target controls how HostKit reads current state and applies changes. Mix tasks
 
 ## Config resources and redaction
 
-Structured config resources render through explicit format modules but remain ordinary file-like resources for plan/apply. INI public entries are compared by section/key. YAML public entries are compared by decoded scalar path using `yaml_elixir`, while scalar rendering uses `ymlr`. Secret leaves (`%HostKit.Secret{}` or `:redacted`) are omitted from public drift comparison. `:redacted` is for existing/generated secrets and intentionally cannot render during apply; env-backed secrets resolve only at render/apply boundaries. Template resources allow secret assigns and render/apply resolves them only at the boundary; plan diffs compare assign metadata and intentionally do not render secret-bearing template content.
+Structured config resources render through explicit format modules but remain ordinary file-like resources for plan/apply. INI public entries are compared by section/key. YAML public entries are compared by decoded scalar path using `yaml_elixir`, while scalar rendering uses `ymlr`. TOML public entries are compared by decoded scalar path using `toml`; rendering supports deterministic tables and arrays of tables from keyword/map data. Secret leaves (`%HostKit.Secret{}` or `:redacted`) are omitted from public drift comparison. `:redacted` is for existing/generated secrets and intentionally cannot render during apply; env-backed secrets resolve only at render/apply boundaries. Template resources allow secret assigns and render/apply resolves them only at the boundary; plan diffs compare assign metadata and intentionally do not render secret-bearing template content.
 
 ## Execution dependency graph
 

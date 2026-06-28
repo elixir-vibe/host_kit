@@ -42,6 +42,7 @@ defmodule HostKit.MixProject do
       {:jsonpatch, "~> 2.3"},
       {:yaml_elixir, "~> 2.11"},
       {:ymlr, "~> 5.1"},
+      {:toml, "~> 0.7"},
       {:req, "~> 0.5"},
       {:hammer, "~> 7.0"},
       {:dotenvy, "~> 1.1"},

@@ -1,7 +1,7 @@
 defmodule HostKit.Resources.ConfigFile do
-  @moduledoc "Structured INI/YAML config rendered to a managed file."
+  @moduledoc "Structured INI/YAML/TOML config rendered to a managed file."
 
-  @type format :: :ini | :yaml
+  @type format :: :ini | :yaml | :toml
   @type content :: map() | keyword()
 
   @type t :: %__MODULE__{
@@ -25,7 +25,7 @@ defmodule HostKit.Resources.ConfigFile do
             meta: %{}
 
   @spec new(String.t(), format(), keyword()) :: t()
-  def new(path, format, opts \\ []) when format in [:ini, :yaml] do
+  def new(path, format, opts \\ []) when format in [:ini, :yaml, :toml] do
     %__MODULE__{
       path: path,
       format: format,
@@ -57,6 +57,12 @@ defmodule HostKit.Resources.ConfigFile do
     |> Map.new()
   end
 
+  def public_entries(%__MODULE__{format: :toml, content: content}) do
+    content
+    |> yaml_public_entries()
+    |> Map.new()
+  end
+
   @spec public_entries_from_content(t(), String.t()) :: {:ok, map()} | {:error, term()}
   def public_entries_from_content(%__MODULE__{format: :ini} = desired, content) do
     public_keys = desired |> public_entries() |> Map.keys()
@@ -74,6 +80,14 @@ defmodule HostKit.Resources.ConfigFile do
     end
   end
 
+  def public_entries_from_content(%__MODULE__{format: :toml} = desired, content) do
+    public_keys = desired |> public_entries() |> Map.keys()
+
+    with {:ok, decoded} <- parse_toml(content) do
+      {:ok, decoded |> yaml_public_entries() |> Map.new() |> Map.take(public_keys)}
+    end
+  end
+
   @spec render(t()) :: {:ok, String.t()} | {:error, term()}
   def render(%__MODULE__{format: :ini, content: content}) do
     with {:ok, content} <- resolve_secrets(content) do
@@ -84,6 +98,12 @@ defmodule HostKit.Resources.ConfigFile do
   def render(%__MODULE__{format: :yaml, content: content}) do
     with {:ok, content} <- resolve_secrets(content) do
       {:ok, render_yaml(content)}
+    end
+  end
+
+  def render(%__MODULE__{format: :toml, content: content}) do
+    with {:ok, content} <- resolve_secrets(content) do
+      {:ok, render_toml(content)}
     end
   end
 
@@ -228,6 +248,109 @@ defmodule HostKit.Resources.ConfigFile do
 
   defp yaml_public_entries(value, path), do: [{path |> Enum.reverse() |> List.to_tuple(), value}]
 
+  defp render_toml(content) do
+    content
+    |> normalize_map()
+    |> toml_entries([])
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n")
+  end
+
+  defp toml_entries(entries, path) do
+    {scalars, tables} = Enum.split_with(entries, fn {_key, value} -> toml_scalar_like?(value) end)
+
+    scalar_lines = Enum.map(scalars, &toml_pair/1)
+    table_lines = Enum.flat_map(tables, &toml_table(&1, path))
+
+    case {path, scalar_lines, table_lines} do
+      {[], [], table_lines} ->
+        table_lines
+
+      {[], scalar_lines, []} ->
+        [Enum.join(scalar_lines, "\n") <> "\n"]
+
+      {[], scalar_lines, table_lines} ->
+        [Enum.join(scalar_lines, "\n") <> "\n" | table_lines]
+
+      {_path, [], table_lines} ->
+        table_lines
+
+      {_path, scalar_lines, table_lines} ->
+        [toml_header(path), Enum.join(scalar_lines, "\n") <> "\n" | table_lines]
+    end
+  end
+
+  defp toml_table({key, values}, path) when is_map(values) do
+    values
+    |> normalize_map()
+    |> toml_entries(path ++ [key])
+  end
+
+  defp toml_table({key, values}, path) when is_list(values) do
+    if Keyword.keyword?(values) do
+      values
+      |> normalize_map()
+      |> toml_entries(path ++ [key])
+    else
+      Enum.flat_map(values, fn
+        value when is_map(value) -> toml_array_table(path ++ [key], normalize_map(value))
+        value when is_list(value) -> toml_array_table(path ++ [key], normalize_map(value))
+        _value -> [toml_pair({key, values})]
+      end)
+    end
+  end
+
+  defp toml_array_table(path, entries) do
+    {scalars, tables} = Enum.split_with(entries, fn {_key, value} -> toml_scalar_like?(value) end)
+
+    [
+      toml_array_header(path),
+      Enum.map_join(scalars, "\n", &toml_pair/1) <> "\n"
+      | Enum.flat_map(tables, &toml_table(&1, path))
+    ]
+  end
+
+  defp toml_header(path), do: "[#{toml_path(path)}]"
+  defp toml_array_header(path), do: "[[#{toml_path(path)}]]"
+  defp toml_path(path), do: Enum.map_join(path, ".", &toml_key/1)
+
+  defp toml_pair({key, value}), do: "#{toml_key(key)} = #{toml_value(value)}"
+
+  defp toml_key(key) do
+    key = to_string(key)
+
+    if String.match?(key, ~r/^[A-Za-z0-9_-]+$/) do
+      key
+    else
+      Jason.encode!(key)
+    end
+  end
+
+  defp toml_value(value) when is_binary(value), do: Jason.encode!(value)
+  defp toml_value(value) when is_boolean(value), do: if(value, do: "true", else: "false")
+  defp toml_value(value) when is_integer(value) or is_float(value), do: to_string(value)
+  defp toml_value(value) when is_atom(value), do: value |> Atom.to_string() |> Jason.encode!()
+
+  defp toml_value(values) when is_list(values) do
+    if Keyword.keyword?(values) do
+      raise ArgumentError, "TOML inline tables are not supported; use nested tables"
+    else
+      "[" <> (values |> Enum.map(&toml_value/1) |> Enum.join(", ")) <> "]"
+    end
+  end
+
+  defp toml_scalar_like?(value) when is_map(value), do: false
+
+  defp toml_scalar_like?(value) when is_list(value) do
+    cond do
+      Keyword.keyword?(value) -> false
+      Enum.all?(value, &(not map_like?(&1))) -> true
+      true -> false
+    end
+  end
+
+  defp toml_scalar_like?(_value), do: true
+
   defp spaces(indent), do: String.duplicate(" ", indent)
 
   @spec secret_path_segments(t()) :: [[String.t() | integer()]]
@@ -239,6 +362,13 @@ defmodule HostKit.Resources.ConfigFile do
   end
 
   def secret_path_segments(%__MODULE__{format: :yaml, content: content}) do
+    content
+    |> yaml_secret_paths([])
+    |> Enum.map(&Tuple.to_list/1)
+    |> Enum.sort()
+  end
+
+  def secret_path_segments(%__MODULE__{format: :toml, content: content}) do
     content
     |> yaml_secret_paths([])
     |> Enum.map(&Tuple.to_list/1)
@@ -355,10 +485,12 @@ defmodule HostKit.Resources.ConfigFile do
 
   defp format_public_path(:ini, path), do: format_ini_path(path)
   defp format_public_path(:yaml, path), do: format_yaml_path(path)
+  defp format_public_path(:toml, path), do: format_yaml_path(path)
 
   defp format_path_segments(:ini, [key]), do: key
   defp format_path_segments(:ini, [section, key]), do: "#{section}.#{key}"
   defp format_path_segments(:yaml, segments), do: format_yaml_path(segments)
+  defp format_path_segments(:toml, segments), do: format_yaml_path(segments)
 
   defp format_ini_path({nil, key}), do: key
   defp format_ini_path({section, key}), do: "#{section}.#{key}"
@@ -379,6 +511,10 @@ defmodule HostKit.Resources.ConfigFile do
     YamlElixir.read_from_string(content)
   rescue
     error in [YamlElixir.ParsingError] -> {:error, {:invalid_yaml, Exception.message(error)}}
+  end
+
+  defp parse_toml(content) do
+    Toml.decode(content, keys: :strings)
   end
 
   defp parse_ini(content) do

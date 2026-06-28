@@ -1003,6 +1003,14 @@ defmodule HostKit.DSL do
     end
   end
 
+  defmacro toml(path, opts) do
+    quote do
+      HostKit.DSL.Scope.add_resource(
+        HostKit.Resources.ConfigFile.new(unquote(path), :toml, unquote(opts))
+      )
+    end
+  end
+
   defmacro exs(path, opts \\ [], do: block) do
     ast = Macro.escape(block)
 

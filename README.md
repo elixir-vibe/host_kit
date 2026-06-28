@@ -15,7 +15,7 @@ Infrastructure code should be boring Elixir, not an opaque pile of shell scripts
 
 HostKit gives you:
 
-- **Declarative host bootstrap** — OS packages, accounts, directories, files, templates, dotenv/INI/YAML configs, systemd units, firewall rules, and `mise` runtimes.
+- **Declarative host bootstrap** — OS packages, accounts, directories, files, templates, dotenv/INI/YAML/TOML configs, systemd units, firewall rules, and `mise` runtimes.
 - **Docker-less service isolation** — systemd sandboxing, resource limits, network policy, read/write path allowlists, loopback listeners, and managed env files.
 - **Plan before apply** — read current state, produce a diff, write an inspectable JSON artifact, then apply exactly what was reviewed.
 - **Distribution-aware packages** — semantic package names resolve through Repology and can be locked for deterministic applies.
@@ -109,7 +109,7 @@ project :prod do
 end
 ```
 
-This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, templates, dotenv/INI/YAML config files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits. Secret/redacted structured config entries are omitted from public drift comparison by dotenv key, INI key, or YAML path, so generated values can be modeled without leaking them into plans. Public dotenv/INI/YAML drift is shown as structured, JSON Patch-style plan diffs with readable paths and before/after values, while redacted entries are listed only by path. Templates diff public assign metadata and redacted assign names; rendered template content is not structurally inferred from arbitrary text. Unit names and command argv can be built from structured declarations instead of hand-written strings. See the [DSL design guidelines](guides/reference/dsl-guidelines.md) for naming, block shape, defaults, and reference style.
+This compiles to inspectable HostKit structs and renders ordinary Linux primitives: packages, files, templates, dotenv/INI/YAML/TOML config files, accounts, systemd units, Caddy site config, and systemd hardening directives such as `NoNewPrivileges=`, `ProtectSystem=`, `RestrictAddressFamilies=`, `ReadWritePaths=`, and memory limits. Secret/redacted structured config entries are omitted from public drift comparison by dotenv key, INI key, YAML path, or TOML path, so generated values can be modeled without leaking them into plans. Public dotenv/INI/YAML/TOML drift is shown as structured, JSON Patch-style plan diffs with readable paths and before/after values, while redacted entries are listed only by path. Templates diff public assign metadata and redacted assign names; rendered template content is not structurally inferred from arbitrary text. Unit names and command argv can be built from structured declarations instead of hand-written strings. See the [DSL design guidelines](guides/reference/dsl-guidelines.md) for naming, block shape, defaults, and reference style.
 
 Plan, review, apply:
 

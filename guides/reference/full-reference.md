@@ -491,7 +491,7 @@ mix host_kit.apply --host prod \
 
 `ssh retry: ...` is an SSH transport policy. It retries connection establishment for transient SSH startup/network failures; it does not blindly rerun arbitrary deployment commands after a command has been sent to the remote host. Use `retry: 3` as shorthand for three attempts, `retry: false` to disable, or keyword options with `:attempts`, `:base_delay`/`:base_delay_ms`, and `:max_delay`/`:max_delay_ms`. Retry progress is emitted as apply events and mirrored to Logger for collection.
 
-Plan artifacts are JSON and intended to be inspectable. They include an artifact version, target metadata, dumped project/resources/changes, source identities, diagnostics, aggregate resource/action statistics, source-location metadata on changes where available, and structured diffs for resources that support semantic review. Structured diffs are generated through HostKit's diff wrapper around JSON Patch concepts; HostKit stores its own stable diff structs rather than exposing the dependency as the artifact contract. Dotenv/INI/YAML resources diff public keys or paths. Templates diff public assign metadata and redacted assign names, not arbitrary rendered text. Secret references are stored as references, not values, for example:
+Plan artifacts are JSON and intended to be inspectable. They include an artifact version, target metadata, dumped project/resources/changes, source identities, diagnostics, aggregate resource/action statistics, source-location metadata on changes where available, and structured diffs for resources that support semantic review. Structured diffs are generated through HostKit's diff wrapper around JSON Patch concepts; HostKit stores its own stable diff structs rather than exposing the dependency as the artifact contract. Dotenv/INI/YAML/TOML resources diff public keys or paths. Templates diff public assign metadata and redacted assign names, not arbitrary rendered text. Secret references are stored as references, not values, for example:
 
 ```json
 {
@@ -1108,7 +1108,7 @@ service :forgejo, path: "forgejo" do
 end
 ```
 
-Secret or redacted INI/YAML values are omitted from public drift comparison. For public values, HostKit produces structured plan diffs with operations, paths, before/after values, and human-readable output such as `~ server.HTTP_PORT: 3000 -> 4000`; redacted values are reported as redacted paths without reading or storing their actual values. HostKit decodes YAML with `yaml_elixir` for public-path comparison, renders YAML scalars with `ymlr`, and uses JSON Patch-style operations internally for structured diffs; HostKit does not hand-roll YAML quoting/parsing. `env: :redacted` is useful for modeling existing generated secrets without storing or rendering them, and it is intentionally not renderable during apply. Use an env-backed secret when HostKit should render the file during apply:
+Secret or redacted INI/YAML/TOML values are omitted from public drift comparison. For public values, HostKit produces structured plan diffs with operations, paths, before/after values, and human-readable output such as `~ server.HTTP_PORT: 3000 -> 4000`; redacted values are reported as redacted paths without reading or storing their actual values. HostKit decodes YAML with `yaml_elixir` for public-path comparison, renders YAML scalars with `ymlr`, decodes TOML with `toml`, and uses JSON Patch-style operations internally for structured diffs. `env: :redacted` is useful for modeling existing generated secrets without storing or rendering them, and it is intentionally not renderable during apply. Use an env-backed secret when HostKit should render the file during apply:
 
 ```elixir
 secret "TOKEN", env: "APP_TOKEN"
@@ -1116,7 +1116,7 @@ secret "TOKEN", file: "/run/secrets/app-token"
 secret "TOKEN", command: ["pass", "show", "app/token"]
 ```
 
-YAML configs use Elixir keyword data for stable order and may contain redacted secret leaves:
+YAML and TOML configs use Elixir keyword data for stable order and may contain redacted secret leaves:
 
 ```elixir
 yaml path(:config, "gatus.yaml"),
@@ -1130,6 +1130,16 @@ yaml path(:config, "gatus.yaml"),
         conditions: ["[STATUS] == 200"]
       ]
     ]
+  ],
+  owner: "root",
+  group: service_user(),
+  mode: 0o640
+
+toml path(:config, "app.toml"),
+  content: [
+    server: [host: "127.0.0.1", port: 4000],
+    storage: [type: "sqlite", path: path(:state, "app.db")],
+    workers: [[name: "default", concurrency: 4]]
   ],
   owner: "root",
   group: service_user(),

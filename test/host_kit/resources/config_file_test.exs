@@ -38,6 +38,44 @@ defmodule HostKit.Resources.ConfigFileTest do
               "endpoints:\n  - name: Forgejo\n    url: https://git.elixir.toys\n    conditions:\n      - '[STATUS] == 200'\n\nstorage:\n  type: sqlite\n  path: /var/lib/gatus/gatus.db\n"}
   end
 
+  test "TOML config renders deterministic tables and arrays of tables" do
+    config =
+      ConfigFile.new("/etc/app/config.toml", :toml,
+        content: [
+          server: [host: "127.0.0.1", port: 4000],
+          storage: [type: "sqlite", path: "/var/lib/app/app.db"],
+          workers: [[name: "default", concurrency: 4]]
+        ]
+      )
+
+    assert ConfigFile.render(config) ==
+             {:ok,
+              "[server]\nhost = \"127.0.0.1\"\nport = 4000\n\n[storage]\ntype = \"sqlite\"\npath = \"/var/lib/app/app.db\"\n\n[[workers]]\nname = \"default\"\nconcurrency = 4\n"}
+  end
+
+  test "TOML DSL builds structured config" do
+    project =
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :config do
+        roots config: "/etc"
+
+        service :app do
+          toml path(:config, "config.toml"),
+            owner: "root",
+            group: service_user(),
+            mode: 0o640,
+            content: [workers: [[name: "default"]]]
+        end
+      end
+      """)
+      |> elem(0)
+
+    assert [%ConfigFile{format: :toml, content: [workers: [[name: "default"]]], group: "app"}] =
+             HostKit.Project.resources(project)
+  end
+
   test "INI block DSL builds structured config" do
     project =
       Code.eval_string("""
@@ -153,6 +191,32 @@ defmodule HostKit.Resources.ConfigFileTest do
     assert HostKit.Plan.Format.format_change(change) =~ "redacted paths: alerting.telegram.token"
   after
     cleanup_tmp("config-file-secret-yaml-drift")
+  end
+
+  test "secret TOML plan detects public path drift" do
+    path = Path.join(tmp_dir("config-file-secret-toml-drift"), "config.toml")
+
+    File.write!(path, """
+    [service]
+    endpoint = "https://old.example"
+    token = "actual-secret"
+    """)
+
+    project =
+      project_with_config(path, :toml,
+        service: [endpoint: "https://api.example", token: :redacted]
+      )
+
+    assert {:ok, plan} = HostKit.plan(project, reader: HostKit.Local)
+    assert [%Change{action: :update, resource_id: {:toml, ^path}} = change] = plan.changes
+    assert HostKit.Plan.Format.format_change(change) =~ "public changes:"
+
+    assert HostKit.Plan.Format.format_change(change) =~
+             "~ service.endpoint: \"https://old.example\" -> \"https://api.example\""
+
+    assert HostKit.Plan.Format.format_change(change) =~ "redacted paths: service.token"
+  after
+    cleanup_tmp("config-file-secret-toml-drift")
   end
 
   test "redacted structured configs are not renderable" do
