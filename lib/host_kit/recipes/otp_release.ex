@@ -78,6 +78,23 @@ defmodule HostKit.Recipes.OTPRelease do
 
         directory(config_dir, owner: "root", group: service_user(), mode: 0o750)
 
+        HostKit.DSL.Scope.put_release_metadata(artifact.name, %{
+          name: artifact.name,
+          kind: :otp_release,
+          version: artifact.version,
+          releases_dir: Path.join(base_dir, "releases"),
+          release_path: release_dir,
+          current_path: current_dir,
+          artifact_dir: Path.dirname(artifact.manifest_path),
+          artifact_prefix:
+            HostKit.Recipes.OTPRelease.artifact_prefix(
+              artifact.tarball,
+              artifact.release.name,
+              artifact.version
+            ),
+          keep: Keyword.get(recipe_opts, :keep)
+        })
+
         dotenv env_path, owner: "root", group: service_user(), mode: 0o640 do
           for {key, value} <- artifact.env.clear do
             set(key, value)
@@ -315,6 +332,18 @@ defmodule HostKit.Recipes.OTPRelease do
 
   def release_kit_command(%{out_dir: out_dir}) do
     ["release_kit.artifact", "--out-dir", out_dir]
+  end
+
+  def artifact_prefix(tarball, release_name, version)
+      when is_binary(tarball) and is_binary(release_name) and is_binary(version) do
+    basename = Path.basename(tarball)
+    suffix = "-#{version}.tar.gz"
+
+    if String.ends_with?(basename, suffix) do
+      String.replace_suffix(basename, suffix, "")
+    else
+      release_name
+    end
   end
 
   def release_kit_command_text(%{} = artifact) do

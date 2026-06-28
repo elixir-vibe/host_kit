@@ -525,6 +525,18 @@ defmodule HostKit.DSL.Scope do
       )
     )
 
+    metadata = %{
+      name: release_name,
+      kind: :release,
+      version: to_string(version),
+      releases_dir: releases_dir,
+      release_path: release_path,
+      current_path: current_path,
+      keep: Keyword.get(opts, :keep)
+    }
+
+    put_release_metadata(release_name, metadata)
+
     %{
       name: release_name,
       version: to_string(version),
@@ -532,6 +544,17 @@ defmodule HostKit.DSL.Scope do
       release_path: release_path,
       current_path: current_path
     }
+  end
+
+  def put_release_metadata(name, metadata) do
+    if service_active?() do
+      update_current(:service, fn service ->
+        releases = service.meta |> Map.get(:releases, %{}) |> Map.put(name, metadata)
+        %{service | meta: Map.put(service.meta, :releases, releases)}
+      end)
+    else
+      :ok
+    end
   end
 
   defp maybe_add_release_current_dir(current_path, opts) do

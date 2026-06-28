@@ -125,6 +125,31 @@ mix host_kit.apply --host prod --package-lock host_kit.package.lock --dry-run in
 mix host_kit.apply --host prod --service exograph --confirm infra/config.exs
 ```
 
+## `mix host_kit.clean`
+
+Build and optionally apply a conservative cleanup plan from release metadata emitted by existing release declarations. Cleanup is explicit and inspectable: `--dry-run` prints the generated command resources, and `--confirm` applies them through the normal HostKit apply engine.
+
+```sh
+mix host_kit.clean [options] [config.exs]
+```
+
+Useful options:
+
+- target flags shared with `plan`
+- `--service NAME` — restrict cleanup to one declared service; repeat for multiple services
+- `--keep N` — keep the active release plus newest inactive releases up to `N` total
+- `--dry-run` — inspect cleanup commands without deleting anything
+- `--confirm` — apply cleanup commands
+
+Examples:
+
+```sh
+mix host_kit.clean --host prod --service app --keep 2 --dry-run infra/config.exs
+mix host_kit.clean --host prod --service app --keep 2 --confirm infra/config.exs
+```
+
+For OTP releases, cleanup never deletes the active `current` target, deletes only inactive version directories under the known releases directory, and only removes matching release tarball/checksum artifacts for pruned versions. Manifests and package caches are left in place.
+
 ## `mix host_kit.read`
 
 Read current target state for resources declared by a config. Text output starts with a present/missing/read-error summary and resource counts, then lists each declared resource. This is a read-only introspection wrapper around `HostKit.Project.read/2` / audit planning.
