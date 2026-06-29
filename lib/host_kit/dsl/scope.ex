@@ -16,7 +16,8 @@ defmodule HostKit.DSL.Scope do
   }
 
   @project_key {__MODULE__, :project}
-  @default_providers_key {__MODULE__, :default_providers}
+
+  setting(:default_providers, default: [])
 
   scope(:observability)
 
@@ -70,10 +71,6 @@ defmodule HostKit.DSL.Scope do
     requires(:service)
   end
 
-  def put_default_providers(providers) do
-    Process.put(@default_providers_key, providers)
-  end
-
   def start_project(name, opts) do
     push_project(Project.new(name, project_opts(opts)))
   end
@@ -82,7 +79,7 @@ defmodule HostKit.DSL.Scope do
     if Keyword.has_key?(opts, :providers) do
       opts
     else
-      Keyword.put(opts, :providers, Process.get(@default_providers_key, []))
+      Keyword.put(opts, :providers, default_providers())
     end
   end
 

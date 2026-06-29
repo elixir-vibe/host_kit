@@ -7,7 +7,7 @@ defmodule HostKit.DSLCore do
   defmacro __using__(_opts) do
     quote do
       alias HostKit.DSLCore, as: DSLCore
-      import HostKit.DSLCore, only: [scope: 1, scope: 2, scope: 3]
+      import HostKit.DSLCore, only: [scope: 1, scope: 2, scope: 3, setting: 1, setting: 2]
       Module.register_attribute(__MODULE__, :dsl_core_scopes, accumulate: true)
 
       def attach(child_name, child) when is_atom(child_name) do
@@ -28,6 +28,34 @@ defmodule HostKit.DSLCore do
     quote do
       def __dsl_core_scope__(_name), do: :error
       def __dsl_core_scopes__, do: unquote(Macro.escape(scopes))
+    end
+  end
+
+  @doc "Declare a named process-local DSL setting."
+  defmacro setting(name, opts \\ []) when is_atom(name) and is_list(opts) do
+    caller_module = __CALLER__.module
+    key = {caller_module, name}
+    default = Keyword.get(opts, :default)
+
+    get_fun = name
+    put_fun = :"put_#{name}"
+    reset_fun = :"reset_#{name}"
+    core = __MODULE__
+    escaped_key = Macro.escape(key)
+    escaped_default = Macro.escape(default)
+
+    quote do
+      def unquote(get_fun)() do
+        unquote(core).get_setting(unquote(escaped_key), unquote(escaped_default))
+      end
+
+      def unquote(put_fun)(value) do
+        unquote(core).put_setting(unquote(escaped_key), value)
+      end
+
+      def unquote(reset_fun)() do
+        unquote(core).reset_setting(unquote(escaped_key))
+      end
     end
   end
 
@@ -334,6 +362,23 @@ defmodule HostKit.DSLCore do
     {last, rest} = List.pop_at(scopes, -1)
     "#{Enum.join(rest, ", ")}, or #{last}"
   end
+
+  @doc "Return a process-local DSL setting or its default value."
+  def get_setting(key, default \\ nil), do: Process.get(setting_key(key), default)
+
+  @doc "Store a process-local DSL setting."
+  def put_setting(key, value) do
+    Process.put(setting_key(key), value)
+    :ok
+  end
+
+  @doc "Reset a process-local DSL setting."
+  def reset_setting(key) do
+    Process.delete(setting_key(key))
+    :ok
+  end
+
+  defp setting_key(key), do: {__MODULE__, :setting, key}
 
   @doc "Start a named DSL scope."
   defdelegate start(key, name, state, location \\ nil), to: Stack

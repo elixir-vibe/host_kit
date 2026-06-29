@@ -9,6 +9,8 @@ defmodule HostKit.DSLCoreTest do
   defmodule Fixture do
     use HostKit.DSLCore
 
+    setting(:mode, default: :default)
+
     scope :parent do
       accepts(:item)
     end
@@ -19,6 +21,14 @@ defmodule HostKit.DSLCoreTest do
     scope :child do
       requires(:parent)
     end
+  end
+
+  test "setting generates ambient state helpers" do
+    assert Fixture.mode() == :default
+    assert Fixture.put_mode(:custom) == :ok
+    assert Fixture.mode() == :custom
+    assert Fixture.reset_mode() == :ok
+    assert Fixture.mode() == :default
   end
 
   test "scope generates conventional lifecycle helpers" do
