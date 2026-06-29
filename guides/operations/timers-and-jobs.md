@@ -34,6 +34,35 @@ end
 
 `job` is a service-oriented alias for a oneshot-ish systemd service declaration. `schedule` declares the matching timer.
 
+Backup jobs reuse the same concepts. Mark service storage with `backup: true`, attach service backup metadata with `backup`, then attach backup execution metadata to an existing `job`. HostKit sets the job `ExecStart` to `mix host_kit.backup.run ...`; archive creation, service stop/start, verification, checksums, manifests, and retention are implemented in Elixir modules rather than generated shell scripts.
+
+```elixir
+service :app do
+  storage :state, path: "/var/lib/app", backup: true
+
+  backup do
+    consistency :stop
+    verify storage_path(:state), "app.duckdb"
+  end
+end
+
+service :maintenance do
+  storage :backups, path: "/srv/backups", mode: 0o700
+
+  job "app-backup" do
+    backup destination: storage_path(:backups), config: "/opt/app/infra/config.exs", cwd: "/opt/host_kit" do
+      include :app
+      keep days: 14
+    end
+  end
+
+  schedule "app-backup" do
+    daily at: ~T[02:30:00]
+    persistent true
+  end
+end
+```
+
 Lower-level forms are available when you want explicit sections:
 
 ```elixir

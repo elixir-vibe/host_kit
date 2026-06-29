@@ -8,7 +8,7 @@ defmodule HostKit.DSL do
 
   use DSL.Macros
 
-  alias HostKit.DSL.{ConfigFile, EnvFile, Ingress, Lifecycle, Readiness, Scope}
+  alias HostKit.DSL.{Backup, ConfigFile, EnvFile, Ingress, Lifecycle, Readiness, Scope}
   alias HostKit.DSL.Systemd.Scope, as: SystemdScope
   alias HostKit.Providers.Caddy.Scope, as: CaddyScope
   alias HostKit.Resources
@@ -129,6 +129,35 @@ defmodule HostKit.DSL do
     path = Scope.env_path!(name)
     SystemdScope.put_service(:environment_file, path)
     path
+  end
+
+  defblock backup(opts \\ []) do
+    start(Backup.Scope.start(opts))
+    finish(Backup.Scope.finish())
+  end
+
+  defdirective include(value) do
+    Backup.Scope.include(value)
+  end
+
+  defdirective include(value, opts) do
+    Backup.Scope.include(value, opts)
+  end
+
+  defdirective consistency(strategy) do
+    Backup.Scope.consistency(strategy)
+  end
+
+  defdirective verify(path) do
+    Backup.Scope.verify(path)
+  end
+
+  defdirective verify(path, member) do
+    Backup.Scope.verify(path, member)
+  end
+
+  defdirective keep(opts) do
+    Backup.Scope.keep(opts)
   end
 
   defblock ready(name, opts \\ []), source: true do

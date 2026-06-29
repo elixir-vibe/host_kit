@@ -54,6 +54,10 @@ defmodule HostKit.DSL.Systemd.Scope do
     end)
   end
 
+  def put_backup(backup) do
+    update(:service, &HostKit.Backup.attach_to_job(&1, backup))
+  end
+
   def put_network_policy(opts) do
     update_current(fn resource ->
       resource

@@ -415,6 +415,9 @@ Legend:
 | `storage_path` | Reference | Return named storage path. |
 | `writable_storage_paths` | Reference | Return paths for writable storage volumes. |
 | `backup_storage` | Reference | Return storage volumes marked for backup. |
+| `backup` | Reference | Attach backup metadata to the current service or existing job; execution is handled by `mix host_kit.backup.run`. |
+| `consistency` | Reference | Set service backup consistency, currently `:online` or `:stop`. |
+| `verify` | Reference | Add an expected path for archive verification. |
 | `dotenv` | Reference | Declare a dotenv-format env file at an explicit path. Prefer contextual `env` when the file is service-scoped and attached to daemons. |
 | `env_file` | Compatibility | Older name for explicit dotenv resources. Prefer `dotenv`. |
 
@@ -433,6 +436,8 @@ Legend:
 | `systemd_timer` | Escape hatch | Declare a raw systemd timer resource. |
 | `job` | Reference | Systemd service intended as a job. |
 | `schedule` | Reference | Systemd timer helper. |
+| `include` | Reference | Add a service or explicit path to a backup attached to an existing job. |
+| `keep` | Reference | Record retention policy for a backup attached to an existing job. |
 | `unit` | Escape hatch | Set raw `[Unit]` directives. |
 | `systemd` | Reference | Readiness check for a systemd unit. |
 | `service` | Escape hatch | Set raw `[Service]` directives in systemd scope. |
