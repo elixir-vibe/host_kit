@@ -1,7 +1,7 @@
 defmodule HostKit.DSL.EnvFile.Scope do
   @moduledoc false
 
-  use HostKit.DSLCore
+  use DSL
 
   scope(:env_file)
 

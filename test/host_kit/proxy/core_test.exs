@@ -84,7 +84,7 @@ defmodule HostKit.ProxyTest do
     assert service.tls == :auto
   end
 
-  test "proxy DSL validates options through DSLCore option schemas" do
+  test "proxy DSL validates options through DSL option schemas" do
     assert_raise ArgumentError, ~r/unknown option :bad for proxy_opts at nofile:4/, fn ->
       Code.eval_string("""
       use HostKit.DSL

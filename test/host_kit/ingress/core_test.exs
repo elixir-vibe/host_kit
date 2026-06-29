@@ -1,7 +1,7 @@
 defmodule HostKit.IngressTest do
   use ExUnit.Case, async: true
 
-  test "ingress DSL validates options through DSLCore option schemas" do
+  test "ingress DSL validates options through DSL option schemas" do
     assert_raise ArgumentError, ~r/unknown option :bad for ingress_opts at nofile:4/, fn ->
       Code.eval_string("""
       use HostKit.DSL

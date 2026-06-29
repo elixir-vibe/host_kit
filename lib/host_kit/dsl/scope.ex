@@ -1,7 +1,7 @@
 defmodule HostKit.DSL.Scope do
   @moduledoc false
 
-  use HostKit.DSLCore
+  use DSL
 
   alias HostKit.{
     Conventions,
@@ -833,7 +833,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp update_project(fun) do
-    DSLCore.update(@project_key, fun)
+    DSL.update(@project_key, fun)
     :ok
   end
 end

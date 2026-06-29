@@ -1,7 +1,7 @@
 defmodule HostKit.DSL.Lifecycle.Scope do
   @moduledoc "Process-local scope helpers for HostKit lifecycle command DSL blocks."
 
-  use HostKit.DSLCore
+  use DSL
 
   defmodule Command do
     @moduledoc "State accumulated while evaluating a lifecycle command DSL block."

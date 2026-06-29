@@ -1,7 +1,7 @@
 defmodule HostKit.DSL.Systemd.Scope do
   @moduledoc false
 
-  use HostKit.DSLCore
+  use DSL
 
   scope(:systemd_service)
   scope(:timer)

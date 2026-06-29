@@ -1,7 +1,7 @@
 defmodule HostKit.DSL.Readiness.Scope do
   @moduledoc false
 
-  use HostKit.DSLCore
+  use DSL
 
   options :readiness_opts, return: :keyword do
     field(:checks, {:array, :any}, default: [])

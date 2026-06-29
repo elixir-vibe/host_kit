@@ -34,7 +34,7 @@ defmodule HostKit.ReadinessTest do
            end)
   end
 
-  test "ready DSL validates options through DSLCore option schemas" do
+  test "ready DSL validates options through DSL option schemas" do
     assert_raise ArgumentError, ~r/unknown option :bad for readiness_opts at nofile:4/, fn ->
       Code.eval_string("""
       use HostKit.DSL

@@ -1,27 +1,27 @@
-# DSLCore
+# DSL
 
-`HostKit.DSLCore` is the internal substrate for HostKit-shaped DSL modules. It keeps the public DSL human-shaped while centralizing repeated process-local scope plumbing.
+`DSL` is the extracted package HostKit uses for HostKit-shaped DSL modules. It keeps the public DSL human-shaped while centralizing repeated process-local scope plumbing.
 
 It is intentionally small and layered. Use only the pieces a DSL module needs.
 
 ## Internal layers
 
-`HostKit.DSLCore` is the public macro/runtime facade. The implementation is split by concern:
+`DSL` is the public macro/runtime facade. The implementation is split by concern:
 
-- `HostKit.DSLCore.Scope.Builder` parses `scope` declarations and emits generated helpers.
-- `HostKit.DSLCore.Options.Builder` parses `options` declarations into option schema structs.
-- `HostKit.DSLCore.Options` validates option schemas through schemaless `Ecto.Changeset` casting.
-- `HostKit.DSLCore.Attach` resolves nearest accepting scopes and applies attach strategies.
-- `HostKit.DSLCore.Source` is the source-location struct used by DSL diagnostics.
-- `HostKit.DSLCore.Stack` owns process-local scope stacks.
+- `DSL.Scope.Builder` parses `scope` declarations and emits generated helpers.
+- `DSL.Options.Builder` parses `options` declarations into option schema structs.
+- `DSL.Options` validates option schemas through schemaless `Ecto.Changeset` casting.
+- `DSL.Attach` resolves nearest accepting scopes and applies attach strategies.
+- `DSL.Source` is the source-location struct used by DSL diagnostics.
+- `DSL.Stack` owns process-local scope stacks.
 
-Keep domain behavior out of these modules. They should remain generic enough to extract after more HostKit surfaces have dogfooded them.
+Keep domain behavior out of these modules. HostKit should consume DSL through the package boundary and keep HostKit-specific semantics in `HostKit.DSL.*` modules.
 
 ## Use
 
 ```elixir
 defmodule HostKit.DSL.Scope do
-  use HostKit.DSLCore
+  use DSL
 
   setting :default_providers, default: []
 
@@ -80,7 +80,7 @@ service_active?()
 attach_service(value)
 ```
 
-`push_*` helpers are macros so they can capture the caller location. The active scope stores that source metadata in `HostKit.DSLCore.Scope.location`.
+`push_*` helpers are macros so they can capture the caller location. The active scope stores that source metadata in `DSL.Scope.location`.
 
 For boolean scopes, provide a value:
 
@@ -114,7 +114,7 @@ end
 ## Options
 
 Use `options/2` for module-local option validation without defining one module per option set.
-The field DSL mirrors Ecto's `field/3` shape while DSLCore stores a small struct schema and validates through schemaless `Ecto.Changeset` casting.
+The field DSL mirrors Ecto's `field/3` shape while DSL stores a small struct schema and validates through schemaless `Ecto.Changeset` casting.
 
 ```elixir
 options :proxy_opts do
@@ -150,17 +150,17 @@ end
 
 Keyword output omits nil optional fields. This prevents absent optional DSL values from overriding defaults in downstream keyword-based constructors.
 
-DSLCore rejects unknown options before casting and raises DSL-oriented messages. Callers can pass a source location when validating options:
+DSL rejects unknown options before casting and raises DSL-oriented messages. Callers can pass a source location when validating options:
 
 ```elixir
-source = HostKit.DSLCore.Source.from_caller(__CALLER__)
+source = DSL.Source.from_caller(__CALLER__)
 validate_proxy_opts!(opts, location: source)
 ```
 
 For quoted macro calls, use `escape_caller/1`:
 
 ```elixir
-source = HostKit.DSLCore.Source.escape_caller(__CALLER__)
+source = DSL.Source.escape_caller(__CALLER__)
 
 quote do
   validate_proxy_opts!(opts, location: unquote(source))
@@ -287,7 +287,7 @@ resource must be declared inside project, instance, or service
 
 Attach diagnostics are derived from declared `accepts` metadata. Requirement diagnostics are derived from declared `requires` metadata.
 
-## When not to use DSLCore
+## When not to use DSL
 
 Do not force ordinary data transformation into a scope. Use `scope` for nested DSL block state and `setting` for ambient DSL state. Plain functions and structs are still preferable for normal domain logic.
 

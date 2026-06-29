@@ -1,7 +1,7 @@
 defmodule HostKit.DSL.ConfigFile.Scope do
   @moduledoc false
 
-  use HostKit.DSLCore
+  use DSL
 
   scope(:config_file)
 

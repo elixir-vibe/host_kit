@@ -1,7 +1,7 @@
 defmodule HostKit.DSL.Ingress.Scope do
   @moduledoc false
 
-  use HostKit.DSLCore
+  use DSL
 
   options :ingress_opts do
     field(:path, :string)
