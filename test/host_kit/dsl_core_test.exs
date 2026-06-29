@@ -45,4 +45,10 @@ defmodule HostKit.DSLCoreTest do
     assert HostKit.DSLCore.attach(Fixture, :item, :attached) == :ok
     assert Fixture.pop_parent() == %Fixture.Parent{items: [:attached]}
   end
+
+  test "use DSLCore provides caller-local attach helper" do
+    assert Fixture.push_parent(%Fixture.Parent{}) == :ok
+    assert Fixture.attach(:item, :local) == :ok
+    assert Fixture.pop_parent() == %Fixture.Parent{items: [:local]}
+  end
 end

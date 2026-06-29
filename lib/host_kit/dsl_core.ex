@@ -9,6 +9,10 @@ defmodule HostKit.DSLCore do
       alias HostKit.DSLCore, as: DSLCore
       import HostKit.DSLCore, only: [scope: 1, scope: 2, scope: 3]
 
+      def attach(child_name, child) when is_atom(child_name) do
+        DSLCore.attach(__MODULE__, child_name, child)
+      end
+
       @before_compile HostKit.DSLCore
     end
   end
@@ -151,7 +155,16 @@ defmodule HostKit.DSLCore do
         value_helpers
       end
 
-    base ++ Enum.reverse(value_helpers)
+    attach_fun = :"attach_#{name}"
+
+    attach_helper =
+      quote do
+        def unquote(attach_fun)(child) do
+          attach(unquote(name), child)
+        end
+      end
+
+    base ++ Enum.reverse(value_helpers) ++ [attach_helper]
   end
 
   @doc "Attach a child value to the nearest active accepting scope."

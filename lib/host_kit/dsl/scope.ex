@@ -55,7 +55,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_project(name, opts) do
-    Process.put(@project_key, Project.new(name, project_opts(opts)))
+    DSLCore.start(@project_key, :project, Project.new(name, project_opts(opts)))
   end
 
   defp project_opts(opts) do
@@ -67,11 +67,11 @@ defmodule HostKit.DSL.Scope do
   end
 
   def current_project do
-    Process.get(@project_key) || raise "no HostKit project in scope"
+    DSLCore.current!(@project_key)
   end
 
   def finish_project do
-    Process.delete(@project_key) || raise "no HostKit project in scope"
+    DSLCore.finish(@project_key, :project)
   end
 
   def start_observability do
@@ -294,12 +294,7 @@ defmodule HostKit.DSL.Scope do
 
   def finish_host do
     host = pop_host()
-
-    if instance_active?() do
-      update_instance(&Instance.add_host(&1, host))
-    else
-      update_project(&Project.add_host(&1, host))
-    end
+    attach_host(host)
   end
 
   def start_instance(name, opts) do
@@ -363,12 +358,7 @@ defmodule HostKit.DSL.Scope do
 
   def finish_service do
     service = pop_service()
-
-    if instance_active?() do
-      update_instance(&Instance.add_service(&1, service))
-    else
-      update_project(&Project.add_service(&1, service))
-    end
+    attach_service(service)
   end
 
   def start_workspace(name, opts) do
@@ -738,13 +728,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def add_resource(resource) do
-    case {service_active?(), instance_active?()} do
-      {false, false} -> update_project(&Project.add_resource(&1, resource))
-      {false, true} -> update_instance(&Instance.add_resource(&1, resource))
-      {true, _instance} -> update_service(&Service.add_resource(&1, resource))
-    end
-
-    :ok
+    attach(:resource, resource)
   end
 
   def update_last_resource(fun) do
@@ -830,13 +814,11 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp project_conventions do
-    project = Process.get(@project_key) || raise "no HostKit project in scope"
-    project.conventions
+    current_project().conventions
   end
 
   defp update_project(fun) do
-    project = Process.get(@project_key) || raise "no HostKit project in scope"
-    Process.put(@project_key, fun.(project))
+    DSLCore.update(@project_key, fun)
     :ok
   end
 end
