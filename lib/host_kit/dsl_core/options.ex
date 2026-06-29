@@ -2,6 +2,7 @@ defmodule HostKit.DSLCore.Options do
   @moduledoc "Ecto-style option schema validation for DSLCore declarations."
 
   alias HostKit.DSLCore.Option
+  alias HostKit.DSLCore.Source
   alias HostKit.DSLCore.Types
 
   @enforce_keys [:name]
@@ -145,6 +146,11 @@ defmodule HostKit.DSLCore.Options do
       |> Enum.join(", ")
 
     "invalid options for #{schema.name}: #{errors}"
+  end
+
+  defp with_location(message, %Source{file: file, line: line})
+       when is_binary(file) and is_integer(line) do
+    "#{message} at #{file}:#{line}"
   end
 
   defp with_location(message, %{file: file, line: line})

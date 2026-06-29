@@ -12,6 +12,7 @@ It is intentionally small and layered. Use only the pieces a DSL module needs.
 - `HostKit.DSLCore.Options.Builder` parses `options` declarations into option schema structs.
 - `HostKit.DSLCore.Options` validates option schemas through schemaless `Ecto.Changeset` casting.
 - `HostKit.DSLCore.Attach` resolves nearest accepting scopes and applies attach strategies.
+- `HostKit.DSLCore.Source` is the source-location struct used by DSL diagnostics.
 - `HostKit.DSLCore.Stack` owns process-local scope stacks.
 
 Keep domain behavior out of these modules. They should remain generic enough to extract after more HostKit surfaces have dogfooded them.
@@ -152,7 +153,8 @@ Keyword output omits nil optional fields. This prevents absent optional DSL valu
 DSLCore rejects unknown options before casting and raises DSL-oriented messages. Callers can pass a source location when validating options:
 
 ```elixir
-validate_proxy_opts!(opts, location: %{file: "config.hostkit", line: 12})
+source = HostKit.DSLCore.Source.from_caller(__CALLER__)
+validate_proxy_opts!(opts, location: source)
 ```
 
 Messages include the location when present:

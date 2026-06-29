@@ -145,7 +145,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro ready(name, opts \\ [], do: block) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       HostKit.DSL.Readiness.Scope.start(
@@ -160,7 +160,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro ingress(name, opts \\ [], do: block) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       HostKit.DSL.Ingress.Scope.start_ingress(
@@ -175,7 +175,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro server(listen \\ ":443", opts \\ [], do: block) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       HostKit.DSL.Ingress.Scope.start_server(
@@ -190,7 +190,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro tls(mode, opts \\ []) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       if HostKit.DSL.Scope.proxy_service_active?() do
@@ -206,7 +206,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro route(opts, do: block) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       HostKit.DSL.Ingress.Scope.start_route(unquote(opts), unquote(Macro.escape(source)))
@@ -216,7 +216,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro proxy(opts) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       HostKit.DSL.Ingress.Scope.put_proxy(unquote(opts), unquote(Macro.escape(source)))
@@ -224,7 +224,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro systemd(unit, opts \\ []) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       HostKit.DSL.Readiness.Scope.add_check(
@@ -238,7 +238,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro http(url_or_opts \\ []) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       cond do
@@ -261,7 +261,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro http(url, opts) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       cond do
@@ -436,7 +436,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro proxy(name, opts, do: block) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       HostKit.DSL.Scope.start_proxy(unquote(name), unquote(opts), unquote(Macro.escape(source)))
@@ -633,7 +633,7 @@ defmodule HostKit.DSL do
   end
 
   defmacro firewall(opts \\ [], do: block) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
+    source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 
     quote do
       HostKit.DSL.Scope.start_firewall(unquote(opts), unquote(Macro.escape(source)))
