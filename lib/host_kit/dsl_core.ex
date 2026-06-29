@@ -135,6 +135,7 @@ defmodule HostKit.DSLCore do
     pop_fun = :"pop_#{name}"
     current_fun = :"current_#{name}"
     current_bang_fun = :"current_#{name}!"
+    current_scope_bang_fun = :"current_#{name}_scope!"
     update_fun = :"update_#{name}"
     active_fun = :"#{name}_active?"
     start_fun = :"start_#{name}"
@@ -142,6 +143,7 @@ defmodule HostKit.DSLCore do
 
     core = __MODULE__
     escaped_key = Macro.escape(key)
+    escaped_owner = Macro.escape(elem(key, 0))
     escaped_value = Macro.escape(value)
     escaped_requires = Macro.escape(List.wrap(Keyword.get(opts, :requires, [])) ++ requires)
 
@@ -153,9 +155,27 @@ defmodule HostKit.DSLCore do
         opts,
         :push,
         quote do
-          def unquote(push_fun)(state) do
-            unquote(core).require_scopes!(__MODULE__, unquote(name), unquote(escaped_requires))
-            unquote(core).start(unquote(escaped_key), unquote(name), state)
+          defmacro unquote(push_fun)(state) do
+            key = unquote(escaped_key)
+            owner = unquote(escaped_owner)
+            name = unquote(name)
+            requires = unquote(escaped_requires)
+            location = Macro.escape(__CALLER__)
+
+            quote do
+              HostKit.DSLCore.require_scopes!(
+                unquote(owner),
+                unquote(name),
+                unquote(Macro.escape(requires))
+              )
+
+              HostKit.DSLCore.start(
+                unquote(Macro.escape(key)),
+                unquote(name),
+                unquote(state),
+                unquote(location)
+              )
+            end
           end
         end
       )
@@ -192,6 +212,18 @@ defmodule HostKit.DSLCore do
         quote do
           def unquote(current_bang_fun)() do
             unquote(core).current_scope_state!(unquote(escaped_key), unquote(name))
+          end
+        end
+      )
+
+    base =
+      maybe_helper(
+        base,
+        opts,
+        :current_scope!,
+        quote do
+          def unquote(current_scope_bang_fun)() do
+            unquote(core).current_scope!(unquote(escaped_key))
           end
         end
       )

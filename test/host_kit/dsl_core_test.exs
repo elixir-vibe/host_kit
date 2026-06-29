@@ -1,27 +1,35 @@
+defmodule HostKit.DSLCoreTest.ParentFixture do
+  defstruct items: []
+
+  def add_item(parent, item), do: %{parent | items: parent.items ++ [item]}
+end
+
+defmodule HostKit.DSLCoreTest.Fixture do
+  use HostKit.DSLCore
+
+  alias HostKit.DSLCoreTest.ParentFixture
+
+  setting(:mode, default: :default)
+
+  scope :parent do
+    accepts(:item)
+  end
+
+  scope(:flag, value: true)
+  scope(:partial, current: false, update: false)
+
+  scope :child do
+    requires(:parent)
+  end
+end
+
 defmodule HostKit.DSLCoreTest do
   use ExUnit.Case, async: true
 
-  defmodule Fixture.Parent do
-    defstruct items: []
-    def add_item(parent, item), do: %{parent | items: parent.items ++ [item]}
-  end
+  alias HostKit.DSLCoreTest.Fixture
+  alias HostKit.DSLCoreTest.ParentFixture
 
-  defmodule Fixture do
-    use HostKit.DSLCore
-
-    setting(:mode, default: :default)
-
-    scope :parent do
-      accepts(:item)
-    end
-
-    scope(:flag, value: true)
-    scope(:partial, current: false, update: false)
-
-    scope :child do
-      requires(:parent)
-    end
-  end
+  require Fixture
 
   test "setting generates ambient state helpers" do
     assert Fixture.mode() == :default
@@ -41,17 +49,21 @@ defmodule HostKit.DSLCoreTest do
   end
 
   test "scope generates state helpers" do
-    assert Fixture.push_parent(%Fixture.Parent{}) == :ok
+    assert Fixture.push_parent(%ParentFixture{}) == :ok
     assert Fixture.parent_active?()
-    assert Fixture.current_parent!() == %Fixture.Parent{}
+    assert Fixture.current_parent!() == %ParentFixture{}
 
-    assert Fixture.update_parent(&Fixture.Parent.add_item(&1, :one)) == :ok
-    assert Fixture.pop_parent() == %Fixture.Parent{items: [:one]}
+    scope = Fixture.current_parent_scope!()
+    assert scope.location.file == __ENV__.file
+    assert is_integer(scope.location.line)
+
+    assert Fixture.update_parent(&ParentFixture.add_item(&1, :one)) == :ok
+    assert Fixture.pop_parent() == %ParentFixture{items: [:one]}
     refute Fixture.parent_active?()
   end
 
   test "scope can suppress selected helpers" do
-    assert function_exported?(Fixture, :push_partial, 1)
+    assert macro_exported?(Fixture, :push_partial, 1)
     refute function_exported?(Fixture, :current_partial, 0)
     refute function_exported?(Fixture, :update_partial, 1)
   end
@@ -69,22 +81,22 @@ defmodule HostKit.DSLCoreTest do
       Fixture.push_child(%{})
     end
 
-    assert Fixture.push_parent(%Fixture.Parent{}) == :ok
+    assert Fixture.push_parent(%ParentFixture{}) == :ok
     assert Fixture.push_child(%{}) == :ok
     assert Fixture.pop_child() == %{}
-    assert Fixture.pop_parent() == %Fixture.Parent{}
+    assert Fixture.pop_parent() == %ParentFixture{}
   end
 
   test "attach updates the nearest active scope that accepts the child" do
-    assert Fixture.push_parent(%Fixture.Parent{}) == :ok
+    assert Fixture.push_parent(%ParentFixture{}) == :ok
     assert HostKit.DSLCore.attach(Fixture, :item, :attached) == :ok
-    assert Fixture.pop_parent() == %Fixture.Parent{items: [:attached]}
+    assert Fixture.pop_parent() == %ParentFixture{items: [:attached]}
   end
 
   test "use DSLCore provides caller-local attach helper" do
-    assert Fixture.push_parent(%Fixture.Parent{}) == :ok
+    assert Fixture.push_parent(%ParentFixture{}) == :ok
     assert Fixture.attach(:item, :local) == :ok
-    assert Fixture.pop_parent() == %Fixture.Parent{items: [:local]}
+    assert Fixture.pop_parent() == %ParentFixture{items: [:local]}
   end
 
   test "generated helpers raise readable inactive scope errors" do
