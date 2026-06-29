@@ -98,6 +98,41 @@ scope :project, current: false, update: false do
 end
 ```
 
+## Options
+
+Use `options/2` for module-local option validation without defining one module per option set.
+The field DSL mirrors Ecto's `field/3` shape while DSLCore stores a small struct schema and validates through schemaless `Ecto.Changeset` casting.
+
+```elixir
+options :proxy_opts do
+  field :provider, :atom, required: true
+  field :path, :string, default: "/etc/gatehouse/config.exs"
+  field :meta, :map, default: %{}
+end
+```
+
+Generated helpers:
+
+```elixir
+validate_proxy_opts(opts)
+validate_proxy_opts!(opts)
+```
+
+The bang helper returns atom-keyed normalized data with defaults applied:
+
+```elixir
+opts = validate_proxy_opts!(provider: :gatehouse)
+opts.provider
+opts.path
+```
+
+DSLCore rejects unknown options before casting and raises DSL-oriented messages such as:
+
+```text
+unknown option :bad for proxy_opts
+invalid options for proxy_opts: provider can't be blank
+```
+
 ## Requirements
 
 Use `requires/1` when a scope can only be started inside another active scope.
@@ -171,7 +206,7 @@ Do not use `accepts` just to avoid writing clear domain code. It is useful when 
 
 ## Current limitations
 
-- Option/schema validation is not part of DSLCore yet.
+- Option schemas intentionally cover simple field casting/defaults/required validation only. Complex domain invariants still belong in domain code.
 - Diagnostics are string-based and do not yet include source snippets.
 - `accepts` assumes the active parent state is a struct and calls the parent module with `apply(parent.__struct__, via, [parent, child])`.
 - `setting` is process-local only; there is no setting stack.
