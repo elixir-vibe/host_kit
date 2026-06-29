@@ -12,10 +12,15 @@ defmodule HostKit.DSLCoreTest.Fixture do
   setting(:mode, default: :default)
 
   options :proxy_opts do
-    field(:provider, :atom, required: true)
+    field(:provider, :atom, required: true, in: [:gatehouse])
     field(:path, :string, default: "/etc/gatehouse/config.exs")
     field(:tags, {:array, :string}, default: [])
     field(:meta, :map, default: %{})
+  end
+
+  options :command_opts, return: :keyword do
+    field(:phase, :atom, default: :apply, in: [:plan, :apply])
+    field(:timeout, :integer, default: 5_000)
   end
 
   scope :parent do
@@ -57,6 +62,10 @@ defmodule HostKit.DSLCoreTest do
     assert schema.name == :proxy_opts
   end
 
+  test "options supports keyword return shapes" do
+    assert Fixture.validate_command_opts!(phase: :plan) == [phase: :plan, timeout: 5_000]
+  end
+
   test "options raises readable validation errors" do
     assert_raise ArgumentError, "unknown option :bad for proxy_opts", fn ->
       Fixture.validate_proxy_opts!(provider: :gatehouse, bad: true)
@@ -68,6 +77,10 @@ defmodule HostKit.DSLCoreTest do
 
     assert_raise ArgumentError, ~r/invalid options for proxy_opts: provider is invalid/, fn ->
       Fixture.validate_proxy_opts!(provider: "gatehouse")
+    end
+
+    assert_raise ArgumentError, ~r/invalid options for proxy_opts: provider is invalid/, fn ->
+      Fixture.validate_proxy_opts!(provider: :caddy)
     end
   end
 

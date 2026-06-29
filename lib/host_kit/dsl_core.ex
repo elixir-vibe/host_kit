@@ -9,7 +9,7 @@ defmodule HostKit.DSLCore do
       alias HostKit.DSLCore, as: DSLCore
 
       import HostKit.DSLCore,
-        only: [options: 2, scope: 1, scope: 2, scope: 3, setting: 1, setting: 2]
+        only: [options: 2, options: 3, scope: 1, scope: 2, scope: 3, setting: 1, setting: 2]
 
       Module.register_attribute(__MODULE__, :dsl_core_scopes, accumulate: true)
       Module.register_attribute(__MODULE__, :dsl_core_options, accumulate: true)
@@ -40,8 +40,13 @@ defmodule HostKit.DSLCore do
   end
 
   @doc "Declare a named Ecto-style option schema."
-  defmacro options(name, do: block) when is_atom(name) do
-    schema = %HostKit.DSLCore.Options{name: name, fields: option_fields(block, __CALLER__)}
+  defmacro options(name, opts \\ [], do: block) when is_atom(name) and is_list(opts) do
+    schema = %HostKit.DSLCore.Options{
+      name: name,
+      fields: option_fields(block, __CALLER__),
+      return: option_return!(Keyword.get(opts, :return, :map))
+    }
+
     validate_fun = :"validate_#{name}"
     validate_bang_fun = :"validate_#{name}!"
 
@@ -58,6 +63,13 @@ defmodule HostKit.DSLCore do
         HostKit.DSLCore.Options.validate!(unquote(Macro.escape(schema)), opts)
       end
     end
+  end
+
+  defp option_return!(return) when return in [:map, :keyword], do: return
+
+  defp option_return!(return) do
+    raise ArgumentError,
+          "DSLCore options return must be :map or :keyword, got: #{inspect(return)}"
   end
 
   defp option_fields({:__block__, _meta, expressions}, env) do
@@ -80,7 +92,8 @@ defmodule HostKit.DSLCore do
       name: name,
       type: literal!(type, env),
       required?: Keyword.get(opts, :required, false),
-      default: opts |> Keyword.get(:default) |> literal!(env)
+      default: opts |> Keyword.get(:default) |> literal!(env),
+      values: opts |> Keyword.get(:in) |> literal!(env)
     }
   end
 

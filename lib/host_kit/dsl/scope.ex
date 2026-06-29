@@ -25,6 +25,18 @@ defmodule HostKit.DSL.Scope do
     field(:meta, :map, default: %{})
   end
 
+  options :firewall_opts do
+    field(:path, :string, default: "/etc/nftables.d/hostkit.nft")
+    field(:activate, :atom, default: :systemd, in: [:systemd, false])
+    field(:unit, :any)
+    field(:nft, :any)
+    field(:description, :string)
+    field(:after, :any)
+    field(:before, :any)
+    field(:wants, :any)
+    field(:wanted_by, :any)
+  end
+
   scope(:observability)
 
   scope :project, current: false, update: false do
@@ -116,16 +128,17 @@ defmodule HostKit.DSL.Scope do
 
   def start_firewall(opts \\ []) do
     scope = if host_active?(), do: :host, else: :project
+    validated = validate_firewall_opts!(opts)
 
     activation_opts =
       opts
-      |> Keyword.take([:unit, :nft, :description, :after, :before, :wants, :wanted_by])
       |> Map.new()
+      |> Map.take([:unit, :nft, :description, :after, :before, :wants, :wanted_by])
 
     firewall = %HostKit.Firewall{
       scope: scope,
-      path: Keyword.get(opts, :path, "/etc/nftables.d/hostkit.nft"),
-      activate: Keyword.get(opts, :activate, :systemd),
+      path: validated.path,
+      activate: validated.activate,
       meta: activation_opts
     }
 

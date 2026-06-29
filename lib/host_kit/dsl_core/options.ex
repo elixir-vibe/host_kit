@@ -6,24 +6,28 @@ defmodule HostKit.DSLCore.Options do
 
   @enforce_keys [:name]
   defstruct name: nil,
-            fields: []
+            fields: [],
+            return: :map
+
+  @type return_shape :: :map | :keyword
 
   @type t :: %__MODULE__{
           name: atom(),
-          fields: [Option.t()]
+          fields: [Option.t()],
+          return: return_shape()
         }
 
   @doc "Validate options and return normalized field data."
-  @spec validate(t(), keyword() | map()) :: {:ok, map()} | {:error, term()}
+  @spec validate(t(), keyword() | map()) :: {:ok, map() | keyword()} | {:error, term()}
   def validate(%__MODULE__{} = schema, opts) when is_list(opts) or is_map(opts) do
     with {:ok, params} <- normalize_params(schema, opts),
          {:ok, data} <- cast(schema, params) do
-      {:ok, Map.take(data, field_names(schema))}
+      {:ok, return_data(schema, data)}
     end
   end
 
   @doc "Validate options and raise `ArgumentError` with DSL-friendly messages on failure."
-  @spec validate!(t(), keyword() | map()) :: map()
+  @spec validate!(t(), keyword() | map()) :: map() | keyword()
   def validate!(%__MODULE__{} = schema, opts) when is_list(opts) or is_map(opts) do
     case validate(schema, opts) do
       {:ok, data} -> data
@@ -71,9 +75,29 @@ defmodule HostKit.DSLCore.Options do
   end
 
   defp changeset(%__MODULE__{} = schema, params) do
-    {defaults(schema), types(schema)}
+    schema
+    |> then(&{defaults(&1), types(&1)})
     |> Ecto.Changeset.cast(params, field_names(schema))
     |> Ecto.Changeset.validate_required(required_fields(schema))
+    |> validate_inclusions(schema)
+  end
+
+  defp validate_inclusions(changeset, %__MODULE__{} = schema) do
+    Enum.reduce(schema.fields, changeset, fn
+      %Option{values: nil}, changeset ->
+        changeset
+
+      %Option{name: name, values: values}, changeset ->
+        Ecto.Changeset.validate_inclusion(changeset, name, values)
+    end)
+  end
+
+  defp return_data(%__MODULE__{return: :map} = schema, data) do
+    Map.take(data, field_names(schema))
+  end
+
+  defp return_data(%__MODULE__{return: :keyword} = schema, data) do
+    Enum.map(field_names(schema), &{&1, Map.fetch!(data, &1)})
   end
 
   defp field_names(%__MODULE__{} = schema), do: Enum.map(schema.fields, & &1.name)

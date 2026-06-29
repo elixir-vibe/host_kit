@@ -105,7 +105,7 @@ The field DSL mirrors Ecto's `field/3` shape while DSLCore stores a small struct
 
 ```elixir
 options :proxy_opts do
-  field :provider, :atom, required: true
+  field :provider, :atom, required: true, in: [:gatehouse]
   field :path, :string, default: "/etc/gatehouse/config.exs"
   field :meta, :map, default: %{}
 end
@@ -118,12 +118,21 @@ validate_proxy_opts(opts)
 validate_proxy_opts!(opts)
 ```
 
-The bang helper returns atom-keyed normalized data with defaults applied:
+The bang helper returns atom-keyed normalized data with defaults applied. `in: [...]` adds inclusion validation after casting.
 
 ```elixir
 opts = validate_proxy_opts!(provider: :gatehouse)
 opts.provider
 opts.path
+```
+
+Use `return: :keyword` when the downstream API naturally consumes keyword options:
+
+```elixir
+options :command_opts, return: :keyword do
+  field :phase, :atom, default: :apply, in: [:plan, :apply]
+  field :timeout, :integer, default: 5_000
+end
 ```
 
 DSLCore rejects unknown options before casting and raises DSL-oriented messages such as:
