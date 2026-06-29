@@ -91,38 +91,81 @@ defmodule HostKit.DSLCore do
     escaped_key = Macro.escape(key)
     escaped_value = Macro.escape(value)
 
-    base = [
-      quote do
-        def unquote(push_fun)(state) do
-          unquote(core).start(unquote(escaped_key), unquote(name), state)
+    base = []
+
+    base =
+      maybe_helper(
+        base,
+        opts,
+        :push,
+        quote do
+          def unquote(push_fun)(state) do
+            unquote(core).start(unquote(escaped_key), unquote(name), state)
+          end
         end
-      end,
-      quote do
-        def unquote(pop_fun)() do
-          unquote(core).finish(unquote(escaped_key), unquote(name))
+      )
+
+    base =
+      maybe_helper(
+        base,
+        opts,
+        :pop,
+        quote do
+          def unquote(pop_fun)() do
+            unquote(core).finish(unquote(escaped_key), unquote(name))
+          end
         end
-      end,
-      quote do
-        def unquote(current_fun)() do
-          unquote(core).current(unquote(escaped_key))
+      )
+
+    base =
+      maybe_helper(
+        base,
+        opts,
+        :current,
+        quote do
+          def unquote(current_fun)() do
+            unquote(core).current(unquote(escaped_key))
+          end
         end
-      end,
-      quote do
-        def unquote(current_bang_fun)() do
-          unquote(core).current!(unquote(escaped_key))
+      )
+
+    base =
+      maybe_helper(
+        base,
+        opts,
+        :current!,
+        quote do
+          def unquote(current_bang_fun)() do
+            unquote(core).current!(unquote(escaped_key))
+          end
         end
-      end,
-      quote do
-        def unquote(update_fun)(fun) do
-          unquote(core).update(unquote(escaped_key), fun)
+      )
+
+    base =
+      maybe_helper(
+        base,
+        opts,
+        :update,
+        quote do
+          def unquote(update_fun)(fun) do
+            unquote(core).update(unquote(escaped_key), fun)
+          end
         end
-      end,
-      quote do
-        def unquote(active_fun)() do
-          unquote(core).active?(unquote(escaped_key))
+      )
+
+    base =
+      maybe_helper(
+        base,
+        opts,
+        :active,
+        quote do
+          def unquote(active_fun)() do
+            unquote(core).active?(unquote(escaped_key))
+          end
         end
-      end
-    ]
+      )
+
+    base = Enum.reverse(base)
 
     value_helpers = []
 
@@ -165,6 +208,10 @@ defmodule HostKit.DSLCore do
       end
 
     base ++ Enum.reverse(value_helpers) ++ [attach_helper]
+  end
+
+  defp maybe_helper(definitions, opts, name, quoted) do
+    if Keyword.get(opts, name, true), do: [quoted | definitions], else: definitions
   end
 
   @doc "Attach a child value to the nearest active accepting scope."

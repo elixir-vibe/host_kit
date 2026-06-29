@@ -23,7 +23,7 @@ defmodule HostKit.DSL.Scope do
 
   scope(:observability)
 
-  scope :project, helpers: false do
+  scope :project, current: false, update: false do
     accepts(:host)
     accepts(:service)
     accepts(:resource)
@@ -55,7 +55,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_project(name, opts) do
-    DSLCore.start(@project_key, :project, Project.new(name, project_opts(opts)))
+    push_project(Project.new(name, project_opts(opts)))
   end
 
   defp project_opts(opts) do
@@ -67,11 +67,11 @@ defmodule HostKit.DSL.Scope do
   end
 
   def current_project do
-    DSLCore.current!(@project_key)
+    current_project!()
   end
 
   def finish_project do
-    DSLCore.finish(@project_key, :project)
+    pop_project()
   end
 
   def start_observability do

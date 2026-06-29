@@ -14,6 +14,7 @@ defmodule HostKit.DSLCoreTest do
     end
 
     scope(:flag, value: true)
+    scope(:partial, current: false, update: false)
   end
 
   test "scope generates conventional lifecycle helpers" do
@@ -33,6 +34,12 @@ defmodule HostKit.DSLCoreTest do
     assert Fixture.update_parent(&Fixture.Parent.add_item(&1, :one)) == :ok
     assert Fixture.pop_parent() == %Fixture.Parent{items: [:one]}
     refute Fixture.parent_active?()
+  end
+
+  test "scope can suppress selected helpers" do
+    assert function_exported?(Fixture, :push_partial, 1)
+    refute function_exported?(Fixture, :current_partial, 0)
+    refute function_exported?(Fixture, :update_partial, 1)
   end
 
   test "scope records accepted children" do
