@@ -1,17 +1,14 @@
 defmodule HostKit.TestPlugin.DSL do
   @moduledoc false
 
-  defmacro test_site(host, do: block) do
-    quote do
-      HostKit.TestPlugin.Scope.start_site(unquote(host))
-      unquote(block)
-      HostKit.DSL.Scope.add_resource(HostKit.TestPlugin.Scope.finish_site())
-    end
+  use DSL.Macros
+
+  defblock test_site(host) do
+    start(HostKit.TestPlugin.Scope.start_site(host))
+    finish(HostKit.DSL.Scope.add_resource(HostKit.TestPlugin.Scope.finish_site()))
   end
 
-  defmacro reverse_proxy(upstream) do
-    quote do
-      HostKit.TestPlugin.Scope.put_upstream(unquote(upstream))
-    end
+  defdirective reverse_proxy(upstream) do
+    HostKit.TestPlugin.Scope.put_upstream(upstream)
   end
 end

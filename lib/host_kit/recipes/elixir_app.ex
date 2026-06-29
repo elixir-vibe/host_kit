@@ -10,19 +10,17 @@ defmodule HostKit.Recipes.ElixirApp do
   @default_erlang "27.2"
   @default_elixir "1.18.2-otp-27"
 
-  defmacro elixir_app(name, do: block) do
-    quote do
-      Scope.start_scope()
-      unquote(block)
+  defblock elixir_app(name) do
+    start(Scope.start_scope())
+
+    finish do
       opts = Scope.finish_scope()
-      elixir_app(unquote(name), opts)
+      elixir_app(name, opts)
     end
   end
 
-  defmacro source(opts) do
-    quote do
-      Scope.put_scope(:source, unquote(opts))
-    end
+  defdirective source(opts) do
+    Scope.put_scope(:source, opts)
   end
 
   defdirective(phoenix(opts)) do
@@ -54,15 +52,13 @@ defmodule HostKit.Recipes.ElixirApp do
     HostKit.Recipes.ElixirApp.Scope.add_ecto_repo(name)
   end
 
-  defmacro mix(name, command_line, opts \\ []) do
-    quote do
-      command(
-        unquote(name),
-        unquote(opts)
-        |> Keyword.put_new(:runtime, {:mise, :beam})
-        |> Keyword.put(:exec, HostKit.Recipes.ElixirApp.mix_exec(unquote(command_line)))
-      )
-    end
+  defdirective mix(name, command_line, opts \\ []) do
+    command(
+      name,
+      opts
+      |> Keyword.put_new(:runtime, {:mise, :beam})
+      |> Keyword.put(:exec, HostKit.Recipes.ElixirApp.mix_exec(command_line))
+    )
   end
 
   def mix_exec(%HostKit.CommandLine{} = command), do: {"mix", [command.command | command.args]}

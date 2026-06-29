@@ -16,45 +16,44 @@ defmodule HostKit.DSL.Systemd do
     finish(HostScope.add_resource(Scope.finish_timer()))
   end
 
-  defmacro daemon(do: block) do
-    quote do
-      systemd_service unit_name() do
-        unquote(block)
-      end
-    end
+  defblock daemon() do
+    start(Scope.start_service(unit_name(), []))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro daemon(opts, do: block) when is_list(opts) do
-    quote do
-      systemd_service Keyword.get(unquote(opts), :unit, unit_name()),
-                      Keyword.delete(unquote(opts), :unit) do
-        unquote(block)
-      end
-    end
+  defblock daemon(opts) when is_list(opts) do
+    start(Scope.start_service(Keyword.get(opts, :unit, unit_name()), Keyword.delete(opts, :unit)))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro daemon(name, opts \\ [], do: block) do
-    quote do
-      systemd_service HostKit.DSL.Systemd.service_unit_name(unquote(name)), unquote(opts) do
-        unquote(block)
-      end
-    end
+  defblock daemon(name) do
+    start(Scope.start_service(HostKit.DSL.Systemd.service_unit_name(name), []))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro job(name, opts \\ [], do: block) do
-    quote do
-      systemd_service HostKit.DSL.Systemd.service_unit_name(unquote(name)), unquote(opts) do
-        unquote(block)
-      end
-    end
+  defblock daemon(name, opts) do
+    start(Scope.start_service(HostKit.DSL.Systemd.service_unit_name(name), opts))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro schedule(name, opts \\ [], do: block) do
-    quote do
-      systemd_timer HostKit.DSL.Systemd.timer_unit_name(unquote(name)), unquote(opts) do
-        unquote(block)
-      end
-    end
+  defblock job(name) do
+    start(Scope.start_service(HostKit.DSL.Systemd.service_unit_name(name), []))
+    finish(HostScope.add_resource(Scope.finish_service()))
+  end
+
+  defblock job(name, opts) do
+    start(Scope.start_service(HostKit.DSL.Systemd.service_unit_name(name), opts))
+    finish(HostScope.add_resource(Scope.finish_service()))
+  end
+
+  defblock schedule(name) do
+    start(Scope.start_timer(HostKit.DSL.Systemd.timer_unit_name(name), []))
+    finish(HostScope.add_resource(Scope.finish_timer()))
+  end
+
+  defblock schedule(name, opts) do
+    start(Scope.start_timer(HostKit.DSL.Systemd.timer_unit_name(name), opts))
+    finish(HostScope.add_resource(Scope.finish_timer()))
   end
 
   defdirective(unit(opts)) do

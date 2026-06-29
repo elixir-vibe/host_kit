@@ -69,18 +69,14 @@ defmodule HostKit.DSL do
     Scope.put_providers(providers)
   end
 
-  defmacro roots(values) do
-    quote do
-      Enum.each(unquote(values), fn {name, path} -> Scope.put_root(name, path) end)
-    end
+  defdirective roots(values) do
+    Enum.each(values, fn {name, path} -> Scope.put_root(name, path) end)
   end
 
-  defmacro prefixes(values) do
-    quote do
-      Enum.each(unquote(values), fn {name, prefix} ->
-        Scope.put_prefix(name, prefix)
-      end)
-    end
+  defdirective prefixes(values) do
+    Enum.each(values, fn {name, prefix} ->
+      Scope.put_prefix(name, prefix)
+    end)
   end
 
   defblock provider(name, module) do
@@ -88,18 +84,16 @@ defmodule HostKit.DSL do
     finish(Scope.finish_provider_config())
   end
 
-  defmacro set(key, value) do
-    quote do
-      cond do
-        EnvFile.Scope.active?() ->
-          EnvFile.Scope.put_set(unquote(key), unquote(value))
+  defdirective set(key, value) do
+    cond do
+      EnvFile.Scope.active?() ->
+        EnvFile.Scope.put_set(key, value)
 
-        ConfigFile.Scope.active?() ->
-          ConfigFile.Scope.put_set(unquote(key), unquote(value))
+      ConfigFile.Scope.active?() ->
+        ConfigFile.Scope.put_set(key, value)
 
-        true ->
-          Scope.put_provider_config(unquote(key), unquote(value))
-      end
+      true ->
+        Scope.put_provider_config(key, value)
     end
   end
 
@@ -108,36 +102,33 @@ defmodule HostKit.DSL do
     finish(Scope.add_resource(EnvFile.Scope.finish()))
   end
 
-  defmacro env_file(path, opts \\ [], do: block) do
-    quote do
-      dotenv unquote(path), unquote(opts) do
-        unquote(block)
-      end
-    end
+  defblock env_file(path, opts \\ []) do
+    start(EnvFile.Scope.start(path, opts))
+    finish(Scope.add_resource(EnvFile.Scope.finish()))
   end
 
-  defmacro env(name, opts \\ [], do: block) do
-    quote do
-      path = Scope.env_path(unquote(name), unquote(opts))
+  defblock env(name, opts \\ []) do
+    start do
+      env_path = Scope.env_path(name, opts)
 
-      opts =
-        unquote(opts)
+      env_opts =
+        opts
         |> Keyword.put_new(:owner, "root")
         |> Keyword.put_new(:group, service_user())
 
-      EnvFile.Scope.start(path, opts)
-      unquote(block)
-      Scope.put_env(unquote(name), path)
+      EnvFile.Scope.start(env_path, env_opts)
+    end
+
+    finish do
+      Scope.put_env(name, env_path)
       Scope.add_resource(EnvFile.Scope.finish())
     end
   end
 
-  defmacro env(name) do
-    quote do
-      path = Scope.env_path!(unquote(name))
-      SystemdScope.put_service(:environment_file, path)
-      path
-    end
+  defdirective env(name) do
+    path = Scope.env_path!(name)
+    SystemdScope.put_service(:environment_file, path)
+    path
   end
 
   defblock ready(name, opts \\ []), source: true do
@@ -155,15 +146,11 @@ defmodule HostKit.DSL do
     finish(Ingress.Scope.finish_server())
   end
 
-  defmacro tls(mode, opts \\ []) do
-    source = DSL.Source.escape_caller(__CALLER__)
-
-    quote do
-      if Scope.proxy_service_active?() do
-        Scope.put_proxy_tls(unquote(mode))
-      else
-        Ingress.Scope.put_tls(unquote(mode), unquote(opts), unquote(source))
-      end
+  defdirective tls(mode, opts \\ []), source: true do
+    if Scope.proxy_service_active?() do
+      Scope.put_proxy_tls(mode)
+    else
+      Ingress.Scope.put_tls(mode, opts, source)
     end
   end
 
@@ -172,66 +159,42 @@ defmodule HostKit.DSL do
     finish(Ingress.Scope.finish_route())
   end
 
-  defmacro proxy(opts) do
-    source = DSL.Source.escape_caller(__CALLER__)
+  defdirective proxy(opts), source: true do
+    Ingress.Scope.put_proxy(opts, source)
+  end
 
-    quote do
-      Ingress.Scope.put_proxy(unquote(opts), unquote(source))
+  defdirective systemd(unit, opts \\ []), source: true do
+    Readiness.Scope.add_check(Readiness.Scope.systemd_check(unit, opts, source))
+  end
+
+  defdirective http(url_or_opts \\ []), source: true do
+    cond do
+      Readiness.Scope.active?() ->
+        Readiness.Scope.add_check(Readiness.Scope.http_check(url_or_opts, [], source))
+
+      Scope.proxy_active?() ->
+        Scope.put_proxy_listener(:http, url_or_opts)
+
+      true ->
+        raise ArgumentError, "http/1 is only supported inside ready/2 or proxy/3"
     end
   end
 
-  defmacro systemd(unit, opts \\ []) do
-    source = DSL.Source.escape_caller(__CALLER__)
+  defdirective http(url, opts), source: true do
+    cond do
+      Readiness.Scope.active?() ->
+        Readiness.Scope.add_check(Readiness.Scope.http_check(url, opts, source))
 
-    quote do
-      Readiness.Scope.add_check(
-        Readiness.Scope.systemd_check(unquote(unit), unquote(opts), unquote(source))
-      )
+      Scope.proxy_active?() ->
+        raise ArgumentError, "proxy http listener expects keyword options, got two arguments"
+
+      true ->
+        raise ArgumentError, "http/2 is only supported inside ready/2"
     end
   end
 
-  defmacro http(url_or_opts \\ []) do
-    source = DSL.Source.escape_caller(__CALLER__)
-
-    quote do
-      cond do
-        Readiness.Scope.active?() ->
-          Readiness.Scope.add_check(
-            Readiness.Scope.http_check(unquote(url_or_opts), [], unquote(source))
-          )
-
-        Scope.proxy_active?() ->
-          Scope.put_proxy_listener(:http, unquote(url_or_opts))
-
-        true ->
-          raise ArgumentError, "http/1 is only supported inside ready/2 or proxy/3"
-      end
-    end
-  end
-
-  defmacro http(url, opts) do
-    source = DSL.Source.escape_caller(__CALLER__)
-
-    quote do
-      cond do
-        Readiness.Scope.active?() ->
-          Readiness.Scope.add_check(
-            Readiness.Scope.http_check(unquote(url), unquote(opts), unquote(source))
-          )
-
-        Scope.proxy_active?() ->
-          raise ArgumentError, "proxy http listener expects keyword options, got two arguments"
-
-        true ->
-          raise ArgumentError, "http/2 is only supported inside ready/2"
-      end
-    end
-  end
-
-  defmacro https(opts \\ []) do
-    quote do
-      Scope.put_proxy_listener(:https, unquote(opts))
-    end
+  defdirective https(opts \\ []) do
+    Scope.put_proxy_listener(:https, opts)
   end
 
   defdirective(state(path)) do
@@ -254,52 +217,39 @@ defmodule HostKit.DSL do
     Scope.put_proxy_drain(timeout)
   end
 
-  defmacro secret(key, opts) do
-    quote do
-      if ConfigFile.Scope.active?() do
-        ConfigFile.Scope.put_secret(unquote(key), unquote(opts))
-      else
-        EnvFile.Scope.put_secret(unquote(key), unquote(opts))
-      end
+  defdirective secret(key, opts) do
+    if ConfigFile.Scope.active?() do
+      ConfigFile.Scope.put_secret(key, opts)
+    else
+      EnvFile.Scope.put_secret(key, opts)
     end
   end
 
-  defmacro tenant(name, opts \\ [], do: block) do
-    quote do
-      Scope.put_tenant(unquote(name), unquote(opts))
+  defblock tenant(name, opts \\ []) do
+    start do
+      Scope.put_tenant(name, opts)
+      Scope.start_workspace(name, Keyword.put_new(opts, :owner, name))
+    end
 
-      workspace unquote(name), Keyword.put_new(unquote(opts), :owner, unquote(name)) do
-        unquote(block)
-      end
+    finish(Scope.finish_workspace())
+  end
+
+  defdirective host(name) do
+    if Scope.proxy_active?() do
+      Scope.add_proxy_host(name)
+    else
+      raise ArgumentError, "host/1 without a block is only supported inside proxy/3"
     end
   end
 
-  defmacro host(name, opts \\ []) do
-    case Keyword.pop(opts, :do) do
-      {nil, _opts} ->
-        quote do
-          if Scope.proxy_active?() do
-            Scope.add_proxy_host(unquote(name))
-          else
-            raise ArgumentError, "host/2 without a block is only supported inside proxy/3"
-          end
-        end
-
-      {block, opts} ->
-        quote do
-          Scope.start_host(unquote(name), unquote(opts))
-          unquote(block)
-          Scope.finish_host()
-        end
-    end
+  defblock host(name) do
+    start(Scope.start_host(name, []))
+    finish(Scope.finish_host())
   end
 
-  defmacro host(name, opts, do: block) do
-    quote do
-      Scope.start_host(unquote(name), unquote(opts))
-      unquote(block)
-      Scope.finish_host()
-    end
+  defblock host(name, opts) do
+    start(Scope.start_host(name, opts))
+    finish(Scope.finish_host())
   end
 
   defblock(instance(name, opts \\ [])) do
@@ -307,24 +257,17 @@ defmodule HostKit.DSL do
     finish(Scope.finish_instance())
   end
 
-  defmacro backend(name) do
-    quote do
-      Scope.put_instance_backend(unquote(name))
-    end
+  defdirective backend(name) do
+    Scope.put_instance_backend(name)
   end
 
-  defmacro backend(name, [{:do, block}]) do
-    quote do
-      Scope.start_backend_config(unquote(name))
-      unquote(block)
-      Scope.finish_backend_config()
-    end
+  defblock backend(name) do
+    start(Scope.start_backend_config(name))
+    finish(Scope.finish_backend_config())
   end
 
-  defmacro backend(name, opts) when is_list(opts) do
-    quote do
-      Scope.put_instance_backend(unquote(name), unquote(opts))
-    end
+  defdirective backend(name, opts) when is_list(opts) do
+    Scope.put_instance_backend(name, opts)
   end
 
   defdirective(option(key, value)) do
@@ -347,13 +290,11 @@ defmodule HostKit.DSL do
     Scope.put_instance_target_host(name)
   end
 
-  defmacro expose(name, opts \\ []) do
-    quote do
-      if Scope.rpc_active?() do
-        Scope.put_rpc_exposure(unquote(name), unquote(opts))
-      else
-        Scope.add_instance_port(unquote(name), unquote(opts))
-      end
+  defdirective expose(name, opts \\ []) do
+    if Scope.rpc_active?() do
+      Scope.put_rpc_exposure(name, opts)
+    else
+      Scope.add_instance_port(name, opts)
     end
   end
 
@@ -362,15 +303,19 @@ defmodule HostKit.DSL do
     finish(Scope.finish_proxy())
   end
 
-  defmacro service(name, opts \\ [], do: block) do
-    quote do
+  defblock service(name, opts \\ []) do
+    start do
       if Scope.proxy_active?() do
-        Scope.start_proxy_service(unquote(name), unquote(opts))
-        unquote(block)
+        Scope.start_proxy_service(name, opts)
+      else
+        Scope.start_service(name, opts)
+      end
+    end
+
+    finish do
+      if Scope.proxy_service_active?() do
         Scope.finish_proxy_service()
       else
-        Scope.start_service(unquote(name), unquote(opts))
-        unquote(block)
         Scope.finish_service()
       end
     end
@@ -381,10 +326,8 @@ defmodule HostKit.DSL do
     finish(Scope.finish_workspace())
   end
 
-  defmacro put_in_meta(key, value) do
-    quote do
-      Scope.update_current(:service, &put_in(&1.meta[unquote(key)], unquote(value)))
-    end
+  defdirective put_in_meta(key, value) do
+    Scope.update_current(:service, &put_in(&1.meta[key], value))
   end
 
   defdirective(service_name()) do
@@ -443,27 +386,14 @@ defmodule HostKit.DSL do
     Scope.put_ssh(:sudo, value)
   end
 
-  defmacro ssh(do: block) do
-    quote do
-      Scope.start_ssh([])
-      unquote(block)
-      Scope.finish_ssh()
-    end
+  defblock ssh(), optional: true do
+    start(Scope.start_ssh([]))
+    finish(Scope.finish_ssh())
   end
 
-  defmacro ssh(opts) do
-    quote do
-      Scope.start_ssh(unquote(opts))
-      Scope.finish_ssh()
-    end
-  end
-
-  defmacro ssh(opts, do: block) do
-    quote do
-      Scope.start_ssh(unquote(opts))
-      unquote(block)
-      Scope.finish_ssh()
-    end
+  defblock ssh(opts), optional: true do
+    start(Scope.start_ssh(opts))
+    finish(Scope.finish_ssh())
   end
 
   defdirective(identity_file(path)) do
@@ -491,10 +421,8 @@ defmodule HostKit.DSL do
     finish(Scope.finish_bootstrap())
   end
 
-  defmacro secret_env(name) do
-    quote do
-      HostKit.Secret.env(unquote(name))
-    end
+  defdirective secret_env(name) do
+    HostKit.Secret.env(name)
   end
 
   defblock(observability()) do
@@ -507,32 +435,23 @@ defmodule HostKit.DSL do
     finish(Scope.finish_firewall())
   end
 
-  defmacro allow(opts) do
-    quote do
-      Scope.add_firewall_rule(HostKit.Firewall.allow(unquote(opts)))
-    end
+  defdirective allow(opts) do
+    Scope.add_firewall_rule(HostKit.Firewall.allow(opts))
   end
 
-  defmacro deny(target, opts \\ []) do
-    quote do
-      Scope.add_firewall_rule(HostKit.Firewall.deny(unquote(target), unquote(opts)))
-    end
+  defdirective deny(target, opts \\ []) do
+    Scope.add_firewall_rule(HostKit.Firewall.deny(target, opts))
   end
 
-  defmacro egress(opts) do
-    quote do
-      user = service_user()
-      policy = HostKit.Workspace.Egress.new(Keyword.put_new(unquote(opts), :user, user))
-      Scope.update_current(:service, &put_in(&1.meta[:egress], policy))
-    end
+  defdirective egress(opts) do
+    user = service_user()
+    policy = HostKit.Workspace.Egress.new(Keyword.put_new(opts, :user, user))
+    Scope.update_current(:service, &put_in(&1.meta[:egress], policy))
   end
 
-  defmacro rpc(do: block) do
-    quote do
-      Scope.start_rpc()
-      unquote(block)
-      Scope.finish_rpc()
-    end
+  defblock rpc() do
+    start(Scope.start_rpc())
+    finish(Scope.finish_rpc())
   end
 
   defdirective(bind(service, opts \\ [])) do
@@ -548,68 +467,59 @@ defmodule HostKit.DSL do
     Scope.add_inside_monitor(type, opts)
   end
 
-  defmacro agent(opts \\ []) do
-    quote do
-      service Keyword.get(unquote(opts), :service, :agent) do
-        account(service_user(), system: true)
+  defdirective agent(opts \\ []) do
+    service Keyword.get(opts, :service, :agent) do
+      account(service_user(), system: true)
 
-        directory(path(:data),
-          owner: service_user(),
-          group: service_user(),
-          mode: :private_dir
+      directory(path(:data),
+        owner: service_user(),
+        group: service_user(),
+        mode: :private_dir
+      )
+
+      daemon unit_name() do
+        service_user(service_user())
+        service_group(service_user())
+        working_directory(path(:data))
+
+        run(
+          exec_start: Keyword.get(opts, :exec_start, ["/usr/local/bin/hostkit-workspace-agent"])
         )
 
-        daemon unit_name() do
-          service_user(service_user())
-          service_group(service_user())
-          working_directory(path(:data))
+        restart(:on_failure)
+        wanted_by(:multi_user)
+        listen(:agent, port: Keyword.get(opts, :port, 4173), on: :loopback)
 
-          run(
-            exec_start:
-              Keyword.get(unquote(opts), :exec_start, ["/usr/local/bin/hostkit-workspace-agent"])
-          )
+        put_in_meta(
+          :agent_socket,
+          Keyword.get(opts, :socket, "/run/hostkit/workspaces/#{service_user()}.sock")
+        )
 
-          restart(:on_failure)
-          wanted_by(:multi_user)
-          listen(:agent, port: Keyword.get(unquote(opts), :port, 4173), on: :loopback)
-
-          put_in_meta(
-            :agent_socket,
-            Keyword.get(unquote(opts), :socket, "/run/hostkit/workspaces/#{service_user()}.sock")
-          )
-
-          logs(identifier: service_user(), stdout: :journal, stderr: :journal)
-          telemetry(logs: true, metrics: true, service_name: service_user())
-          monitor(:systemd, expect: [state: :active], severity: :critical)
-          network_policy(deny: :all, allow: [:loopback])
-        end
+        logs(identifier: service_user(), stdout: :journal, stderr: :journal)
+        telemetry(logs: true, metrics: true, service_name: service_user())
+        monitor(:systemd, expect: [state: :active], severity: :critical)
+        network_policy(deny: :all, allow: [:loopback])
       end
     end
   end
 
-  defmacro workspace_agent(opts \\ []) do
-    quote do
-      agent(unquote(opts))
+  defdirective workspace_agent(opts \\ []) do
+    agent(opts)
+  end
+
+  defdirective telemetry(opts) do
+    if Scope.observability_active?() do
+      Scope.put_observability(:telemetry, HostKit.Telemetry.config(opts))
+    else
+      HostKit.DSL.attach_telemetry(opts)
     end
   end
 
-  defmacro telemetry(opts) do
-    quote do
-      if Scope.observability_active?() do
-        Scope.put_observability(:telemetry, HostKit.Telemetry.config(unquote(opts)))
-      else
-        HostKit.DSL.attach_telemetry(unquote(opts))
-      end
-    end
-  end
-
-  defmacro logs(opts) do
-    quote do
-      if Scope.observability_active?() do
-        Scope.put_observability(:logs, HostKit.Logs.config(unquote(opts)))
-      else
-        HostKit.DSL.attach_logs(unquote(opts))
-      end
+  defdirective logs(opts) do
+    if Scope.observability_active?() do
+      Scope.put_observability(:logs, HostKit.Logs.config(opts))
+    else
+      HostKit.DSL.attach_logs(opts)
     end
   end
 
@@ -659,29 +569,23 @@ defmodule HostKit.DSL do
     SystemdScope.put_isolation_resource(:memory_max, value)
   end
 
-  defmacro writable(name) when is_atom(name) do
-    quote do
-      SystemdScope.put_isolation_sandbox(
-        :read_write_paths,
-        Scope.storage_path(unquote(name))
-      )
-    end
+  defdirective writable(name) when is_atom(name) do
+    SystemdScope.put_isolation_sandbox(
+      :read_write_paths,
+      Scope.storage_path(name)
+    )
   end
 
-  defmacro writable(path) do
-    quote do
-      SystemdScope.put_isolation_sandbox(:read_write_paths, unquote(path))
-    end
+  defdirective writable(path) do
+    SystemdScope.put_isolation_sandbox(:read_write_paths, path)
   end
 
   defdirective(private_network(value)) do
     SystemdScope.put_isolation_sandbox(:private_network, value)
   end
 
-  defmacro network(:loopback) do
-    quote do
-      SystemdScope.put_isolation_network(:loopback)
-    end
+  defdirective network(:loopback) do
+    SystemdScope.put_isolation_network(:loopback)
   end
 
   defdirective(network_policy(opts)) do
@@ -696,24 +600,22 @@ defmodule HostKit.DSL do
     Scope.listener_upstream(name)
   end
 
-  defmacro preview(name, opts) do
-    quote do
-      listen(unquote(name),
-        port: Keyword.fetch!(unquote(opts), :port),
-        on: Keyword.get(unquote(opts), :on, :loopback)
+  defdirective preview(name, opts) do
+    listen(name,
+      port: Keyword.fetch!(opts, :port),
+      on: Keyword.get(opts, :on, :loopback)
+    )
+
+    caddy_site name, Keyword.fetch!(opts, :domain) do
+      reverse_proxy(listener(name))
+
+      monitor(:http,
+        url: "https://#{Keyword.fetch!(opts, :domain)}",
+        expect: [status: Keyword.get(opts, :status, 200)]
       )
 
-      caddy_site unquote(name), Keyword.fetch!(unquote(opts), :domain) do
-        reverse_proxy(listener(unquote(name)))
-
-        monitor(:http,
-          url: "https://#{Keyword.fetch!(unquote(opts), :domain)}",
-          expect: [status: Keyword.get(unquote(opts), :status, 200)]
-        )
-
-        telemetry(logs: true, metrics: :http, service_name: to_string(unquote(name)))
-        logs(driver: :caddy_access, format: :json, ship: true)
-      end
+      telemetry(logs: true, metrics: :http, service_name: to_string(name))
+      logs(driver: :caddy_access, format: :json, ship: true)
     end
   end
 
@@ -731,64 +633,56 @@ defmodule HostKit.DSL do
     SystemdScope.put_listen(port, opts)
   end
 
-  defmacro monitor(type, opts \\ []) do
-    quote do
-      cond do
-        Scope.inside_active?() ->
-          Scope.add_inside_monitor(unquote(type), unquote(opts))
+  defdirective monitor(type, opts \\ []) do
+    cond do
+      Scope.inside_active?() ->
+        Scope.add_inside_monitor(type, opts)
 
-        SystemdScope.active?() ->
-          SystemdScope.put_monitor(unquote(type), unquote(opts))
+      SystemdScope.active?() ->
+        SystemdScope.put_monitor(type, opts)
 
-        Code.ensure_loaded?(CaddyScope) and
-            CaddyScope.active?() ->
-          CaddyScope.put_monitor(unquote(type), unquote(opts))
+      Code.ensure_loaded?(CaddyScope) and
+          CaddyScope.active?() ->
+        CaddyScope.put_monitor(type, opts)
 
-        true ->
-          Scope.update_last_resource(fn resource ->
-            resource_id = HostKit.Resource.id(resource)
+      true ->
+        Scope.update_last_resource(fn resource ->
+          resource_id = HostKit.Resource.id(resource)
 
-            check =
-              HostKit.Monitor.check(
-                unquote(type),
-                Keyword.put(unquote(opts), :resource_id, resource_id)
-              )
+          check =
+            HostKit.Monitor.check(
+              type,
+              Keyword.put(opts, :resource_id, resource_id)
+            )
 
-            update_in(resource.meta[:monitor], &(List.wrap(&1) ++ [check]))
-          end)
-      end
+          update_in(resource.meta[:monitor], &(List.wrap(&1) ++ [check]))
+        end)
     end
   end
 
-  defmacro account(opts) when is_list(opts) do
-    quote do
-      account(service_user(), unquote(opts))
-    end
+  defdirective account(opts) when is_list(opts) do
+    account(service_user(), opts)
   end
 
-  defmacro account(name) do
-    quote do
-      HostKit.Account.ref(unquote(name))
-    end
+  defdirective account(name) do
+    HostKit.Account.ref(name)
   end
 
-  defmacro account(name, opts) do
-    quote do
-      account_name = HostKit.Account.name!(unquote(name))
+  defdirective account(name, opts) do
+    account_name = HostKit.Account.name!(name)
 
-      Scope.add_resource(%Resources.Account{
-        name: account_name,
-        system: Keyword.get(unquote(opts), :system, false),
-        home: Keyword.get(unquote(opts), :home),
-        shell: Keyword.get(unquote(opts), :shell, "/usr/sbin/nologin"),
-        groups: Keyword.get(unquote(opts), :groups, []),
-        rollback: Keyword.get(unquote(opts), :rollback, :keep),
-        meta: Keyword.get(unquote(opts), :meta, %{})
-      })
+    Scope.add_resource(%Resources.Account{
+      name: account_name,
+      system: Keyword.get(opts, :system, false),
+      home: Keyword.get(opts, :home),
+      shell: Keyword.get(opts, :shell, "/usr/sbin/nologin"),
+      groups: Keyword.get(opts, :groups, []),
+      rollback: Keyword.get(opts, :rollback, :keep),
+      meta: Keyword.get(opts, :meta, %{})
+    })
 
-      if Scope.service_active?() do
-        Scope.put_service_account(account_name)
-      end
+    if Scope.service_active?() do
+      Scope.put_service_account(account_name)
     end
   end
 
@@ -796,57 +690,29 @@ defmodule HostKit.DSL do
     Scope.add_resource(Resources.Directory.new(path, opts))
   end
 
-  defmacro endpoint(name_or_service, name_or_opts \\ :default, opts \\ []) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
-
-    quote do
-      if Scope.service_active?() and is_list(unquote(name_or_opts)) and
-           unquote(opts) == [] do
-        declaration_opts =
-          HostKit.DSL.put_source_meta(unquote(name_or_opts), unquote(Macro.escape(source)))
-
-        Scope.put_endpoint(unquote(name_or_service), declaration_opts)
-      else
-        ref_opts = HostKit.DSL.put_source_meta(unquote(opts), unquote(Macro.escape(source)))
-        HostKit.Endpoint.new(unquote(name_or_service), unquote(name_or_opts), ref_opts)
-      end
+  defdirective endpoint(name_or_service, name_or_opts \\ :default, opts \\ []),
+    source: HostKit.SourceLocation do
+    if Scope.service_active?() and is_list(name_or_opts) and opts == [] do
+      declaration_opts = HostKit.DSL.put_source_meta(name_or_opts, source)
+      Scope.put_endpoint(name_or_service, declaration_opts)
+    else
+      ref_opts = HostKit.DSL.put_source_meta(opts, source)
+      HostKit.Endpoint.new(name_or_service, name_or_opts, ref_opts)
     end
   end
 
-  defmacro source(name, opts) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
-
-    quote do
-      opts =
-        Keyword.update(
-          unquote(opts),
-          :meta,
-          %{source: unquote(Macro.escape(source))},
-          &Map.put(&1, :source, unquote(Macro.escape(source)))
-        )
-
-      Scope.add_resource(Resources.Source.new(unquote(name), opts))
-    end
+  defdirective source(name, opts), source: HostKit.SourceLocation do
+    resource_opts = put_source_meta(opts, source)
+    Scope.add_resource(Resources.Source.new(name, resource_opts))
   end
 
   def put_source_meta(opts, source) do
     Keyword.update(opts, :meta, %{source: source}, &Map.put(&1, :source, source))
   end
 
-  defmacro package(name, opts \\ []) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
-
-    quote do
-      opts =
-        Keyword.update(
-          unquote(opts),
-          :meta,
-          %{source: unquote(Macro.escape(source))},
-          &Map.put(&1, :source, unquote(Macro.escape(source)))
-        )
-
-      Scope.add_resource(Resources.Package.new(unquote(name), opts))
-    end
+  defdirective package(name, opts \\ []), source: HostKit.SourceLocation do
+    package_opts = put_source_meta(opts, source)
+    Scope.add_resource(Resources.Package.new(name, package_opts))
   end
 
   defdirective(packages(names, opts \\ [])) do
@@ -857,13 +723,11 @@ defmodule HostKit.DSL do
     Scope.add_resource(Resources.File.new(path, opts))
   end
 
-  defmacro template(path, opts) do
-    base_dir = __CALLER__.file |> Path.dirname() |> Path.expand()
+  defdirective template(path, opts), source: HostKit.SourceLocation do
+    template_opts =
+      Keyword.put_new(opts, :base_dir, source.file |> Path.dirname() |> Path.expand())
 
-    quote do
-      opts = Keyword.put_new(unquote(opts), :base_dir, unquote(base_dir))
-      Scope.add_resource(Resources.Template.new(unquote(path), opts))
-    end
+    Scope.add_resource(Resources.Template.new(path, template_opts))
   end
 
   defdirective(ini(path, opts \\ [])) do
@@ -883,12 +747,8 @@ defmodule HostKit.DSL do
     Scope.add_resource(Resources.ConfigFile.new(path, :toml, opts))
   end
 
-  defmacro exs(path, opts \\ [], do: block) do
-    ast = Macro.escape(block)
-
-    quote do
-      Scope.add_resource(Resources.Exs.new(unquote(path), unquote(ast), unquote(opts)))
-    end
+  defdirective exs(path, opts \\ []), quoted: [:block] do
+    Scope.add_resource(Resources.Exs.new(path, block, opts))
   end
 
   defblock(section(name)) do
@@ -920,93 +780,59 @@ defmodule HostKit.DSL do
     finish(Lifecycle.Scope.finish())
   end
 
-  defmacro command(name, opts) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
-
-    quote do
-      opts =
-        Keyword.update(
-          unquote(opts),
-          :meta,
-          %{source: unquote(Macro.escape(source))},
-          &Map.put(&1, :source, unquote(Macro.escape(source)))
-        )
-
-      Scope.add_resource(Resources.Command.new(unquote(name), opts))
-    end
+  defdirective command(name, opts), source: HostKit.SourceLocation do
+    command_opts = put_source_meta(opts, source)
+    Scope.add_resource(Resources.Command.new(name, command_opts))
   end
 
-  defmacro run(name, command, opts \\ []) do
-    quote do
-      command(unquote(name), Keyword.put(unquote(opts), :exec, unquote(command)))
-    end
+  defdirective run(name, command, opts \\ []) do
+    command(name, Keyword.put(opts, :exec, command))
   end
 
-  defmacro git(name, command, opts \\ []) do
-    quote do
-      command(
-        unquote(name),
-        Keyword.put(unquote(opts), :exec, HostKit.DSL.git_exec(unquote(command)))
-      )
-    end
+  defdirective git(name, command, opts \\ []) do
+    command(
+      name,
+      Keyword.put(opts, :exec, HostKit.DSL.git_exec(command))
+    )
   end
 
-  defmacro bash(name, script, opts \\ []) do
-    source = HostKit.SourceLocation.from_caller(__CALLER__)
-
-    quote do
-      opts =
-        Keyword.update(
-          unquote(opts),
-          :meta,
-          %{source: unquote(Macro.escape(source))},
-          &Map.put(&1, :source, unquote(Macro.escape(source)))
-        )
-
-      Scope.add_resource(Resources.Shell.new(unquote(name), unquote(script), opts))
-    end
+  defdirective bash(name, script, opts \\ []), source: HostKit.SourceLocation do
+    shell_opts = put_source_meta(opts, source)
+    Scope.add_resource(Resources.Shell.new(name, script, shell_opts))
   end
 
   defdirective(argv(command, opts \\ [])) do
     HostKit.CommandLine.argv(command, opts)
   end
 
-  defmacro mix(task, opts \\ []) do
-    quote do
-      opts = Keyword.put_new(unquote(opts), :command, path(:bin, "mix"))
-      HostKit.CommandLine.mix(unquote(task), opts)
-    end
+  defdirective mix(task, opts \\ []) do
+    mix_opts = Keyword.put_new(opts, :command, path(:bin, "mix"))
+    HostKit.CommandLine.mix(task, mix_opts)
   end
 
-  defmacro elixir(opts \\ []) do
-    quote do
-      opts = Keyword.put_new(unquote(opts), :command, path(:bin, "elixir"))
-      HostKit.CommandLine.elixir(opts)
-    end
+  defdirective elixir(opts \\ []) do
+    elixir_opts = Keyword.put_new(opts, :command, path(:bin, "elixir"))
+    HostKit.CommandLine.elixir(elixir_opts)
   end
 
-  defmacro elixir(script_or_args, opts) do
-    quote do
-      opts = Keyword.put_new(unquote(opts), :command, path(:bin, "elixir"))
-      HostKit.CommandLine.elixir(unquote(script_or_args), opts)
-    end
+  defdirective elixir(script_or_args, opts) do
+    elixir_opts = Keyword.put_new(opts, :command, path(:bin, "elixir"))
+    HostKit.CommandLine.elixir(script_or_args, elixir_opts)
   end
 
-  defmacro eval(expression, opts \\ []) do
-    expression =
+  defdirective eval(expression, opts \\ []), quoted: [:expression] do
+    eval_expression =
       case expression do
         expression when is_binary(expression) -> expression
         expression -> Macro.to_string(expression)
       end
 
-    quote do
-      opts = Keyword.put_new(unquote(opts), :command, path(:bin, "elixir"))
+    eval_opts = Keyword.put_new(opts, :command, path(:bin, "elixir"))
 
-      if Lifecycle.Scope.active?() do
-        Lifecycle.Scope.put_exec(Lifecycle.Scope.eval_exec(unquote(expression), opts))
-      else
-        HostKit.CommandLine.eval(unquote(expression), opts)
-      end
+    if Lifecycle.Scope.active?() do
+      Lifecycle.Scope.put_exec(Lifecycle.Scope.eval_exec(eval_expression, eval_opts))
+    else
+      HostKit.CommandLine.eval(eval_expression, eval_opts)
     end
   end
 

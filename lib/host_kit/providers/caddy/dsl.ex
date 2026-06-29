@@ -11,12 +11,9 @@ defmodule HostKit.Providers.Caddy.DSL do
     finish(HostScope.add_resource(Scope.finish_site()))
   end
 
-  defmacro caddy_site(host, do: block) do
-    quote do
-      caddy_site unquote(host), unquote(host) do
-        unquote(block)
-      end
-    end
+  defblock caddy_site(host) do
+    start(Scope.start_site(host, host, []))
+    finish(HostScope.add_resource(Scope.finish_site()))
   end
 
   defdirective root(path, opts \\ []) do
