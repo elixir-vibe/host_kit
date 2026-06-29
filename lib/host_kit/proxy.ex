@@ -38,6 +38,10 @@ defmodule HostKit.Proxy do
     }
   end
 
+  def add_service(%__MODULE__{} = proxy, service) when is_map(service) do
+    %{proxy | services: proxy.services ++ [service]}
+  end
+
   def render(%__MODULE__{} = proxy) do
     proxy
     |> to_quoted()

@@ -16,9 +16,6 @@ defmodule HostKit.DSL.Scope do
   }
 
   @project_key {__MODULE__, :project}
-  @workspace_key {__MODULE__, :workspace}
-  @proxy_key {__MODULE__, :proxy}
-  @proxy_service_key {__MODULE__, :proxy_service}
   @default_providers_key {__MODULE__, :default_providers}
 
   scope(:observability)
@@ -41,6 +38,13 @@ defmodule HostKit.DSL.Scope do
     accepts(:resource)
   end
 
+  scope(:workspace)
+
+  scope :proxy do
+    accepts(:proxy_service, via: :add_service)
+  end
+
+  scope(:proxy_service)
   scope(:backend_config)
   scope(:provider_config)
   scope(:mise)
@@ -171,7 +175,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_proxy(name, opts) do
-    Process.put(@proxy_key, %HostKit.Proxy{
+    push_proxy(%HostKit.Proxy{
       name: name,
       provider: Keyword.fetch!(opts, :provider),
       path: Keyword.get(opts, :path, "/etc/gatehouse/config.exs"),
@@ -180,12 +184,9 @@ defmodule HostKit.DSL.Scope do
   end
 
   def finish_proxy do
-    proxy = Process.delete(@proxy_key) || raise "no HostKit proxy in scope"
+    proxy = pop_proxy()
     update_project(&Project.add_proxy(&1, proxy))
   end
-
-  def proxy_active?, do: Process.get(@proxy_key) != nil
-  def proxy_service_active?, do: Process.get(@proxy_service_key) != nil
 
   def put_proxy_state(path) do
     update_proxy(&%{&1 | state: path})
@@ -217,13 +218,12 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_proxy_service(name, opts) do
-    Process.put(@proxy_service_key, HostKit.Proxy.service(name, opts))
+    push_proxy_service(HostKit.Proxy.service(name, opts))
   end
 
   def finish_proxy_service do
-    service = Process.delete(@proxy_service_key) || raise "no HostKit proxy service in scope"
-    proxy = Process.get(@proxy_key) || raise "no HostKit proxy in scope"
-    Process.put(@proxy_key, %{proxy | services: proxy.services ++ [service]})
+    service = pop_proxy_service()
+    attach_proxy_service(service)
   end
 
   def add_proxy_host(host) do
@@ -369,11 +369,11 @@ defmodule HostKit.DSL.Scope do
       identity: Keyword.get(opts, :identity)
     }
 
-    Process.put(@workspace_key, workspace)
+    push_workspace(workspace)
   end
 
   def finish_workspace do
-    Process.delete(@workspace_key) || raise "no HostKit workspace in scope"
+    pop_workspace()
     :ok
   end
 
@@ -702,21 +702,6 @@ defmodule HostKit.DSL.Scope do
     if Keyword.has_key?(opts, :sudo), do: %{host | sudo: Keyword.fetch!(opts, :sudo)}, else: host
   end
 
-  defp update_proxy(fun) do
-    proxy = Process.get(@proxy_key) || raise "proxy directive used outside proxy block"
-    Process.put(@proxy_key, fun.(proxy))
-    :ok
-  end
-
-  defp update_proxy_service(fun) do
-    service =
-      Process.get(@proxy_service_key) ||
-        raise "proxy service directive used outside proxy service block"
-
-    Process.put(@proxy_service_key, fun.(service))
-    :ok
-  end
-
   def update_current(:host, fun) do
     update_host(fun)
     :ok
@@ -760,7 +745,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp service_path(name) do
-    case Process.get(@workspace_key) do
+    case current_workspace() do
       nil ->
         Naming.path_segment(name)
 
@@ -770,7 +755,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp service_identity(name) do
-    case Process.get(@workspace_key) do
+    case current_workspace() do
       nil ->
         Naming.identity_segment(name)
 
@@ -780,7 +765,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp maybe_put_workspace(meta) do
-    case Process.get(@workspace_key) do
+    case current_workspace() do
       nil -> meta
       workspace -> Map.put(meta, :workspace, Map.take(workspace, [:name, :owner]))
     end
