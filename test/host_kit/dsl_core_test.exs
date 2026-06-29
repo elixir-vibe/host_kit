@@ -27,6 +27,14 @@ defmodule HostKit.DSLCoreTest.Fixture do
     accepts(:item)
   end
 
+  scope :list_parent do
+    accepts(:thing, into: :items)
+  end
+
+  scope :tuple_parent do
+    accepts(:thing, via: {ParentFixture, :add_item})
+  end
+
   scope(:flag, value: true)
   scope(:partial, current: false, update: false)
 
@@ -123,7 +131,7 @@ defmodule HostKit.DSLCoreTest do
 
   test "scope records accepted children and required scopes" do
     assert {:ok, scope} = Fixture.__dsl_core_scope__(:parent)
-    assert scope.accepts == [%{name: :item, via: :add_item}]
+    assert scope.accepts == [%{name: :item, via: :add_item, into: nil}]
 
     assert {:ok, scope} = Fixture.__dsl_core_scope__(:child)
     assert scope.requires == [:parent]
@@ -144,6 +152,18 @@ defmodule HostKit.DSLCoreTest do
     assert Fixture.push_parent(%ParentFixture{}) == :ok
     assert HostKit.DSLCore.attach(Fixture, :item, :attached) == :ok
     assert Fixture.pop_parent() == %ParentFixture{items: [:attached]}
+  end
+
+  test "attach supports generic list-field append" do
+    assert Fixture.push_list_parent(%ParentFixture{}) == :ok
+    assert Fixture.attach(:thing, :generic) == :ok
+    assert Fixture.pop_list_parent() == %ParentFixture{items: [:generic]}
+  end
+
+  test "attach supports module-function callbacks" do
+    assert Fixture.push_tuple_parent(%ParentFixture{}) == :ok
+    assert Fixture.attach(:thing, :tuple) == :ok
+    assert Fixture.pop_tuple_parent() == %ParentFixture{items: [:tuple]}
   end
 
   test "use DSLCore provides caller-local attach helper" do

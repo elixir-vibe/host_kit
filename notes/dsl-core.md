@@ -193,6 +193,22 @@ scope :proxy do
 end
 ```
 
+For less domain-shaped parents, attach directly into a list field:
+
+```elixir
+scope :menu do
+  accepts :item, into: :items
+end
+```
+
+For callbacks outside the parent struct module, pass a module/function tuple:
+
+```elixir
+scope :menu do
+  accepts :item, via: {MenuBuilder, :add_item}
+end
+```
+
 This keeps topology implicit. Runtime nesting determines whether a child attaches to `project`, `instance`, `service`, or another accepting scope.
 
 ## Diagnostics
@@ -217,6 +233,6 @@ Do not use `accepts` just to avoid writing clear domain code. It is useful when 
 
 - Option schemas intentionally cover simple field casting/defaults/required validation only. Complex domain invariants still belong in domain code.
 - Diagnostics are string-based and do not yet include source snippets.
-- `accepts` assumes the active parent state is a struct and calls the parent module with `apply(parent.__struct__, via, [parent, child])`.
+- `accepts` supports default parent-struct callbacks, module/function callbacks, and list-field append. More advanced attach strategies should stay explicit until repeated consumers appear.
 - `setting` is process-local only; there is no setting stack.
 - Extraction outside HostKit should wait until more HostKit surfaces dogfood the primitives.

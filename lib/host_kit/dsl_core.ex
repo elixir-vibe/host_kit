@@ -136,7 +136,7 @@ defmodule HostKit.DSLCore do
     caller_module = __CALLER__.module
     key = {caller_module, name}
     body = Keyword.get(block, :do)
-    accepts = extract_accepts(body)
+    accepts = extract_accepts(body, __CALLER__)
     requires = extract_requires(body)
 
     scope = %{
@@ -161,20 +161,22 @@ defmodule HostKit.DSLCore do
 
   defp normalize_scope_args(opts, block), do: {opts, block}
 
-  defp extract_accepts(nil), do: []
+  defp extract_accepts(nil, _env), do: []
 
-  defp extract_accepts({:__block__, _meta, expressions}) do
-    Enum.flat_map(expressions, &extract_accepts/1)
+  defp extract_accepts({:__block__, _meta, expressions}, env) do
+    Enum.flat_map(expressions, &extract_accepts(&1, env))
   end
 
-  defp extract_accepts({:accepts, _meta, [thing]}) when is_atom(thing),
-    do: [%{name: thing, via: via(thing)}]
-
-  defp extract_accepts({:accepts, _meta, [thing, opts]}) when is_atom(thing) and is_list(opts) do
-    [%{name: thing, via: Keyword.get(opts, :via, via(thing))}]
+  defp extract_accepts({:accepts, _meta, [thing]}, _env) when is_atom(thing) do
+    [%{name: thing, via: via(thing), into: nil}]
   end
 
-  defp extract_accepts(_other), do: []
+  defp extract_accepts({:accepts, _meta, [thing, opts]}, env)
+       when is_atom(thing) and is_list(opts) do
+    [%{name: thing, via: accept_via(thing, opts, env), into: accept_into(opts, env)}]
+  end
+
+  defp extract_accepts(_other, _env), do: []
 
   defp extract_requires(nil), do: []
 
@@ -187,6 +189,20 @@ defmodule HostKit.DSLCore do
   defp extract_requires({:requires, _meta, [scopes]}) when is_list(scopes), do: scopes
 
   defp extract_requires(_other), do: []
+
+  defp accept_via(thing, opts, env) do
+    case Keyword.fetch(opts, :via) do
+      {:ok, via} -> literal!(via, env)
+      :error -> via(thing)
+    end
+  end
+
+  defp accept_into(opts, env) do
+    case Keyword.fetch(opts, :into) do
+      {:ok, into} -> literal!(into, env)
+      :error -> nil
+    end
+  end
 
   defp via(name), do: :"add_#{name}"
 
@@ -407,12 +423,43 @@ defmodule HostKit.DSLCore do
     |> Enum.find_value(fn key ->
       with {:ok, scope} <- owner.__dsl_core_scope__(elem(key, 1)),
            accept when not is_nil(accept) <- Enum.find(scope.accepts, &(&1.name == child_name)) do
-        update(key, fn parent -> apply(parent.__struct__, accept.via, [parent, child]) end)
+        update(key, &attach_child(&1, child, accept))
         :ok
       else
         _ -> nil
       end
     end) || raise ArgumentError, attach_message(owner, child_name)
+  end
+
+  defp attach_child(parent, child, %{into: field}) when is_atom(field) and not is_nil(field) do
+    append_field(parent, field, child)
+  end
+
+  defp attach_child(parent, child, %{via: via}) when is_atom(via) do
+    apply(parent.__struct__, via, [parent, child])
+  end
+
+  defp attach_child(parent, child, %{via: {module, function}})
+       when is_atom(module) and is_atom(function) do
+    apply(module, function, [parent, child])
+  end
+
+  defp attach_child(parent, child, %{via: via}) when is_function(via, 2) do
+    via.(parent, child)
+  end
+
+  defp append_field(parent, field, child) do
+    case Map.fetch(parent, field) do
+      {:ok, values} when is_list(values) ->
+        Map.put(parent, field, values ++ [child])
+
+      {:ok, value} ->
+        raise ArgumentError,
+              "cannot attach into #{field}; expected a list, got: #{inspect(value)}"
+
+      :error ->
+        raise ArgumentError, "cannot attach into missing field #{field}"
+    end
   end
 
   @doc "Finish the active scope with a readable scope-name error."
