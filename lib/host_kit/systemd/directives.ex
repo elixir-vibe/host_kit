@@ -1,5 +1,5 @@
 defmodule HostKit.Systemd.Directives do
-  @moduledoc "Shared systemd defdirective coercion for DSL and runtime builders."
+  @moduledoc "Shared systemd directive coercion for DSL and runtime builders."
 
   @spec coerce(keyword()) :: keyword()
   def coerce(values) do

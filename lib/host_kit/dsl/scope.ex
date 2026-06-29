@@ -318,7 +318,7 @@ defmodule HostKit.DSL.Scope do
     if host_active?() do
       update_current(:host, &put_host_ssh_opts(&1, opts))
     else
-      raise "ssh defdirective used outside host defblock"
+      raise "ssh directive used outside host block"
     end
   end
 

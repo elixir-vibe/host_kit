@@ -66,7 +66,7 @@ defmodule HostKit.Providers.Caddy.Scope do
     update_site(&put_in(&1.meta[:logs], config))
   end
 
-  defp append_directive(%Site{} = site, defdirective) do
-    %{site | directives: site.directives ++ [defdirective]}
+  defp append_directive(%Site{} = site, directive) do
+    %{site | directives: site.directives ++ [directive]}
   end
 end

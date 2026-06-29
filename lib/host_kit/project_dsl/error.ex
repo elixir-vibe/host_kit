@@ -1,5 +1,5 @@
 defmodule HostKit.ProjectDSL.UnknownDefinitionError do
-  @moduledoc "Raised when a ProjectDSL defservice defblock contains an unsupported form."
+  @moduledoc "Raised when a ProjectDSL defservice block contains an unsupported form."
 
   defexception [:form]
 

@@ -4,7 +4,7 @@ defmodule HostKit.DSL.Lifecycle.Scope do
   use DSL
 
   defmodule Command do
-    @moduledoc "State accumulated while evaluating a lifecycle command DSL defblock."
+    @moduledoc "State accumulated while evaluating a lifecycle command DSL block."
 
     @enforce_keys [:name, :phase, :opts]
     defstruct name: nil,
@@ -69,7 +69,7 @@ defmodule HostKit.DSL.Lifecycle.Scope do
       update_lifecycle_command(&%{&1 | exec: exec})
       :ok
     else
-      raise "lifecycle command used outside lifecycle defblock"
+      raise "lifecycle command used outside lifecycle block"
     end
   end
 

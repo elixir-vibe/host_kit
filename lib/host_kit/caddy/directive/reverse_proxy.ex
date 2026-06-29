@@ -1,5 +1,5 @@
 defmodule HostKit.Caddy.Directive.ReverseProxy do
-  @moduledoc "Inspectable Caddy reverse_proxy defdirective."
+  @moduledoc "Inspectable Caddy reverse_proxy directive."
 
   @type t :: %__MODULE__{upstreams: [String.t()]}
 
