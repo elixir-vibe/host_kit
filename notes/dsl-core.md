@@ -4,6 +4,18 @@
 
 It is intentionally small and layered. Use only the pieces a DSL module needs.
 
+## Internal layers
+
+`HostKit.DSLCore` is the public macro/runtime facade. The implementation is split by concern:
+
+- `HostKit.DSLCore.Scope.Builder` parses `scope` declarations and emits generated helpers.
+- `HostKit.DSLCore.Options.Builder` parses `options` declarations into option schema structs.
+- `HostKit.DSLCore.Options` validates option schemas through schemaless `Ecto.Changeset` casting.
+- `HostKit.DSLCore.Attach` resolves nearest accepting scopes and applies attach strategies.
+- `HostKit.DSLCore.Stack` owns process-local scope stacks.
+
+Keep domain behavior out of these modules. They should remain generic enough to extract after more HostKit surfaces have dogfooded them.
+
 ## Use
 
 ```elixir

@@ -1,6 +1,9 @@
 defmodule HostKit.DSLCore do
   @moduledoc "Shared building blocks for HostKit DSL scopes."
 
+  alias HostKit.DSLCore.Attach
+  alias HostKit.DSLCore.Options.Builder, as: OptionsBuilder
+  alias HostKit.DSLCore.Scope.Builder, as: ScopeBuilder
   alias HostKit.DSLCore.Stack
 
   @doc "Import DSLCore macros and install compile-time scope metadata."
@@ -41,12 +44,7 @@ defmodule HostKit.DSLCore do
 
   @doc "Declare a named Ecto-style option schema."
   defmacro options(name, opts \\ [], do: block) when is_atom(name) and is_list(opts) do
-    schema = %HostKit.DSLCore.Options{
-      name: name,
-      fields: option_fields(block, __CALLER__),
-      return: option_return!(Keyword.get(opts, :return, :map))
-    }
-
+    schema = OptionsBuilder.schema!(name, opts, block, __CALLER__)
     validate_fun = :"validate_#{name}"
     validate_bang_fun = :"validate_#{name}!"
 
@@ -63,43 +61,6 @@ defmodule HostKit.DSLCore do
         HostKit.DSLCore.Options.validate!(unquote(Macro.escape(schema)), opts)
       end
     end
-  end
-
-  defp option_return!(return) when return in [:map, :keyword], do: return
-
-  defp option_return!(return) do
-    raise ArgumentError,
-          "DSLCore options return must be :map or :keyword, got: #{inspect(return)}"
-  end
-
-  defp option_fields({:__block__, _meta, expressions}, env) do
-    Enum.map(expressions, &option_field(&1, env))
-  end
-
-  defp option_fields(expression, env), do: option_fields({:__block__, [], [expression]}, env)
-
-  defp option_field({:field, _meta, [name]}, env) do
-    option_field({:field, [], [name, :string, []]}, env)
-  end
-
-  defp option_field({:field, _meta, [name, type]}, env) do
-    option_field({:field, [], [name, type, []]}, env)
-  end
-
-  defp option_field({:field, _meta, [name, type, opts]}, env)
-       when is_atom(name) and is_list(opts) do
-    %HostKit.DSLCore.Option{
-      name: name,
-      type: literal!(type, env),
-      required?: Keyword.get(opts, :required, false),
-      default: opts |> Keyword.get(:default) |> literal!(env),
-      values: opts |> Keyword.get(:in) |> literal!(env)
-    }
-  end
-
-  defp literal!(value, env) do
-    {literal, _binding} = Code.eval_quoted(value, [], env)
-    literal
   end
 
   @doc "Declare a named process-local DSL setting."
@@ -132,260 +93,15 @@ defmodule HostKit.DSLCore do
 
   @doc "Declare a named process-local DSL scope."
   defmacro scope(name, opts \\ [], block \\ []) when is_atom(name) and is_list(opts) do
-    {opts, block} = normalize_scope_args(opts, block)
-    caller_module = __CALLER__.module
-    key = {caller_module, name}
-    body = Keyword.get(block, :do)
-    accepts = extract_accepts(body, __CALLER__)
-    requires = extract_requires(body)
-
-    scope = %{
-      name: name,
-      key: key,
-      accepts: accepts,
-      requires: requires
-    }
+    {scope, functions} = ScopeBuilder.build(name, opts, block, __CALLER__)
 
     quote do
       @dsl_core_scopes unquote(Macro.escape(scope))
 
       def __dsl_core_scope__(unquote(name)), do: {:ok, unquote(Macro.escape(scope))}
 
-      unquote_splicing(scope_functions(name, key, opts, requires))
+      unquote_splicing(functions)
     end
-  end
-
-  defp normalize_scope_args(opts, []) do
-    if Keyword.has_key?(opts, :do), do: {[], opts}, else: {opts, []}
-  end
-
-  defp normalize_scope_args(opts, block), do: {opts, block}
-
-  defp extract_accepts(nil, _env), do: []
-
-  defp extract_accepts({:__block__, _meta, expressions}, env) do
-    Enum.flat_map(expressions, &extract_accepts(&1, env))
-  end
-
-  defp extract_accepts({:accepts, _meta, [thing]}, _env) when is_atom(thing) do
-    [%{name: thing, via: via(thing), into: nil}]
-  end
-
-  defp extract_accepts({:accepts, _meta, [thing, opts]}, env)
-       when is_atom(thing) and is_list(opts) do
-    [%{name: thing, via: accept_via(thing, opts, env), into: accept_into(opts, env)}]
-  end
-
-  defp extract_accepts(_other, _env), do: []
-
-  defp extract_requires(nil), do: []
-
-  defp extract_requires({:__block__, _meta, expressions}) do
-    Enum.flat_map(expressions, &extract_requires/1)
-  end
-
-  defp extract_requires({:requires, _meta, [scope]}) when is_atom(scope), do: [scope]
-
-  defp extract_requires({:requires, _meta, [scopes]}) when is_list(scopes), do: scopes
-
-  defp extract_requires(_other), do: []
-
-  defp accept_via(thing, opts, env) do
-    case Keyword.fetch(opts, :via) do
-      {:ok, via} -> literal!(via, env)
-      :error -> via(thing)
-    end
-  end
-
-  defp accept_into(opts, env) do
-    case Keyword.fetch(opts, :into) do
-      {:ok, into} -> literal!(into, env)
-      :error -> nil
-    end
-  end
-
-  defp via(name), do: :"add_#{name}"
-
-  defp scope_functions(name, key, opts, requires) do
-    if Keyword.get(opts, :helpers, true) do
-      build_scope_functions(name, key, opts, requires)
-    else
-      []
-    end
-  end
-
-  defp build_scope_functions(name, key, opts, requires) do
-    value? = Keyword.has_key?(opts, :value)
-    value = Keyword.get(opts, :value)
-
-    push_fun = :"push_#{name}"
-    pop_fun = :"pop_#{name}"
-    current_fun = :"current_#{name}"
-    current_bang_fun = :"current_#{name}!"
-    current_scope_bang_fun = :"current_#{name}_scope!"
-    update_fun = :"update_#{name}"
-    active_fun = :"#{name}_active?"
-    start_fun = :"start_#{name}"
-    finish_fun = :"finish_#{name}"
-
-    core = __MODULE__
-    escaped_key = Macro.escape(key)
-    escaped_owner = Macro.escape(elem(key, 0))
-    escaped_value = Macro.escape(value)
-    escaped_requires = Macro.escape(List.wrap(Keyword.get(opts, :requires, [])) ++ requires)
-
-    base = []
-
-    base =
-      maybe_helper(
-        base,
-        opts,
-        :push,
-        quote do
-          defmacro unquote(push_fun)(state) do
-            key = unquote(escaped_key)
-            owner = unquote(escaped_owner)
-            name = unquote(name)
-            requires = unquote(escaped_requires)
-            location = Macro.escape(__CALLER__)
-
-            quote do
-              HostKit.DSLCore.require_scopes!(
-                unquote(owner),
-                unquote(name),
-                unquote(Macro.escape(requires))
-              )
-
-              HostKit.DSLCore.start(
-                unquote(Macro.escape(key)),
-                unquote(name),
-                unquote(state),
-                unquote(location)
-              )
-            end
-          end
-        end
-      )
-
-    base =
-      maybe_helper(
-        base,
-        opts,
-        :pop,
-        quote do
-          def unquote(pop_fun)() do
-            unquote(core).finish_scope(unquote(escaped_key), unquote(name))
-          end
-        end
-      )
-
-    base =
-      maybe_helper(
-        base,
-        opts,
-        :current,
-        quote do
-          def unquote(current_fun)() do
-            unquote(core).current(unquote(escaped_key))
-          end
-        end
-      )
-
-    base =
-      maybe_helper(
-        base,
-        opts,
-        :current!,
-        quote do
-          def unquote(current_bang_fun)() do
-            unquote(core).current_scope_state!(unquote(escaped_key), unquote(name))
-          end
-        end
-      )
-
-    base =
-      maybe_helper(
-        base,
-        opts,
-        :current_scope!,
-        quote do
-          def unquote(current_scope_bang_fun)() do
-            unquote(core).current_scope!(unquote(escaped_key))
-          end
-        end
-      )
-
-    base =
-      maybe_helper(
-        base,
-        opts,
-        :update,
-        quote do
-          def unquote(update_fun)(fun) do
-            unquote(core).update_scope(unquote(escaped_key), unquote(name), fun)
-          end
-        end
-      )
-
-    base =
-      maybe_helper(
-        base,
-        opts,
-        :active,
-        quote do
-          def unquote(active_fun)() do
-            unquote(core).active?(unquote(escaped_key))
-          end
-        end
-      )
-
-    base = Enum.reverse(base)
-
-    value_helpers = []
-
-    value_helpers =
-      if value? and Keyword.get(opts, :start, true) do
-        [
-          quote do
-            def unquote(start_fun)() do
-              unquote(push_fun)(unquote(escaped_value))
-            end
-          end
-          | value_helpers
-        ]
-      else
-        value_helpers
-      end
-
-    value_helpers =
-      if value? and Keyword.get(opts, :finish, true) do
-        [
-          quote do
-            def unquote(finish_fun)() do
-              unquote(pop_fun)()
-              :ok
-            end
-          end
-          | value_helpers
-        ]
-      else
-        value_helpers
-      end
-
-    attach_fun = :"attach_#{name}"
-
-    attach_helper =
-      quote do
-        def unquote(attach_fun)(child) do
-          attach(unquote(name), child)
-        end
-      end
-
-    base ++ Enum.reverse(value_helpers) ++ [attach_helper]
-  end
-
-  defp maybe_helper(definitions, opts, name, quoted) do
-    if Keyword.get(opts, name, true), do: [quoted | definitions], else: definitions
   end
 
   @doc "Require an active scope by name for the calling DSL owner."
@@ -418,49 +134,7 @@ defmodule HostKit.DSLCore do
   end
 
   @doc "Attach a child value to the nearest active accepting scope."
-  def attach(owner, child_name, child) when is_atom(owner) and is_atom(child_name) do
-    Stack.active_keys(owner)
-    |> Enum.find_value(fn key ->
-      with {:ok, scope} <- owner.__dsl_core_scope__(elem(key, 1)),
-           accept when not is_nil(accept) <- Enum.find(scope.accepts, &(&1.name == child_name)) do
-        update(key, &attach_child(&1, child, accept))
-        :ok
-      else
-        _ -> nil
-      end
-    end) || raise ArgumentError, attach_message(owner, child_name)
-  end
-
-  defp attach_child(parent, child, %{into: field}) when is_atom(field) and not is_nil(field) do
-    append_field(parent, field, child)
-  end
-
-  defp attach_child(parent, child, %{via: via}) when is_atom(via) do
-    apply(parent.__struct__, via, [parent, child])
-  end
-
-  defp attach_child(parent, child, %{via: {module, function}})
-       when is_atom(module) and is_atom(function) do
-    apply(module, function, [parent, child])
-  end
-
-  defp attach_child(parent, child, %{via: via}) when is_function(via, 2) do
-    via.(parent, child)
-  end
-
-  defp append_field(parent, field, child) do
-    case Map.fetch(parent, field) do
-      {:ok, values} when is_list(values) ->
-        Map.put(parent, field, values ++ [child])
-
-      {:ok, value} ->
-        raise ArgumentError,
-              "cannot attach into #{field}; expected a list, got: #{inspect(value)}"
-
-      :error ->
-        raise ArgumentError, "cannot attach into missing field #{field}"
-    end
-  end
+  defdelegate attach(owner, child_name, child), to: Attach
 
   @doc "Finish the active scope with a readable scope-name error."
   def finish_scope(key, name) when is_atom(name) do
@@ -487,30 +161,6 @@ defmodule HostKit.DSLCore do
     else
       raise ArgumentError, "#{name} directive used outside #{name} block"
     end
-  end
-
-  defp attach_message(owner, child_name) do
-    case scopes_accepting(owner, child_name) do
-      [] ->
-        "no active DSL scope accepts #{child_name}"
-
-      scopes ->
-        "#{child_name} must be declared inside #{human_join(scopes)}"
-    end
-  end
-
-  defp scopes_accepting(owner, child_name) do
-    owner.__dsl_core_scopes__()
-    |> Enum.filter(fn scope -> Enum.any?(scope.accepts, &(&1.name == child_name)) end)
-    |> Enum.map(& &1.name)
-  end
-
-  defp human_join([scope]), do: to_string(scope)
-  defp human_join([first, second]), do: "#{first} or #{second}"
-
-  defp human_join(scopes) do
-    {last, rest} = List.pop_at(scopes, -1)
-    "#{Enum.join(rest, ", ")}, or #{last}"
   end
 
   @doc "Return a process-local DSL setting or its default value."
