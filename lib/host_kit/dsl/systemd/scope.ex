@@ -1,9 +1,11 @@
 defmodule HostKit.DSL.Systemd.Scope do
   @moduledoc false
 
-  @service_key {__MODULE__, :service}
-  @timer_key {__MODULE__, :timer}
-  @isolation_key {__MODULE__, :isolation}
+  use HostKit.DSLCore
+
+  scope(:systemd_service)
+  scope(:timer)
+  scope(:isolation)
 
   def start_service(name, opts) do
     opts =
@@ -11,22 +13,22 @@ defmodule HostKit.DSL.Systemd.Scope do
       |> Keyword.update(:install, [wanted_by: :multi_user], & &1)
       |> put_default_service_account()
 
-    Process.put(@service_key, HostKit.Systemd.Service.new(name, opts))
+    push_systemd_service(HostKit.Systemd.Service.new(name, opts))
   end
 
   def finish_service do
-    Process.delete(@service_key) || raise "no systemd service in scope"
+    pop_systemd_service()
   end
 
   def start_timer(name, opts) do
-    Process.put(@timer_key, HostKit.Systemd.Timer.new(name, opts))
+    push_timer(HostKit.Systemd.Timer.new(name, opts))
   end
 
   def finish_timer do
-    Process.delete(@timer_key) || raise "no systemd timer in scope"
+    pop_timer()
   end
 
-  def active?, do: Process.get(@service_key) != nil or Process.get(@timer_key) != nil
+  def active?, do: systemd_service_active?() or timer_active?()
 
   def put_monitor(type, opts) do
     update_current(fn resource ->
@@ -105,7 +107,7 @@ defmodule HostKit.DSL.Systemd.Scope do
     do: update_current(&%{&1 | install: Keyword.put(&1.install, key, value)})
 
   def start_isolation(profile, opts \\ []) do
-    Process.put(@isolation_key, %{
+    push_isolation(%{
       profile: profile,
       sandbox: Keyword.get(opts, :sandbox, []),
       resources: Keyword.get(opts, :resources, []),
@@ -114,7 +116,7 @@ defmodule HostKit.DSL.Systemd.Scope do
   end
 
   def finish_isolation do
-    isolation = Process.delete(@isolation_key) || raise "no systemd isolation in scope"
+    isolation = pop_isolation()
 
     apply_sandbox(isolation.profile,
       sandbox: isolation.sandbox,
@@ -209,27 +211,19 @@ defmodule HostKit.DSL.Systemd.Scope do
 
   defp update_current(fun) do
     cond do
-      Process.get(@service_key) -> update(:service, fun)
-      Process.get(@timer_key) -> update(:timer, fun)
+      systemd_service_active?() -> update(:service, fun)
+      timer_active?() -> update(:timer, fun)
       true -> raise "no systemd unit in scope"
     end
   end
 
-  defp update_isolation(fun) do
-    isolation = Process.get(@isolation_key) || raise "no systemd isolation in scope"
-    Process.put(@isolation_key, fun.(isolation))
-    :ok
-  end
-
   defp update(:service, fun) do
-    service = Process.get(@service_key) || raise "no systemd service in scope"
-    Process.put(@service_key, fun.(service))
+    update_systemd_service(fun)
     :ok
   end
 
   defp update(:timer, fun) do
-    timer = Process.get(@timer_key) || raise "no systemd timer in scope"
-    Process.put(@timer_key, fun.(timer))
+    update_timer(fun)
     :ok
   end
 
