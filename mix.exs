@@ -37,7 +37,7 @@ defmodule HostKit.MixProject do
       {:release_kit, "~> 0.3", optional: true},
       {:systemdkit, "~> 0.1.4"},
       {:unitctl, "~> 0.1.0"},
-      {:dsl, path: "../../../dsl"},
+      {:dsl, "~> 0.1"},
       {:jason, "~> 1.4"},
       {:json_codec, "~> 0.1.4"},
       {:jsonpatch, "~> 2.3"},
