@@ -147,6 +147,8 @@ options :command_opts, return: :keyword do
 end
 ```
 
+Keyword output omits nil optional fields. This prevents absent optional DSL values from overriding defaults in downstream keyword-based constructors.
+
 DSLCore rejects unknown options before casting and raises DSL-oriented messages. Callers can pass a source location when validating options:
 
 ```elixir
@@ -228,6 +230,38 @@ end
 ```
 
 This keeps topology implicit. Runtime nesting determines whether a child attaches to `project`, `instance`, `service`, or another accepting scope.
+
+## Dogfood status
+
+Current HostKit dogfood coverage:
+
+- Scope stacks: project, host, instance, service, proxy, workspace, lifecycle, file resources, readiness, ingress, systemd.
+- Attachments: resources into project/instance/service, proxy services into proxies, ingress servers/routes, generic list-field attach tests.
+- Settings: default providers.
+- Options: proxy, firewall, readiness, readiness checks, ingress, ingress server/route/proxy/tls.
+- Source diagnostics: generated scope pushes capture callsites; option validation accepts explicit source locations from public DSL macros.
+
+API shape that has held up so far:
+
+```elixir
+scope :parent do
+  requires :grandparent
+  accepts :child
+  accepts :item, into: :items
+  accepts :proxy_service, via: :add_service
+end
+
+options :thing_opts, return: :keyword do
+  field :mode, :atom, default: :auto, in: [:auto, :manual]
+end
+```
+
+Known rough edges before extraction:
+
+- Public DSL macros still need to pass source locations manually into option validators.
+- `options` uses Ecto field syntax but is intentionally much smaller than Ecto.Schema; relationships/embeds/custom validations are out of scope for now.
+- `return: :keyword` nil omission is useful, but should be documented as part of the contract if extracted.
+- `accepts ... via: {Module, :function}` is generic, but anonymous function callbacks are only viable when directly stored in runtime metadata, not macro-escaped across arbitrary module attributes.
 
 ## Diagnostics
 
