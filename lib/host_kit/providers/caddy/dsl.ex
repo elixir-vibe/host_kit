@@ -1,43 +1,37 @@
 defmodule HostKit.Providers.Caddy.DSL do
   @moduledoc "DSL macros for Caddy resources."
 
-  defmacro caddy_site(name, host, opts \\ [], do: block) do
-    quote do
-      HostKit.Providers.Caddy.Scope.start_site(unquote(name), unquote(host), unquote(opts))
-      unquote(block)
-      HostKit.DSL.Scope.add_resource(HostKit.Providers.Caddy.Scope.finish_site())
-    end
+  use DSL.Macros
+
+  alias HostKit.DSL.Scope, as: HostScope
+  alias HostKit.Providers.Caddy.Scope
+
+  defblock caddy_site(name, host, opts \\ []) do
+    start(Scope.start_site(name, host, opts))
+    finish(HostScope.add_resource(Scope.finish_site()))
   end
 
   defmacro caddy_site(host, do: block) do
     quote do
-      HostKit.Providers.Caddy.Scope.start_site(unquote(host), unquote(host), [])
-      unquote(block)
-      HostKit.DSL.Scope.add_resource(HostKit.Providers.Caddy.Scope.finish_site())
+      caddy_site unquote(host), unquote(host) do
+        unquote(block)
+      end
     end
   end
 
-  defmacro root(path, opts \\ []) do
-    quote do
-      HostKit.Providers.Caddy.Scope.add_root(unquote(path), unquote(opts))
-    end
+  defdirective root(path, opts \\ []) do
+    Scope.add_root(path, opts)
   end
 
-  defmacro encode(formats) do
-    quote do
-      HostKit.Providers.Caddy.Scope.add_encode(unquote(formats))
-    end
+  defdirective encode(formats) do
+    Scope.add_encode(formats)
   end
 
-  defmacro file_server(opts \\ []) do
-    quote do
-      HostKit.Providers.Caddy.Scope.add_file_server(unquote(opts))
-    end
+  defdirective file_server(opts \\ []) do
+    Scope.add_file_server(opts)
   end
 
-  defmacro reverse_proxy(upstream) do
-    quote do
-      HostKit.Providers.Caddy.Scope.add_reverse_proxy(unquote(upstream))
-    end
+  defdirective reverse_proxy(upstream) do
+    Scope.add_reverse_proxy(upstream)
   end
 end

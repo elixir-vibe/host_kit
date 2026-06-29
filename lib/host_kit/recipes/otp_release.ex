@@ -11,6 +11,7 @@ defmodule HostKit.Recipes.OTPRelease do
   use HostKit.Recipe
 
   alias HostKit.Naming
+  alias HostKit.Recipes.OTPRelease.Scope
 
   @format :beam_release_artifact
   @format_version 2
@@ -170,7 +171,7 @@ defmodule HostKit.Recipes.OTPRelease do
     release_kit = Keyword.get(opts, :release_kit)
     manifest_path = manifest_path(name, opts, release_kit)
 
-    if collecting_release_kit?() and release_kit do
+    if Scope.collecting_release_kit?() and release_kit do
       collect_release_kit!(name, opts, release_kit, manifest_path)
       placeholder_assigns(name, opts, manifest_path)
     else
@@ -217,11 +218,7 @@ defmodule HostKit.Recipes.OTPRelease do
   end
 
   def collect_release_kit(path, opts \\ []) do
-    previous_collecting = Process.get(:hostkit_collect_release_kit?)
-    previous_artifacts = Process.get(:hostkit_release_kit_artifacts)
-
-    Process.put(:hostkit_collect_release_kit?, true)
-    Process.put(:hostkit_release_kit_artifacts, [])
+    previous_collection = Scope.start_release_kit_collection()
 
     previous_compiler_options = Code.compiler_options()
     files = collection_files(path, Keyword.get(opts, :require, []))
@@ -233,14 +230,13 @@ defmodule HostKit.Recipes.OTPRelease do
       Enum.each(Enum.drop(files, 1), &Code.require_file/1)
       Code.eval_file(hd(files))
 
-      Process.get(:hostkit_release_kit_artifacts, [])
+      Scope.release_kit_artifacts_collected()
       |> Enum.reverse()
       |> filter_release_kit_artifacts(opts)
     after
       purge_eval_modules(modules_to_purge, loaded_before)
       Code.compiler_options(previous_compiler_options)
-      restore_process(:hostkit_collect_release_kit?, previous_collecting)
-      restore_process(:hostkit_release_kit_artifacts, previous_artifacts)
+      Scope.restore_release_kit_collection(previous_collection)
     end
   end
 
@@ -376,8 +372,6 @@ defmodule HostKit.Recipes.OTPRelease do
     end
   end
 
-  defp collecting_release_kit?, do: Process.get(:hostkit_collect_release_kit?, false)
-
   defp collect_release_kit!(name, opts, release_kit, manifest_path) do
     artifact = %{
       name: name,
@@ -390,8 +384,7 @@ defmodule HostKit.Recipes.OTPRelease do
       timeout: Keyword.get(release_kit, :timeout, 300_000)
     }
 
-    artifacts = Process.get(:hostkit_release_kit_artifacts, [])
-    Process.put(:hostkit_release_kit_artifacts, [artifact | artifacts])
+    Scope.collect_release_kit_artifact(artifact)
   end
 
   defp placeholder_assigns(name, opts, manifest_path) do
@@ -473,9 +466,6 @@ defmodule HostKit.Recipes.OTPRelease do
 
   defp collect_module(module, modules) when is_atom(module), do: [module | modules]
   defp collect_module(_module, modules), do: modules
-
-  defp restore_process(key, nil), do: Process.delete(key)
-  defp restore_process(key, value), do: Process.put(key, value)
 
   def unpack_exec(tarball, release_dir) do
     script =

@@ -2,102 +2,56 @@ defmodule HostKit.Recipes.ElixirApp do
   @moduledoc "Recipe for building and running a Phoenix/Elixir release on the target host."
 
   use HostKit.Recipe
+  use DSL.Macros
 
   alias HostKit.Naming
+  alias HostKit.Recipes.ElixirApp.Scope
 
   @default_erlang "27.2"
   @default_elixir "1.18.2-otp-27"
-  @scope_key {__MODULE__, :scope}
-  @ecto_key {__MODULE__, :ecto}
 
   defmacro elixir_app(name, do: block) do
     quote do
-      HostKit.Recipes.ElixirApp.start_scope()
+      Scope.start_scope()
       unquote(block)
-      opts = HostKit.Recipes.ElixirApp.finish_scope()
+      opts = Scope.finish_scope()
       elixir_app(unquote(name), opts)
     end
   end
 
   defmacro source(opts) do
     quote do
-      HostKit.Recipes.ElixirApp.put_scope(:source, unquote(opts))
+      Scope.put_scope(:source, unquote(opts))
     end
   end
 
-  defmacro phoenix(opts) do
-    quote do
-      HostKit.Recipes.ElixirApp.put_scope(:phoenix, unquote(opts))
-    end
+  defdirective(phoenix(opts)) do
+    HostKit.Recipes.ElixirApp.Scope.put_scope(:phoenix, opts)
   end
 
-  defmacro runtime(opts) do
-    quote do
-      HostKit.Recipes.ElixirApp.put_scope(:runtime, unquote(opts))
-    end
+  defdirective(runtime(opts)) do
+    HostKit.Recipes.ElixirApp.Scope.put_scope(:runtime, opts)
   end
 
-  defmacro release(opts) do
-    quote do
-      HostKit.Recipes.ElixirApp.put_scope(:release, unquote(opts))
-    end
+  defdirective(release(opts)) do
+    HostKit.Recipes.ElixirApp.Scope.put_scope(:release, opts)
   end
 
-  defmacro caddy(opts) do
-    quote do
-      HostKit.Recipes.ElixirApp.put_scope(:caddy, unquote(opts))
-    end
+  defdirective(caddy(opts)) do
+    HostKit.Recipes.ElixirApp.Scope.put_scope(:caddy, opts)
   end
 
-  defmacro ecto(opts) do
-    quote do
-      HostKit.Recipes.ElixirApp.put_scope(:ecto, unquote(opts))
-    end
+  defdirective(ecto(opts)) do
+    HostKit.Recipes.ElixirApp.Scope.put_scope(:ecto, opts)
   end
 
-  defmacro ecto(opts, do: block) do
-    quote do
-      HostKit.Recipes.ElixirApp.start_ecto(unquote(opts))
-      unquote(block)
-      HostKit.Recipes.ElixirApp.finish_ecto()
-    end
+  defblock(ecto(opts)) do
+    start(Scope.start_ecto(opts))
+    finish(Scope.finish_ecto())
   end
 
-  defmacro repo(name) do
-    quote do
-      HostKit.Recipes.ElixirApp.add_ecto_repo(unquote(name))
-    end
-  end
-
-  def start_scope do
-    Process.put(@scope_key, [])
-    :ok
-  end
-
-  def finish_scope do
-    Process.delete(@scope_key) || raise "no elixir_app recipe scope"
-  end
-
-  def put_scope(key, value) when is_atom(key) do
-    opts = Process.get(@scope_key) || raise "no elixir_app recipe scope"
-    Process.put(@scope_key, Keyword.put(opts, key, value))
-    :ok
-  end
-
-  def start_ecto(opts) do
-    Process.put(@ecto_key, Keyword.put_new(opts, :repos, []))
-    :ok
-  end
-
-  def add_ecto_repo(name) do
-    opts = Process.get(@ecto_key) || raise "repo/1 is only available inside ecto/2"
-    Process.put(@ecto_key, Keyword.update!(opts, :repos, &(&1 ++ [name])))
-    :ok
-  end
-
-  def finish_ecto do
-    opts = Process.delete(@ecto_key) || raise "no elixir_app ecto scope"
-    put_scope(:ecto, opts)
+  defdirective(repo(name)) do
+    HostKit.Recipes.ElixirApp.Scope.add_ecto_repo(name)
   end
 
   defmacro mix(name, command_line, opts \\ []) do

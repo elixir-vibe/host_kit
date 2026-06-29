@@ -77,13 +77,13 @@ defmodule HostKit.Endpoint.Resolver do
 
   defp resolve_directives(directives, index, resource_id) do
     map_while_ok(directives, fn
-      %ReverseProxy{upstreams: upstreams} = directive ->
+      %ReverseProxy{upstreams: upstreams} = defdirective ->
         with {:ok, upstreams} <- resolve_upstreams(upstreams, index, resource_id) do
-          {:ok, %{directive | upstreams: upstreams}}
+          {:ok, %{defdirective | upstreams: upstreams}}
         end
 
-      directive ->
-        {:ok, directive}
+      defdirective ->
+        {:ok, defdirective}
     end)
   end
 

@@ -187,8 +187,8 @@ defmodule HostKit.ProjectDSL do
       {:path, name, root_expression, service_expression} ->
         build_path_macros(name, root_expression, service_expression, context)
 
-      {:macro, name, block} ->
-        [build_block_macro(name, block, context)]
+      {:macro, name, defblock} ->
+        [build_block_macro(name, defblock, context)]
     end)
   end
 
