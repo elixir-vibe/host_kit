@@ -8,6 +8,7 @@ defmodule HostKit.DSLCore do
     quote do
       alias HostKit.DSLCore, as: DSLCore
       import HostKit.DSLCore, only: [scope: 1, scope: 2, scope: 3]
+      Module.register_attribute(__MODULE__, :dsl_core_scopes, accumulate: true)
 
       def attach(child_name, child) when is_atom(child_name) do
         DSLCore.attach(__MODULE__, child_name, child)
@@ -21,9 +22,12 @@ defmodule HostKit.DSLCore do
     end
   end
 
-  defmacro __before_compile__(_env) do
+  defmacro __before_compile__(env) do
+    scopes = Module.get_attribute(env.module, :dsl_core_scopes) |> Enum.reverse()
+
     quote do
       def __dsl_core_scope__(_name), do: :error
+      def __dsl_core_scopes__, do: unquote(Macro.escape(scopes))
     end
   end
 
@@ -44,6 +48,8 @@ defmodule HostKit.DSLCore do
     }
 
     quote do
+      @dsl_core_scopes unquote(Macro.escape(scope))
+
       def __dsl_core_scope__(unquote(name)), do: {:ok, unquote(Macro.escape(scope))}
 
       unquote_splicing(scope_functions(name, key, opts, requires))
@@ -133,7 +139,7 @@ defmodule HostKit.DSLCore do
         :pop,
         quote do
           def unquote(pop_fun)() do
-            unquote(core).finish(unquote(escaped_key), unquote(name))
+            unquote(core).finish_scope(unquote(escaped_key), unquote(name))
           end
         end
       )
@@ -157,7 +163,7 @@ defmodule HostKit.DSLCore do
         :current!,
         quote do
           def unquote(current_bang_fun)() do
-            unquote(core).current!(unquote(escaped_key))
+            unquote(core).current_scope_state!(unquote(escaped_key), unquote(name))
           end
         end
       )
@@ -169,7 +175,7 @@ defmodule HostKit.DSLCore do
         :update,
         quote do
           def unquote(update_fun)(fun) do
-            unquote(core).update(unquote(escaped_key), fun)
+            unquote(core).update_scope(unquote(escaped_key), unquote(name), fun)
           end
         end
       )
@@ -275,7 +281,58 @@ defmodule HostKit.DSLCore do
       else
         _ -> nil
       end
-    end) || raise ArgumentError, "no active DSL scope accepts #{inspect(child_name)}"
+    end) || raise ArgumentError, attach_message(owner, child_name)
+  end
+
+  @doc "Finish the active scope with a readable scope-name error."
+  def finish_scope(key, name) when is_atom(name) do
+    if active?(key) do
+      finish(key, name)
+    else
+      raise ArgumentError, "no active #{name} scope"
+    end
+  end
+
+  @doc "Return active scope state with a readable scope-name error."
+  def current_scope_state!(key, name) when is_atom(name) do
+    if active?(key) do
+      current!(key)
+    else
+      raise ArgumentError, "no active #{name} scope"
+    end
+  end
+
+  @doc "Update the active scope state with a readable directive error."
+  def update_scope(key, name, fun) when is_atom(name) and is_function(fun, 1) do
+    if active?(key) do
+      update(key, fun)
+    else
+      raise ArgumentError, "#{name} directive used outside #{name} block"
+    end
+  end
+
+  defp attach_message(owner, child_name) do
+    case scopes_accepting(owner, child_name) do
+      [] ->
+        "no active DSL scope accepts #{child_name}"
+
+      scopes ->
+        "#{child_name} must be declared inside #{human_join(scopes)}"
+    end
+  end
+
+  defp scopes_accepting(owner, child_name) do
+    owner.__dsl_core_scopes__()
+    |> Enum.filter(fn scope -> Enum.any?(scope.accepts, &(&1.name == child_name)) end)
+    |> Enum.map(& &1.name)
+  end
+
+  defp human_join([scope]), do: to_string(scope)
+  defp human_join([first, second]), do: "#{first} or #{second}"
+
+  defp human_join(scopes) do
+    {last, rest} = List.pop_at(scopes, -1)
+    "#{Enum.join(rest, ", ")}, or #{last}"
   end
 
   @doc "Start a named DSL scope."

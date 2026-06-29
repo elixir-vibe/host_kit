@@ -76,4 +76,24 @@ defmodule HostKit.DSLCoreTest do
     assert Fixture.attach(:item, :local) == :ok
     assert Fixture.pop_parent() == %Fixture.Parent{items: [:local]}
   end
+
+  test "generated helpers raise readable inactive scope errors" do
+    assert_raise ArgumentError, "no active parent scope", fn ->
+      Fixture.pop_parent()
+    end
+
+    assert_raise ArgumentError, "no active parent scope", fn ->
+      Fixture.current_parent!()
+    end
+
+    assert_raise ArgumentError, "parent directive used outside parent block", fn ->
+      Fixture.update_parent(& &1)
+    end
+  end
+
+  test "attach errors list acceptable parent scopes" do
+    assert_raise ArgumentError, "item must be declared inside parent", fn ->
+      Fixture.attach(:item, :missing_parent)
+    end
+  end
 end
