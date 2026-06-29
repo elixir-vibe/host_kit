@@ -84,6 +84,30 @@ defmodule HostKit.ProxyTest do
     assert service.tls == :auto
   end
 
+  test "proxy DSL validates options through DSLCore option schemas" do
+    assert_raise ArgumentError, "unknown option :bad for proxy_opts", fn ->
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :demo do
+        proxy :edge, provider: :gatehouse, bad: true do
+        end
+      end
+      """)
+    end
+
+    assert_raise ArgumentError, ~r/invalid options for proxy_opts: provider can't be blank/, fn ->
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :demo do
+        proxy :edge, [] do
+        end
+      end
+      """)
+    end
+  end
+
   test "plan resolves endpoint targets from service declarations" do
     project =
       Code.eval_string("""

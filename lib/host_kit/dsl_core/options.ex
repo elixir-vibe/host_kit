@@ -1,0 +1,119 @@
+defmodule HostKit.DSLCore.Options do
+  @moduledoc "Ecto-style option schema validation for DSLCore declarations."
+
+  alias HostKit.DSLCore.Option
+  alias HostKit.DSLCore.Types
+
+  @enforce_keys [:name]
+  defstruct name: nil,
+            fields: []
+
+  @type t :: %__MODULE__{
+          name: atom(),
+          fields: [Option.t()]
+        }
+
+  @doc "Validate options and return normalized field data."
+  @spec validate(t(), keyword() | map()) :: {:ok, map()} | {:error, term()}
+  def validate(%__MODULE__{} = schema, opts) when is_list(opts) or is_map(opts) do
+    with {:ok, params} <- normalize_params(schema, opts),
+         {:ok, data} <- cast(schema, params) do
+      {:ok, Map.take(data, field_names(schema))}
+    end
+  end
+
+  @doc "Validate options and raise `ArgumentError` with DSL-friendly messages on failure."
+  @spec validate!(t(), keyword() | map()) :: map()
+  def validate!(%__MODULE__{} = schema, opts) when is_list(opts) or is_map(opts) do
+    case validate(schema, opts) do
+      {:ok, data} -> data
+      {:error, reason} -> raise ArgumentError, message(schema, reason)
+    end
+  end
+
+  defp normalize_params(%__MODULE__{} = schema, opts) do
+    allowed = allowed_fields(schema)
+    opts = if is_list(opts), do: Map.new(opts), else: opts
+
+    Enum.reduce(opts, {:ok, %{}, []}, fn {key, value}, {:ok, params, unknown} ->
+      case option_name(key, allowed) do
+        {:ok, name} -> {:ok, Map.put(params, name, value), unknown}
+        :error -> {:ok, params, [key | unknown]}
+      end
+    end)
+    |> case do
+      {:ok, params, []} -> {:ok, params}
+      {:ok, _params, unknown} -> {:error, {:unknown_options, Enum.reverse(unknown)}}
+    end
+  end
+
+  defp option_name(key, allowed) when is_atom(key) do
+    if MapSet.member?(allowed.atoms, key), do: {:ok, key}, else: :error
+  end
+
+  defp option_name(key, allowed) when is_binary(key), do: Map.fetch(allowed.strings, key)
+  defp option_name(_key, _allowed), do: :error
+
+  defp allowed_fields(%__MODULE__{} = schema) do
+    atoms = MapSet.new(field_names(schema))
+    strings = Map.new(atoms, &{Atom.to_string(&1), &1})
+    %{atoms: atoms, strings: strings}
+  end
+
+  defp cast(%__MODULE__{} = schema, params) do
+    schema
+    |> changeset(params)
+    |> Ecto.Changeset.apply_action(:validate)
+    |> case do
+      {:ok, data} -> {:ok, data}
+      {:error, changeset} -> {:error, {:invalid_options, changeset}}
+    end
+  end
+
+  defp changeset(%__MODULE__{} = schema, params) do
+    {defaults(schema), types(schema)}
+    |> Ecto.Changeset.cast(params, field_names(schema))
+    |> Ecto.Changeset.validate_required(required_fields(schema))
+  end
+
+  defp field_names(%__MODULE__{} = schema), do: Enum.map(schema.fields, & &1.name)
+
+  defp required_fields(%__MODULE__{} = schema) do
+    schema.fields
+    |> Enum.filter(& &1.required?)
+    |> Enum.map(& &1.name)
+  end
+
+  defp defaults(%__MODULE__{} = schema), do: Map.new(schema.fields, &{&1.name, &1.default})
+  defp types(%__MODULE__{} = schema), do: Map.new(schema.fields, &{&1.name, ecto_type(&1.type)})
+
+  defp ecto_type(:atom), do: Types.Atom
+  defp ecto_type({:array, type}), do: {:array, ecto_type(type)}
+  defp ecto_type(type), do: type
+
+  defp message(%__MODULE__{} = schema, {:unknown_options, [unknown]}) do
+    "unknown option #{inspect(unknown)} for #{schema.name}"
+  end
+
+  defp message(%__MODULE__{} = schema, {:unknown_options, unknown}) do
+    "unknown options #{Enum.map_join(unknown, ", ", &inspect/1)} for #{schema.name}"
+  end
+
+  defp message(%__MODULE__{} = schema, {:invalid_options, changeset}) do
+    errors =
+      changeset
+      |> Ecto.Changeset.traverse_errors(&format_error/1)
+      |> Enum.flat_map(fn {field, messages} -> Enum.map(messages, &"#{field} #{&1}") end)
+      |> Enum.join(", ")
+
+    "invalid options for #{schema.name}: #{errors}"
+  end
+
+  defp format_error({message, opts}) do
+    Regex.replace(~r"%{(\w+)}", message, fn _, key ->
+      opts
+      |> Keyword.get(String.to_existing_atom(key), key)
+      |> to_string()
+    end)
+  end
+end

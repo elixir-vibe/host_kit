@@ -7,8 +7,12 @@ defmodule HostKit.DSLCore do
   defmacro __using__(_opts) do
     quote do
       alias HostKit.DSLCore, as: DSLCore
-      import HostKit.DSLCore, only: [scope: 1, scope: 2, scope: 3, setting: 1, setting: 2]
+
+      import HostKit.DSLCore,
+        only: [options: 2, scope: 1, scope: 2, scope: 3, setting: 1, setting: 2]
+
       Module.register_attribute(__MODULE__, :dsl_core_scopes, accumulate: true)
+      Module.register_attribute(__MODULE__, :dsl_core_options, accumulate: true)
 
       def attach(child_name, child) when is_atom(child_name) do
         DSLCore.attach(__MODULE__, child_name, child)
@@ -24,11 +28,65 @@ defmodule HostKit.DSLCore do
 
   defmacro __before_compile__(env) do
     scopes = Module.get_attribute(env.module, :dsl_core_scopes) |> Enum.reverse()
+    options = Module.get_attribute(env.module, :dsl_core_options) |> Enum.reverse()
 
     quote do
       def __dsl_core_scope__(_name), do: :error
       def __dsl_core_scopes__, do: unquote(Macro.escape(scopes))
+
+      def __dsl_core_options__(_name), do: :error
+      def __dsl_core_options__, do: unquote(Macro.escape(options))
     end
+  end
+
+  @doc "Declare a named Ecto-style option schema."
+  defmacro options(name, do: block) when is_atom(name) do
+    schema = %HostKit.DSLCore.Options{name: name, fields: option_fields(block, __CALLER__)}
+    validate_fun = :"validate_#{name}"
+    validate_bang_fun = :"validate_#{name}!"
+
+    quote do
+      @dsl_core_options unquote(Macro.escape(schema))
+
+      def __dsl_core_options__(unquote(name)), do: {:ok, unquote(Macro.escape(schema))}
+
+      def unquote(validate_fun)(opts) do
+        HostKit.DSLCore.Options.validate(unquote(Macro.escape(schema)), opts)
+      end
+
+      def unquote(validate_bang_fun)(opts) do
+        HostKit.DSLCore.Options.validate!(unquote(Macro.escape(schema)), opts)
+      end
+    end
+  end
+
+  defp option_fields({:__block__, _meta, expressions}, env) do
+    Enum.map(expressions, &option_field(&1, env))
+  end
+
+  defp option_fields(expression, env), do: option_fields({:__block__, [], [expression]}, env)
+
+  defp option_field({:field, _meta, [name]}, env) do
+    option_field({:field, [], [name, :string, []]}, env)
+  end
+
+  defp option_field({:field, _meta, [name, type]}, env) do
+    option_field({:field, [], [name, type, []]}, env)
+  end
+
+  defp option_field({:field, _meta, [name, type, opts]}, env)
+       when is_atom(name) and is_list(opts) do
+    %HostKit.DSLCore.Option{
+      name: name,
+      type: literal!(type, env),
+      required?: Keyword.get(opts, :required, false),
+      default: opts |> Keyword.get(:default) |> literal!(env)
+    }
+  end
+
+  defp literal!(value, env) do
+    {literal, _binding} = Code.eval_quoted(value, [], env)
+    literal
   end
 
   @doc "Declare a named process-local DSL setting."

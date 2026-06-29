@@ -11,6 +11,13 @@ defmodule HostKit.DSLCoreTest.Fixture do
 
   setting(:mode, default: :default)
 
+  options :proxy_opts do
+    field(:provider, :atom, required: true)
+    field(:path, :string, default: "/etc/gatehouse/config.exs")
+    field(:tags, {:array, :string}, default: [])
+    field(:meta, :map, default: %{})
+  end
+
   scope :parent do
     accepts(:item)
   end
@@ -30,6 +37,39 @@ defmodule HostKit.DSLCoreTest do
   alias HostKit.DSLCoreTest.ParentFixture
 
   require Fixture
+
+  test "options generates Ecto-backed validators" do
+    assert Fixture.validate_proxy_opts!(provider: :gatehouse) == %{
+             provider: :gatehouse,
+             path: "/etc/gatehouse/config.exs",
+             tags: [],
+             meta: %{}
+           }
+
+    assert Fixture.validate_proxy_opts!(%{"provider" => :gatehouse, "tags" => ["public"]}) == %{
+             provider: :gatehouse,
+             path: "/etc/gatehouse/config.exs",
+             tags: ["public"],
+             meta: %{}
+           }
+
+    assert {:ok, schema} = Fixture.__dsl_core_options__(:proxy_opts)
+    assert schema.name == :proxy_opts
+  end
+
+  test "options raises readable validation errors" do
+    assert_raise ArgumentError, "unknown option :bad for proxy_opts", fn ->
+      Fixture.validate_proxy_opts!(provider: :gatehouse, bad: true)
+    end
+
+    assert_raise ArgumentError, ~r/invalid options for proxy_opts: provider can't be blank/, fn ->
+      Fixture.validate_proxy_opts!([])
+    end
+
+    assert_raise ArgumentError, ~r/invalid options for proxy_opts: provider is invalid/, fn ->
+      Fixture.validate_proxy_opts!(provider: "gatehouse")
+    end
+  end
 
   test "setting generates ambient state helpers" do
     assert Fixture.mode() == :default

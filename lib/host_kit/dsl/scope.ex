@@ -19,6 +19,12 @@ defmodule HostKit.DSL.Scope do
 
   setting(:default_providers, default: [])
 
+  options :proxy_opts do
+    field(:provider, :atom, required: true)
+    field(:path, :string, default: "/etc/gatehouse/config.exs")
+    field(:meta, :map, default: %{})
+  end
+
   scope(:observability)
 
   scope :project, current: false, update: false do
@@ -188,11 +194,13 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_proxy(name, opts) do
+    opts = validate_proxy_opts!(opts)
+
     push_proxy(%HostKit.Proxy{
       name: name,
-      provider: Keyword.fetch!(opts, :provider),
-      path: Keyword.get(opts, :path, "/etc/gatehouse/config.exs"),
-      meta: Keyword.get(opts, :meta, %{})
+      provider: opts.provider,
+      path: opts.path,
+      meta: opts.meta
     })
   end
 
