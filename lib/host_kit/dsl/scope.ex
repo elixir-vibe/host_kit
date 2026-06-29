@@ -44,15 +44,31 @@ defmodule HostKit.DSL.Scope do
     accepts(:proxy_service, via: :add_service)
   end
 
-  scope(:proxy_service)
-  scope(:backend_config)
+  scope :proxy_service do
+    requires(:proxy)
+  end
+
+  scope :backend_config do
+    requires(:instance)
+  end
+
   scope(:provider_config)
   scope(:mise)
   scope(:firewall)
-  scope(:ssh, value: true, start: false)
+
+  scope :ssh, value: true, start: false do
+    requires(:host)
+  end
+
   scope(:bootstrap, value: true)
-  scope(:inside, value: true)
-  scope(:rpc, value: true)
+
+  scope :inside, value: true do
+    requires(:service)
+  end
+
+  scope :rpc, value: true do
+    requires(:service)
+  end
 
   def put_default_providers(providers) do
     Process.put(@default_providers_key, providers)
@@ -274,10 +290,6 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_ssh(opts \\ []) do
-    unless host_active?() do
-      raise "ssh/1 must be declared inside host/2"
-    end
-
     push_ssh(true)
     put_ssh_opts(opts)
   end

@@ -13,6 +13,10 @@ defmodule HostKit.DSLCore do
         DSLCore.attach(__MODULE__, child_name, child)
       end
 
+      def require_scope!(required, opts \\ []) when is_atom(required) do
+        DSLCore.require_scope!(__MODULE__, required, opts)
+      end
+
       @before_compile HostKit.DSLCore
     end
   end
@@ -28,18 +32,21 @@ defmodule HostKit.DSLCore do
     {opts, block} = normalize_scope_args(opts, block)
     caller_module = __CALLER__.module
     key = {caller_module, name}
-    accepts = block |> Keyword.get(:do) |> extract_accepts()
+    body = Keyword.get(block, :do)
+    accepts = extract_accepts(body)
+    requires = extract_requires(body)
 
     scope = %{
       name: name,
       key: key,
-      accepts: accepts
+      accepts: accepts,
+      requires: requires
     }
 
     quote do
       def __dsl_core_scope__(unquote(name)), do: {:ok, unquote(Macro.escape(scope))}
 
-      unquote_splicing(scope_functions(name, key, opts))
+      unquote_splicing(scope_functions(name, key, opts, requires))
     end
   end
 
@@ -64,17 +71,29 @@ defmodule HostKit.DSLCore do
 
   defp extract_accepts(_other), do: []
 
+  defp extract_requires(nil), do: []
+
+  defp extract_requires({:__block__, _meta, expressions}) do
+    Enum.flat_map(expressions, &extract_requires/1)
+  end
+
+  defp extract_requires({:requires, _meta, [scope]}) when is_atom(scope), do: [scope]
+
+  defp extract_requires({:requires, _meta, [scopes]}) when is_list(scopes), do: scopes
+
+  defp extract_requires(_other), do: []
+
   defp via(name), do: :"add_#{name}"
 
-  defp scope_functions(name, key, opts) do
+  defp scope_functions(name, key, opts, requires) do
     if Keyword.get(opts, :helpers, true) do
-      build_scope_functions(name, key, opts)
+      build_scope_functions(name, key, opts, requires)
     else
       []
     end
   end
 
-  defp build_scope_functions(name, key, opts) do
+  defp build_scope_functions(name, key, opts, requires) do
     value? = Keyword.has_key?(opts, :value)
     value = Keyword.get(opts, :value)
 
@@ -90,6 +109,7 @@ defmodule HostKit.DSLCore do
     core = __MODULE__
     escaped_key = Macro.escape(key)
     escaped_value = Macro.escape(value)
+    escaped_requires = Macro.escape(List.wrap(Keyword.get(opts, :requires, [])) ++ requires)
 
     base = []
 
@@ -100,6 +120,7 @@ defmodule HostKit.DSLCore do
         :push,
         quote do
           def unquote(push_fun)(state) do
+            unquote(core).require_scopes!(__MODULE__, unquote(name), unquote(escaped_requires))
             unquote(core).start(unquote(escaped_key), unquote(name), state)
           end
         end
@@ -212,6 +233,35 @@ defmodule HostKit.DSLCore do
 
   defp maybe_helper(definitions, opts, name, quoted) do
     if Keyword.get(opts, name, true), do: [quoted | definitions], else: definitions
+  end
+
+  @doc "Require an active scope by name for the calling DSL owner."
+  def require_scope!(owner, required, opts \\ []) when is_atom(owner) and is_atom(required) do
+    if active_scope?(owner, required) do
+      :ok
+    else
+      scope = Keyword.get(opts, :for)
+      raise ArgumentError, require_scope_message(required, scope)
+    end
+  end
+
+  @doc "Require all active scopes by name for the calling DSL owner."
+  def require_scopes!(_owner, _scope, []), do: :ok
+
+  def require_scopes!(owner, scope, required) when is_atom(owner) and is_atom(scope) do
+    Enum.each(required, &require_scope!(owner, &1, for: scope))
+  end
+
+  defp active_scope?(owner, required) do
+    Enum.any?(Stack.active_keys(owner), fn key -> elem(key, 1) == required end)
+  end
+
+  defp require_scope_message(required, nil) do
+    "#{required} requires an active #{required} scope"
+  end
+
+  defp require_scope_message(required, scope) do
+    "#{scope} must be declared inside #{required}"
   end
 
   @doc "Attach a child value to the nearest active accepting scope."

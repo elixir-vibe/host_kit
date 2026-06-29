@@ -15,6 +15,10 @@ defmodule HostKit.DSLCoreTest do
 
     scope(:flag, value: true)
     scope(:partial, current: false, update: false)
+
+    scope :child do
+      requires(:parent)
+    end
   end
 
   test "scope generates conventional lifecycle helpers" do
@@ -42,9 +46,23 @@ defmodule HostKit.DSLCoreTest do
     refute function_exported?(Fixture, :update_partial, 1)
   end
 
-  test "scope records accepted children" do
+  test "scope records accepted children and required scopes" do
     assert {:ok, scope} = Fixture.__dsl_core_scope__(:parent)
     assert scope.accepts == [%{name: :item, via: :add_item}]
+
+    assert {:ok, scope} = Fixture.__dsl_core_scope__(:child)
+    assert scope.requires == [:parent]
+  end
+
+  test "scope requirements are enforced before push" do
+    assert_raise ArgumentError, ~r/child must be declared inside parent/, fn ->
+      Fixture.push_child(%{})
+    end
+
+    assert Fixture.push_parent(%Fixture.Parent{}) == :ok
+    assert Fixture.push_child(%{}) == :ok
+    assert Fixture.pop_child() == %{}
+    assert Fixture.pop_parent() == %Fixture.Parent{}
   end
 
   test "attach updates the nearest active scope that accepts the child" do
