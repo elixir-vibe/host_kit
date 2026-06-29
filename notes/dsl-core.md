@@ -157,6 +157,16 @@ source = HostKit.DSLCore.Source.from_caller(__CALLER__)
 validate_proxy_opts!(opts, location: source)
 ```
 
+For quoted macro calls, use `escape_caller/1`:
+
+```elixir
+source = HostKit.DSLCore.Source.escape_caller(__CALLER__)
+
+quote do
+  validate_proxy_opts!(opts, location: unquote(source))
+end
+```
+
 Messages include the location when present:
 
 ```text

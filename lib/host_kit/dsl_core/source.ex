@@ -16,4 +16,12 @@ defmodule HostKit.DSLCore.Source do
   def from_caller(%Macro.Env{} = caller) do
     %__MODULE__{file: caller.file, line: caller.line, column: nil}
   end
+
+  @doc "Build and escape source metadata for injection into quoted code."
+  @spec escape_caller(Macro.Env.t()) :: Macro.t()
+  def escape_caller(%Macro.Env{} = caller) do
+    caller
+    |> from_caller()
+    |> Macro.escape()
+  end
 end
