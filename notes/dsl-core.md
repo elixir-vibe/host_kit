@@ -1,0 +1,178 @@
+# DSLCore
+
+`HostKit.DSLCore` is the internal substrate for HostKit-shaped DSL modules. It keeps the public DSL human-shaped while centralizing repeated process-local scope plumbing.
+
+It is intentionally small and layered. Use only the pieces a DSL module needs.
+
+## Use
+
+```elixir
+defmodule HostKit.DSL.Scope do
+  use HostKit.DSLCore
+
+  setting :default_providers, default: []
+
+  scope :project do
+    accepts :host
+    accepts :service
+    accepts :resource
+  end
+
+  scope :service do
+    accepts :resource
+  end
+
+  scope :ssh, value: true, start: false do
+    requires :host
+  end
+end
+```
+
+## Settings
+
+Use `setting/2` for ambient DSL state that is not a block scope.
+
+```elixir
+setting :default_providers, default: []
+```
+
+Generated helpers:
+
+```elixir
+default_providers()
+put_default_providers(value)
+reset_default_providers()
+```
+
+Settings are process-local and namespaced to the declaring module.
+
+## Scopes
+
+Use `scope/2` for block-local state.
+
+```elixir
+scope :service
+```
+
+Generated helpers include:
+
+```elixir
+push_service(state)
+pop_service()
+current_service()
+current_service!()
+current_service_scope!()
+update_service(fun)
+service_active?()
+attach_service(value)
+```
+
+`push_*` helpers are macros so they can capture the caller location. The active scope stores that source metadata in `HostKit.DSLCore.Scope.location`.
+
+For boolean scopes, provide a value:
+
+```elixir
+scope :inside, value: true
+```
+
+This also generates:
+
+```elixir
+start_inside()
+finish_inside()
+```
+
+Use `start: false` or other helper flags when the DSL needs a custom public entry point:
+
+```elixir
+scope :ssh, value: true, start: false do
+  requires :host
+end
+```
+
+Selected helpers can be disabled:
+
+```elixir
+scope :project, current: false, update: false do
+  accepts :host
+end
+```
+
+## Requirements
+
+Use `requires/1` when a scope can only be started inside another active scope.
+
+```elixir
+scope :section do
+  requires :config_file
+end
+```
+
+The generated `push_section/1` enforces this before pushing state and raises readable DSL errors such as:
+
+```text
+section must be declared inside config_file
+```
+
+Requirements are not parent-tree declarations. They only assert that a named scope is active somewhere in the current DSL stack.
+
+## Attachments
+
+Use `accepts/1` when a scope can receive child values.
+
+```elixir
+scope :project do
+  accepts :host
+  accepts :service
+  accepts :resource
+end
+
+scope :service do
+  accepts :resource
+end
+```
+
+Then attach values to the nearest active accepting scope:
+
+```elixir
+attach(:resource, resource)
+attach_service(service)
+```
+
+`accepts :host` defaults to calling `add_host(parent, child)` on the parent struct module.
+
+Override the callback name when the child name does not map cleanly:
+
+```elixir
+scope :proxy do
+  accepts :proxy_service, via: :add_service
+end
+```
+
+This keeps topology implicit. Runtime nesting determines whether a child attaches to `project`, `instance`, `service`, or another accepting scope.
+
+## Diagnostics
+
+Generated helpers raise scope-name-oriented errors instead of process-key errors:
+
+```text
+no active service scope
+service directive used outside service block
+resource must be declared inside project, instance, or service
+```
+
+Attach diagnostics are derived from declared `accepts` metadata. Requirement diagnostics are derived from declared `requires` metadata.
+
+## When not to use DSLCore
+
+Do not force ordinary data transformation into a scope. Use `scope` for nested DSL block state and `setting` for ambient DSL state. Plain functions and structs are still preferable for normal domain logic.
+
+Do not use `accepts` just to avoid writing clear domain code. It is useful when a child can attach to the nearest active parent from a set of possible scopes.
+
+## Current limitations
+
+- Option/schema validation is not part of DSLCore yet.
+- Diagnostics are string-based and do not yet include source snippets.
+- `accepts` assumes the active parent state is a struct and calls the parent module with `apply(parent.__struct__, via, [parent, child])`.
+- `setting` is process-local only; there is no setting stack.
+- Extraction outside HostKit should wait until more HostKit surfaces dogfood the primitives.
