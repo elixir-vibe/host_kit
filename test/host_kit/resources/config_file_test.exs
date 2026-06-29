@@ -109,6 +109,12 @@ defmodule HostKit.Resources.ConfigFileTest do
            }
   end
 
+  test "INI section scope requires an active config file" do
+    assert_raise ArgumentError, "section must be declared inside config_file", fn ->
+      HostKit.DSL.ConfigFile.Scope.start_section("server")
+    end
+  end
+
   test "INI config supports top-level keys" do
     config =
       ConfigFile.new("/etc/app.ini", :ini,

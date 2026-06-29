@@ -1,31 +1,32 @@
 defmodule HostKit.DSL.ConfigFile.Scope do
   @moduledoc false
 
-  alias HostKit.DSLCore
+  use HostKit.DSLCore
 
-  @key {__MODULE__, :config}
-  @section_key {__MODULE__, :section}
+  scope(:config_file)
+
+  scope :section do
+    requires(:config_file)
+  end
 
   def start(path, format, opts) do
-    DSLCore.start(@key, :config_file, %{path: path, format: format, opts: opts, content: %{}})
+    push_config_file(%{path: path, format: format, opts: opts, content: %{}})
   end
 
   def finish do
-    %{path: path, format: format, opts: opts, content: content} =
-      DSLCore.finish(@key, :config_file)
+    %{path: path, format: format, opts: opts, content: content} = pop_config_file()
 
     HostKit.Resources.ConfigFile.new(path, format, Keyword.put(opts, :content, content))
   end
 
-  def active?, do: DSLCore.active?(@key)
+  def active?, do: config_file_active?()
 
   def start_section(name) do
-    active?() || raise ArgumentError, "section/2 used outside ini/2 block"
-    DSLCore.start(@section_key, :section, name)
+    push_section(name)
   end
 
   def finish_section do
-    DSLCore.finish(@section_key, :section)
+    pop_section()
     :ok
   end
 
@@ -36,10 +37,10 @@ defmodule HostKit.DSL.ConfigFile.Scope do
   end
 
   defp put_value(_kind, key, value) do
-    DSLCore.update(@key, fn config ->
+    update_config_file(fn config ->
       content =
-        if DSLCore.active?(@section_key) do
-          section = DSLCore.current!(@section_key)
+        if section_active?() do
+          section = current_section!()
 
           Map.update(config.content, section, %{key => value}, fn values ->
             Map.put(values, key, value)
