@@ -1,14 +1,16 @@
 defmodule HostKit.Providers.Caddy.Scope do
-  @moduledoc false
+  @moduledoc "Process-local scope helpers for Caddy provider DSL blocks."
+
+  use DSL
 
   alias HostKit.Caddy.Directive.{Encode, FileServer, ReverseProxy, Root}
   alias HostKit.Caddy.Site
 
-  @key {__MODULE__, :site}
+  scope(:site)
 
   def start_site(name, host, opts) do
     meta = opts |> Keyword.take([:path]) |> Map.new()
-    Process.put(@key, %Site{name: name, host: host, meta: meta})
+    push_site(%Site{name: name, host: host, meta: meta})
   end
 
   def add_root(path, opts) when is_binary(path) do
@@ -42,10 +44,10 @@ defmodule HostKit.Providers.Caddy.Scope do
   end
 
   def finish_site do
-    Process.delete(@key) || raise "no caddy site in scope"
+    pop_site()
   end
 
-  def active?, do: Process.get(@key) != nil
+  def active?, do: site_active?()
 
   def put_monitor(type, opts) do
     update_site(fn site ->
@@ -66,11 +68,5 @@ defmodule HostKit.Providers.Caddy.Scope do
 
   defp append_directive(%Site{} = site, directive) do
     %{site | directives: site.directives ++ [directive]}
-  end
-
-  defp update_site(fun) do
-    site = Process.get(@key) || raise "no caddy site in scope"
-    Process.put(@key, fun.(site))
-    :ok
   end
 end

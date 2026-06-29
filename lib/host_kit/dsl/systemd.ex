@@ -1,268 +1,192 @@
 defmodule HostKit.DSL.Systemd do
   @moduledoc "DSL helpers for core systemd resources."
 
-  defmacro systemd_service(name, opts \\ [], do: block) do
-    quote do
-      HostKit.DSL.Systemd.Scope.start_service(unquote(name), unquote(opts))
-      unquote(block)
-      HostKit.DSL.Scope.add_resource(HostKit.DSL.Systemd.Scope.finish_service())
-    end
+  use DSL.Macros
+
+  alias HostKit.DSL.Scope, as: HostScope
+  alias HostKit.DSL.Systemd.Scope
+
+  defblock(systemd_service(name, opts \\ [])) do
+    start(Scope.start_service(name, opts))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro systemd_timer(name, opts \\ [], do: block) do
-    quote do
-      HostKit.DSL.Systemd.Scope.start_timer(unquote(name), unquote(opts))
-      unquote(block)
-      HostKit.DSL.Scope.add_resource(HostKit.DSL.Systemd.Scope.finish_timer())
-    end
+  defblock(systemd_timer(name, opts \\ [])) do
+    start(Scope.start_timer(name, opts))
+    finish(HostScope.add_resource(Scope.finish_timer()))
   end
 
-  defmacro daemon(do: block) do
-    quote do
-      systemd_service unit_name() do
-        unquote(block)
-      end
-    end
+  defblock daemon() do
+    start(Scope.start_service(unit_name(), []))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro daemon(opts, do: block) when is_list(opts) do
-    quote do
-      systemd_service Keyword.get(unquote(opts), :unit, unit_name()),
-                      Keyword.delete(unquote(opts), :unit) do
-        unquote(block)
-      end
-    end
+  defblock daemon(opts) when is_list(opts) do
+    start(Scope.start_service(Keyword.get(opts, :unit, unit_name()), Keyword.delete(opts, :unit)))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro daemon(name, opts \\ [], do: block) do
-    quote do
-      systemd_service HostKit.DSL.Systemd.service_unit_name(unquote(name)), unquote(opts) do
-        unquote(block)
-      end
-    end
+  defblock daemon(name) do
+    start(Scope.start_service(HostKit.DSL.Systemd.service_unit_name(name), []))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro job(name, opts \\ [], do: block) do
-    quote do
-      systemd_service HostKit.DSL.Systemd.service_unit_name(unquote(name)), unquote(opts) do
-        unquote(block)
-      end
-    end
+  defblock daemon(name, opts) do
+    start(Scope.start_service(HostKit.DSL.Systemd.service_unit_name(name), opts))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro schedule(name, opts \\ [], do: block) do
-    quote do
-      systemd_timer HostKit.DSL.Systemd.timer_unit_name(unquote(name)), unquote(opts) do
-        unquote(block)
-      end
-    end
+  defblock job(name) do
+    start(Scope.start_service(HostKit.DSL.Systemd.service_unit_name(name), []))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro unit(opts) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_unit(unquote(opts))
-    end
+  defblock job(name, opts) do
+    start(Scope.start_service(HostKit.DSL.Systemd.service_unit_name(name), opts))
+    finish(HostScope.add_resource(Scope.finish_service()))
   end
 
-  defmacro service(opts) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(
-        HostKit.DSL.Systemd.normalize_account_refs(unquote(opts))
-      )
-    end
+  defblock schedule(name) do
+    start(Scope.start_timer(HostKit.DSL.Systemd.timer_unit_name(name), []))
+    finish(HostScope.add_resource(Scope.finish_timer()))
   end
 
-  defmacro run(opts) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(
-        HostKit.DSL.Systemd.normalize_account_refs(unquote(opts))
-      )
-    end
+  defblock schedule(name, opts) do
+    start(Scope.start_timer(HostKit.DSL.Systemd.timer_unit_name(name), opts))
+    finish(HostScope.add_resource(Scope.finish_timer()))
   end
 
-  defmacro timer(opts) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_timer(unquote(opts))
-    end
+  defdirective(unit(opts)) do
+    HostKit.DSL.Systemd.Scope.put_unit(opts)
   end
 
-  defmacro every(interval) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_timer(
-        :on_calendar,
-        HostKit.Systemd.Calendar.name(unquote(interval))
-      )
-    end
+  defdirective(service(opts)) do
+    HostKit.DSL.Systemd.Scope.put_service(HostKit.DSL.Systemd.normalize_account_refs(opts))
   end
 
-  defmacro daily(opts) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_timer(
-        :on_calendar,
-        HostKit.Systemd.Calendar.daily_at(Keyword.fetch!(unquote(opts), :at))
-      )
-    end
+  defdirective(run(opts)) do
+    HostKit.DSL.Systemd.Scope.put_service(HostKit.DSL.Systemd.normalize_account_refs(opts))
   end
 
-  defmacro weekly(day, opts) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_timer(
-        :on_calendar,
-        HostKit.Systemd.Calendar.weekly_at(unquote(day), Keyword.fetch!(unquote(opts), :at))
-      )
-    end
+  defdirective(timer(opts)) do
+    HostKit.DSL.Systemd.Scope.put_timer(opts)
   end
 
-  defmacro monthly(opts) do
-    quote do
-      opts = unquote(opts)
-
-      HostKit.DSL.Systemd.Scope.put_timer(
-        :on_calendar,
-        HostKit.Systemd.Calendar.monthly_at(Keyword.fetch!(opts, :day), Keyword.fetch!(opts, :at))
-      )
-    end
+  defdirective(every(interval)) do
+    HostKit.DSL.Systemd.Scope.put_timer(:on_calendar, HostKit.Systemd.Calendar.name(interval))
   end
 
-  defmacro jitter(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_timer(:randomized_delay_sec, unquote(value))
-    end
+  defdirective(daily(opts)) do
+    HostKit.DSL.Systemd.Scope.put_timer(
+      :on_calendar,
+      HostKit.Systemd.Calendar.daily_at(Keyword.fetch!(opts, :at))
+    )
   end
 
-  defmacro repeat_after(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_timer(:on_unit_active_sec, unquote(value))
-    end
+  defdirective(weekly(day, opts)) do
+    HostKit.DSL.Systemd.Scope.put_timer(
+      :on_calendar,
+      HostKit.Systemd.Calendar.weekly_at(day, Keyword.fetch!(opts, :at))
+    )
   end
 
-  defmacro after_boot(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_timer(:on_boot_sec, unquote(value))
-    end
+  defdirective(monthly(opts)) do
+    HostKit.DSL.Systemd.Scope.put_timer(
+      :on_calendar,
+      HostKit.Systemd.Calendar.monthly_at(Keyword.fetch!(opts, :day), Keyword.fetch!(opts, :at))
+    )
   end
 
-  defmacro persistent(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_timer(:persistent, unquote(value))
-    end
+  defdirective(jitter(value)) do
+    HostKit.DSL.Systemd.Scope.put_timer(:randomized_delay_sec, value)
   end
 
-  defmacro on_boot(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_timer(:on_boot_sec, unquote(value))
-    end
+  defdirective(repeat_after(value)) do
+    HostKit.DSL.Systemd.Scope.put_timer(:on_unit_active_sec, value)
   end
 
-  defmacro description(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_unit(:description, unquote(value))
-    end
+  defdirective(after_boot(value)) do
+    HostKit.DSL.Systemd.Scope.put_timer(:on_boot_sec, value)
   end
 
-  defmacro after_units(values) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_unit(:after, unquote(values))
-    end
+  defdirective(persistent(value)) do
+    HostKit.DSL.Systemd.Scope.put_timer(:persistent, value)
   end
 
-  defmacro after_target(targets) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_unit(:after, HostKit.Systemd.Target.names(unquote(targets)))
-    end
+  defdirective(on_boot(value)) do
+    HostKit.DSL.Systemd.Scope.put_timer(:on_boot_sec, value)
   end
 
-  defmacro wants(values) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_unit(:wants, HostKit.Systemd.Target.names(unquote(values)))
-    end
+  defdirective(description(value)) do
+    HostKit.DSL.Systemd.Scope.put_unit(:description, value)
   end
 
-  defmacro requires(values) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_unit(:requires, HostKit.Systemd.Target.names(unquote(values)))
-    end
+  defdirective(after_units(values)) do
+    HostKit.DSL.Systemd.Scope.put_unit(:after, values)
   end
 
-  defmacro service_user(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:user, HostKit.Account.name!(unquote(value)))
-    end
+  defdirective(after_target(targets)) do
+    HostKit.DSL.Systemd.Scope.put_unit(:after, HostKit.Systemd.Target.names(targets))
   end
 
-  defmacro service_group(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:group, HostKit.Account.name!(unquote(value)))
-    end
+  defdirective(wants(values)) do
+    HostKit.DSL.Systemd.Scope.put_unit(:wants, HostKit.Systemd.Target.names(values))
   end
 
-  defmacro working_directory(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:working_directory, unquote(value))
-    end
+  defdirective(requires(values)) do
+    HostKit.DSL.Systemd.Scope.put_unit(:requires, HostKit.Systemd.Target.names(values))
   end
 
-  defmacro environment_file(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:environment_file, unquote(value))
-    end
+  defdirective(service_user(value)) do
+    HostKit.DSL.Systemd.Scope.put_service(:user, HostKit.Account.name!(value))
   end
 
-  defmacro exec_start(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:exec_start, unquote(value))
-    end
+  defdirective(service_group(value)) do
+    HostKit.DSL.Systemd.Scope.put_service(:group, HostKit.Account.name!(value))
   end
 
-  defmacro exec(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:exec_start, unquote(value))
-    end
+  defdirective(working_directory(value)) do
+    HostKit.DSL.Systemd.Scope.put_service(:working_directory, value)
   end
 
-  defmacro exec_stop(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:exec_stop, unquote(value))
-    end
+  defdirective(environment_file(value)) do
+    HostKit.DSL.Systemd.Scope.put_service(:environment_file, value)
   end
 
-  defmacro restart(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:restart, unquote(value))
-    end
+  defdirective(exec_start(value)) do
+    HostKit.DSL.Systemd.Scope.put_service(:exec_start, value)
   end
 
-  defmacro restart_sec(value) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:restart_sec, unquote(value))
-    end
+  defdirective(exec(value)) do
+    HostKit.DSL.Systemd.Scope.put_service(:exec_start, value)
   end
 
-  defmacro install(opts) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_install(unquote(opts))
-    end
+  defdirective(exec_stop(value)) do
+    HostKit.DSL.Systemd.Scope.put_service(:exec_stop, value)
   end
 
-  defmacro wanted_by(targets) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_install(
-        :wanted_by,
-        HostKit.Systemd.Target.names(unquote(targets))
-      )
-    end
+  defdirective(restart(value)) do
+    HostKit.DSL.Systemd.Scope.put_service(:restart, value)
   end
 
-  defmacro hardening(level) do
-    quote do
-      HostKit.DSL.Systemd.Scope.apply_hardening(unquote(level))
-    end
+  defdirective(restart_sec(value)) do
+    HostKit.DSL.Systemd.Scope.put_service(:restart_sec, value)
   end
 
-  defmacro read_write_paths(paths) do
-    quote do
-      HostKit.DSL.Systemd.Scope.put_service(:read_write_paths, unquote(paths))
-    end
+  defdirective(install(opts)) do
+    HostKit.DSL.Systemd.Scope.put_install(opts)
+  end
+
+  defdirective(wanted_by(targets)) do
+    HostKit.DSL.Systemd.Scope.put_install(:wanted_by, HostKit.Systemd.Target.names(targets))
+  end
+
+  defdirective(hardening(level)) do
+    HostKit.DSL.Systemd.Scope.apply_hardening(level)
+  end
+
+  defdirective(read_write_paths(paths)) do
+    HostKit.DSL.Systemd.Scope.put_service(:read_write_paths, paths)
   end
 
   def service_unit_name(name), do: unit_name(name, ".service")
@@ -272,7 +196,7 @@ defmodule HostKit.DSL.Systemd do
     identity = HostKit.Naming.identity_segment(name)
 
     :unit
-    |> HostKit.DSL.Scope.prefixed(identity)
+    |> HostScope.prefixed(identity)
     |> HostKit.Naming.systemd_unit(suffix)
   end
 

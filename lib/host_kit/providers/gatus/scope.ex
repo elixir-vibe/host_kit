@@ -1,11 +1,24 @@
 defmodule HostKit.Providers.Gatus.Scope do
-  @moduledoc false
+  @moduledoc "Process-local scope helpers for Gatus provider DSL blocks."
 
-  @config_key {__MODULE__, :config}
-  @telegram_key {__MODULE__, :telegram_alerting}
+  use DSL
+
+  defmodule Config do
+    @moduledoc "State accumulated while evaluating a Gatus config block."
+
+    defstruct path: nil, opts: [], content: []
+  end
+
+  scope :config do
+    accepts(:telegram_alerting, into: :content)
+  end
+
+  scope :telegram_alerting do
+    requires(:config)
+  end
 
   def start_config(path, opts) do
-    Process.put(@config_key, %{path: path, opts: opts, content: []})
+    push_config(%Config{path: path, opts: opts})
   end
 
   def put_web(opts) do
@@ -18,7 +31,7 @@ defmodule HostKit.Providers.Gatus.Scope do
   end
 
   def start_telegram_alerting(opts) do
-    Process.put(@telegram_key, normalize_keyword(opts))
+    push_telegram_alerting(normalize_keyword(opts))
   end
 
   def put_default_alert(opts) do
@@ -28,7 +41,7 @@ defmodule HostKit.Providers.Gatus.Scope do
   end
 
   def finish_telegram_alerting do
-    telegram = Process.delete(@telegram_key) || raise "no gatus telegram alerting in scope"
+    telegram = pop_telegram_alerting()
 
     update_config(fn config ->
       put_content(config, :alerting, telegram: telegram)
@@ -56,8 +69,7 @@ defmodule HostKit.Providers.Gatus.Scope do
   end
 
   def finish_config do
-    %{path: path, opts: opts, content: content} =
-      Process.delete(@config_key) || raise "no gatus config in scope"
+    %Config{path: path, opts: opts, content: content} = pop_config()
 
     HostKit.Resources.ConfigFile.new(path, :yaml, Keyword.put(opts, :content, content))
   end
@@ -70,23 +82,15 @@ defmodule HostKit.Providers.Gatus.Scope do
     end)
   end
 
-  defp update_config(fun) do
-    config = Process.get(@config_key) || raise "no gatus config in scope"
-    Process.put(@config_key, fun.(config))
-    :ok
-  end
-
   defp update_telegram(fun) do
-    telegram = Process.get(@telegram_key) || raise "no gatus telegram alerting in scope"
-    Process.put(@telegram_key, fun.(telegram))
-    :ok
+    update_telegram_alerting(fun)
   end
 
   defp put_content(config, key, value) do
     update_content(config, key, fn _current -> value end)
   end
 
-  defp update_content(%{content: content} = config, key, fun) do
+  defp update_content(%Config{content: content} = config, key, fun) do
     current = Keyword.get(content, key)
     content = put_keyword(content, key, fun.(current))
     %{config | content: content}

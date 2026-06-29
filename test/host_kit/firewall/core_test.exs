@@ -80,6 +80,32 @@ defmodule HostKit.FirewallTest do
     assert loader.depends_on == [HostKit.Firewall.id(firewall)]
   end
 
+  test "firewall DSL validates options through DSL option schemas" do
+    assert_raise ArgumentError, ~r/unknown option :bad for firewall_opts at nofile:4/, fn ->
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :demo do
+        firewall bad: true do
+        end
+      end
+      """)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/invalid options for firewall_opts: activate is invalid at nofile:4/,
+                 fn ->
+                   Code.eval_string("""
+                   use HostKit.DSL
+
+                   project :demo do
+                     firewall activate: :manual do
+                     end
+                   end
+                   """)
+                 end
+  end
+
   test "firewall activation can be disabled" do
     source = """
     use HostKit.DSL

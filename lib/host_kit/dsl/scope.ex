@@ -1,6 +1,8 @@
 defmodule HostKit.DSL.Scope do
   @moduledoc false
 
+  use DSL
+
   alias HostKit.{
     Conventions,
     Host,
@@ -14,84 +16,137 @@ defmodule HostKit.DSL.Scope do
   }
 
   @project_key {__MODULE__, :project}
-  @host_key {__MODULE__, :host}
-  @service_key {__MODULE__, :service}
-  @instance_key {__MODULE__, :instance}
-  @backend_config_key {__MODULE__, :backend_config}
-  @workspace_key {__MODULE__, :workspace}
-  @inside_key {__MODULE__, :inside}
-  @provider_config_key {__MODULE__, :provider_config}
-  @mise_key {__MODULE__, :mise}
-  @ssh_key {__MODULE__, :ssh}
-  @bootstrap_key {__MODULE__, :bootstrap}
-  @observability_key {__MODULE__, :observability}
-  @firewall_key {__MODULE__, :firewall}
-  @proxy_key {__MODULE__, :proxy}
-  @proxy_service_key {__MODULE__, :proxy_service}
-  @rpc_key {__MODULE__, :rpc}
-  @default_providers_key {__MODULE__, :default_providers}
 
-  def put_default_providers(providers) do
-    Process.put(@default_providers_key, providers)
+  setting(:default_providers, default: [])
+
+  options :proxy_opts do
+    field(:provider, :atom, required: true)
+    field(:path, :string, default: "/etc/gatehouse/config.exs")
+    field(:meta, :map, default: %{})
+  end
+
+  options :firewall_opts do
+    field(:path, :string, default: "/etc/nftables.d/hostkit.nft")
+    field(:activate, :atom, default: :systemd, in: [:systemd, false])
+    field(:unit, :any)
+    field(:nft, :any)
+    field(:description, :string)
+    field(:after, :any)
+    field(:before, :any)
+    field(:wants, :any)
+    field(:wanted_by, :any)
+  end
+
+  scope(:observability)
+
+  scope :project, current: false, update: false do
+    accepts(:host)
+    accepts(:service)
+    accepts(:resource)
+  end
+
+  scope(:host)
+
+  scope :instance do
+    accepts(:host)
+    accepts(:service)
+    accepts(:resource)
+  end
+
+  scope :service do
+    accepts(:resource)
+  end
+
+  scope(:workspace)
+
+  scope :proxy do
+    accepts(:proxy_service, via: :add_service)
+  end
+
+  scope :proxy_service do
+    requires(:proxy)
+  end
+
+  scope :backend_config do
+    requires(:instance)
+  end
+
+  scope(:provider_config)
+  scope(:mise)
+  scope(:firewall)
+
+  scope :ssh, value: true, start: false do
+    requires(:host)
+  end
+
+  scope(:bootstrap, value: true)
+
+  scope :inside, value: true do
+    requires(:service)
+  end
+
+  scope :rpc, value: true do
+    requires(:service)
   end
 
   def start_project(name, opts) do
-    Process.put(@project_key, Project.new(name, project_opts(opts)))
+    push_project(Project.new(name, project_opts(opts)))
   end
 
   defp project_opts(opts) do
     if Keyword.has_key?(opts, :providers) do
       opts
     else
-      Keyword.put(opts, :providers, Process.get(@default_providers_key, []))
+      Keyword.put(opts, :providers, default_providers())
     end
   end
 
   def current_project do
-    Process.get(@project_key) || raise "no HostKit project in scope"
+    current_project!()
   end
 
   def finish_project do
-    Process.delete(@project_key) || raise "no HostKit project in scope"
+    pop_project()
   end
 
   def start_observability do
-    scope = if Process.get(@service_key), do: :service, else: :project
-    Process.put(@observability_key, scope)
+    scope = if service_active?(), do: :service, else: :project
+    push_observability(scope)
   end
 
   def finish_observability do
-    Process.delete(@observability_key) || raise "no HostKit observability in scope"
+    pop_observability()
   end
 
-  def observability_active?, do: Process.get(@observability_key) != nil
-
   def put_observability(kind, value) do
-    case Process.get(@observability_key) do
+    case current_observability() do
       :project -> update_project(&put_observability_value(&1, kind, value))
       :service -> update_current(:service, &put_observability_value(&1, kind, value))
       nil -> raise "no HostKit observability in scope"
     end
   end
 
-  def start_firewall(opts \\ []) do
-    scope = if Process.get(@host_key), do: :host, else: :project
+  def start_firewall(opts \\ [], source \\ nil) do
+    scope = if host_active?(), do: :host, else: :project
+    validated = validate_firewall_opts!(opts, location: source)
 
     activation_opts =
       opts
-      |> Keyword.take([:unit, :nft, :description, :after, :before, :wants, :wanted_by])
       |> Map.new()
+      |> Map.take([:unit, :nft, :description, :after, :before, :wants, :wanted_by])
 
-    Process.put(@firewall_key, %HostKit.Firewall{
+    firewall = %HostKit.Firewall{
       scope: scope,
-      path: Keyword.get(opts, :path, "/etc/nftables.d/hostkit.nft"),
-      activate: Keyword.get(opts, :activate, :systemd),
+      path: validated.path,
+      activate: validated.activate,
       meta: activation_opts
-    })
+    }
+
+    push_firewall(firewall)
   end
 
   def finish_firewall do
-    firewall = Process.delete(@firewall_key) || raise "no HostKit firewall in scope"
+    firewall = pop_firewall()
 
     case firewall.scope do
       :project -> update_project(&put_firewall_value(&1, firewall))
@@ -100,8 +155,10 @@ defmodule HostKit.DSL.Scope do
   end
 
   def add_firewall_rule(rule) do
-    firewall = Process.get(@firewall_key) || raise "no HostKit firewall in scope"
-    Process.put(@firewall_key, %{firewall | rules: firewall.rules ++ [rule]})
+    update_firewall(fn firewall ->
+      %{firewall | rules: firewall.rules ++ [rule]}
+    end)
+
     :ok
   end
 
@@ -110,34 +167,38 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_provider_config(name, module) do
-    Process.put(@provider_config_key, %ProviderConfig{name: name, module: module})
+    push_provider_config(%ProviderConfig{
+      name: name,
+      module: module
+    })
   end
 
   def start_mise(opts) do
     opts = Keyword.put_new(opts, :path, "/usr/local/bin/mise")
     opts = Keyword.put_new(opts, :system_data_dir, "/usr/local/share/mise")
-    Process.put(@mise_key, HostKit.Resources.Mise.new(opts))
+    push_mise(HostKit.Resources.Mise.new(opts))
   end
 
   def add_tool(name, version, opts) do
-    mise = Process.get(@mise_key) || raise "no HostKit mise in scope"
-    Process.put(@mise_key, HostKit.Resources.Mise.add_tool(mise, name, version, opts))
+    update_mise(&HostKit.Resources.Mise.add_tool(&1, name, version, opts))
     :ok
   end
 
   def finish_mise do
-    mise = Process.delete(@mise_key) || raise "no HostKit mise in scope"
+    mise = pop_mise()
     add_resource(mise)
   end
 
   def put_provider_config(key, value) do
-    config = Process.get(@provider_config_key) || raise "no HostKit provider config in scope"
-    Process.put(@provider_config_key, %{config | config: Map.put(config.config, key, value)})
+    update_provider_config(fn config ->
+      %{config | config: Map.put(config.config, key, value)}
+    end)
+
     :ok
   end
 
   def finish_provider_config do
-    config = Process.delete(@provider_config_key) || raise "no HostKit provider config in scope"
+    config = pop_provider_config()
     update_project(&Project.put_provider_config(&1, config))
   end
 
@@ -145,22 +206,21 @@ defmodule HostKit.DSL.Scope do
     update_project(&Project.add_tenant(&1, HostKit.Tenant.new(name, opts)))
   end
 
-  def start_proxy(name, opts) do
-    Process.put(@proxy_key, %HostKit.Proxy{
+  def start_proxy(name, opts, source \\ nil) do
+    opts = validate_proxy_opts!(opts, location: source)
+
+    push_proxy(%HostKit.Proxy{
       name: name,
-      provider: Keyword.fetch!(opts, :provider),
-      path: Keyword.get(opts, :path, "/etc/gatehouse/config.exs"),
-      meta: Keyword.get(opts, :meta, %{})
+      provider: opts.provider,
+      path: opts.path,
+      meta: opts.meta
     })
   end
 
   def finish_proxy do
-    proxy = Process.delete(@proxy_key) || raise "no HostKit proxy in scope"
+    proxy = pop_proxy()
     update_project(&Project.add_proxy(&1, proxy))
   end
-
-  def proxy_active?, do: Process.get(@proxy_key) != nil
-  def proxy_service_active?, do: Process.get(@proxy_service_key) != nil
 
   def put_proxy_state(path) do
     update_proxy(&%{&1 | state: path})
@@ -192,13 +252,12 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_proxy_service(name, opts) do
-    Process.put(@proxy_service_key, HostKit.Proxy.service(name, opts))
+    push_proxy_service(HostKit.Proxy.service(name, opts))
   end
 
   def finish_proxy_service do
-    service = Process.delete(@proxy_service_key) || raise "no HostKit proxy service in scope"
-    proxy = Process.get(@proxy_key) || raise "no HostKit proxy in scope"
-    Process.put(@proxy_key, %{proxy | services: proxy.services ++ [service]})
+    service = pop_proxy_service()
+    attach_proxy_service(service)
   end
 
   def add_proxy_host(host) do
@@ -237,69 +296,45 @@ defmodule HostKit.DSL.Scope do
   end
 
   def start_host(name, opts) do
-    Process.put(@host_key, %Host{
+    host = %Host{
       name: name,
       hostname: Keyword.fetch!(opts, :at),
       user: nil,
       sudo: false,
       meta: Keyword.get(opts, :meta, %{})
-    })
+    }
+
+    push_host(host)
   end
 
   def start_ssh(opts \\ []) do
-    unless Process.get(@host_key) do
-      raise "ssh/1 must be declared inside host/2"
-    end
-
-    Process.put(@ssh_key, true)
+    push_ssh(true)
     put_ssh_opts(opts)
   end
-
-  def finish_ssh do
-    Process.delete(@ssh_key) || raise "no HostKit ssh in scope"
-    :ok
-  end
-
-  def ssh_active?, do: Process.get(@ssh_key) == true
 
   def put_ssh(key, value), do: put_ssh_opts([{key, value}])
 
   def put_ssh_opts(opts) do
-    if Process.get(@host_key) do
+    if host_active?() do
       update_current(:host, &put_host_ssh_opts(&1, opts))
     else
       raise "ssh directive used outside host block"
     end
   end
 
-  def start_bootstrap do
-    Process.put(@bootstrap_key, true)
-  end
-
-  def finish_bootstrap do
-    Process.delete(@bootstrap_key) || raise "no HostKit bootstrap in scope"
-    :ok
-  end
-
   def finish_host do
-    host = Process.delete(@host_key) || raise "no HostKit host in scope"
-
-    case Process.get(@instance_key) do
-      nil -> update_project(&Project.add_host(&1, host))
-      instance -> Process.put(@instance_key, Instance.add_host(instance, host))
-    end
+    host = pop_host()
+    attach_host(host)
   end
 
   def start_instance(name, opts) do
-    Process.put(@instance_key, Instance.new(name, opts))
+    push_instance(Instance.new(name, opts))
   end
 
   def finish_instance do
-    instance = Process.delete(@instance_key) || raise "no HostKit instance in scope"
+    instance = pop_instance()
     update_project(&Project.add_instance(&1, instance))
   end
-
-  def instance_active?, do: Process.get(@instance_key) != nil
 
   def put_instance_backend(backend), do: update_instance(&Instance.put_backend(&1, backend))
 
@@ -313,17 +348,16 @@ defmodule HostKit.DSL.Scope do
 
   def start_backend_config(backend) do
     put_instance_backend(backend)
-    Process.put(@backend_config_key, %{})
+    push_backend_config(%{})
   end
 
   def finish_backend_config do
-    config = Process.delete(@backend_config_key) || raise "no HostKit backend config in scope"
+    config = pop_backend_config()
     update_instance(&Instance.put_backend_config(&1, config))
   end
 
   def put_backend_option(key, value) do
-    config = Process.get(@backend_config_key) || raise "backend option used outside backend block"
-    Process.put(@backend_config_key, Map.put(config, key, value))
+    update_backend_config(&Map.put(&1, key, value))
     :ok
   end
 
@@ -349,16 +383,12 @@ defmodule HostKit.DSL.Scope do
 
     meta = service.meta |> maybe_put_workspace()
 
-    Process.put(@service_key, %{service | meta: meta})
+    push_service(%{service | meta: meta})
   end
 
   def finish_service do
-    service = Process.delete(@service_key) || raise "no HostKit service in scope"
-
-    case Process.get(@instance_key) do
-      nil -> update_project(&Project.add_service(&1, service))
-      instance -> Process.put(@instance_key, Instance.add_service(instance, service))
-    end
+    service = pop_service()
+    attach_service(service)
   end
 
   def start_workspace(name, opts) do
@@ -369,32 +399,24 @@ defmodule HostKit.DSL.Scope do
       identity: Keyword.get(opts, :identity)
     }
 
-    Process.put(@workspace_key, workspace)
+    push_workspace(workspace)
   end
 
   def finish_workspace do
-    Process.delete(@workspace_key) || raise "no HostKit workspace in scope"
+    pop_workspace()
     :ok
   end
-
-  def start_inside do
-    Process.put(@inside_key, true)
-  end
-
-  def finish_inside do
-    Process.delete(@inside_key) || raise "no HostKit inside scope"
-    :ok
-  end
-
-  def inside_active?, do: Process.get(@inside_key) == true
 
   def add_inside_monitor(type, opts) do
-    service =
-      Process.get(@service_key) || raise "inside monitors must be declared inside service/2"
+    service_active?() || raise "inside monitors must be declared inside service/2"
 
     check = HostKit.Monitor.check(type, opts)
-    monitors = service.meta |> Map.get(:inside_monitor, []) |> Kernel.++([check])
-    Process.put(@service_key, %{service | meta: Map.put(service.meta, :inside_monitor, monitors)})
+
+    update_current(:service, fn service ->
+      monitors = service.meta |> Map.get(:inside_monitor, []) |> Kernel.++([check])
+      %{service | meta: Map.put(service.meta, :inside_monitor, monitors)}
+    end)
+
     :ok
   end
 
@@ -404,12 +426,12 @@ defmodule HostKit.DSL.Scope do
     do: update_project(&Project.put_convention_prefix(&1, name, prefix))
 
   def service_name do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = current_service!()
     service.name
   end
 
   def service_path do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = current_service!()
     service.path
   end
 
@@ -418,7 +440,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def service_account do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = current_service!()
     Map.get(service.meta, :account)
   end
 
@@ -433,7 +455,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   def service_identity do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = current_service!()
     service.identity
   end
 
@@ -454,7 +476,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp service_scoped_path?(root) when root in [:source, :data, :state, :cache, :config, :run],
-    do: Process.get(@service_key) != nil
+    do: service_active?()
 
   defp service_scoped_path?(_root), do: false
 
@@ -483,7 +505,8 @@ defmodule HostKit.DSL.Scope do
   end
 
   def env_path!(name) do
-    service = Process.get(@service_key) || raise "env/1 must be used inside service/2"
+    service_active?() || raise "env/1 must be used inside service/2"
+    service = current_service!()
     service.meta |> Map.get(:env_files, %{}) |> Map.fetch!(name)
   end
 
@@ -588,35 +611,25 @@ defmodule HostKit.DSL.Scope do
   end
 
   def storage_volume(name) do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = current_service!()
     service.meta |> Map.get(:storage, %{}) |> Map.fetch!(name)
   end
 
   def storage_path(name), do: storage_volume(name).path
 
   def writable_storage_paths do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = current_service!()
     service.meta |> Map.get(:storage, %{}) |> Map.values() |> Storage.read_write_paths()
   end
 
   def backup_storage do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = current_service!()
 
     service.meta
     |> Map.get(:storage, %{})
     |> Enum.filter(fn {_name, volume} -> Storage.backup?(volume) end)
     |> Enum.map(fn {_name, volume} -> volume end)
   end
-
-  def start_rpc do
-    Process.put(@rpc_key, true)
-  end
-
-  def finish_rpc do
-    Process.delete(@rpc_key) || raise "no HostKit rpc in scope"
-  end
-
-  def rpc_active?, do: Process.get(@rpc_key) == true
 
   def put_listener(name, opts) do
     listener = HostKit.Listener.new(name, default_listener_opts(name, opts))
@@ -640,10 +653,8 @@ defmodule HostKit.DSL.Scope do
     endpoint
   end
 
-  def service_active?, do: Process.get(@service_key) != nil
-
   def listener(name) do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
+    service = current_service!()
     service.meta |> Map.get(:listeners, %{}) |> Map.fetch!(name)
   end
 
@@ -721,53 +732,23 @@ defmodule HostKit.DSL.Scope do
     if Keyword.has_key?(opts, :sudo), do: %{host | sudo: Keyword.fetch!(opts, :sudo)}, else: host
   end
 
-  defp update_instance(fun) do
-    instance =
-      Process.get(@instance_key) || raise "instance directive used outside instance block"
-
-    Process.put(@instance_key, fun.(instance))
-    :ok
-  end
-
-  defp update_proxy(fun) do
-    proxy = Process.get(@proxy_key) || raise "proxy directive used outside proxy block"
-    Process.put(@proxy_key, fun.(proxy))
-    :ok
-  end
-
-  defp update_proxy_service(fun) do
-    service =
-      Process.get(@proxy_service_key) ||
-        raise "proxy service directive used outside proxy service block"
-
-    Process.put(@proxy_service_key, fun.(service))
-    :ok
-  end
-
   def update_current(:host, fun) do
-    host = Process.get(@host_key) || raise "no HostKit host in scope"
-    Process.put(@host_key, fun.(host))
+    update_host(fun)
     :ok
   end
 
   def update_current(:service, fun) do
-    service = Process.get(@service_key) || raise "no HostKit service in scope"
-    Process.put(@service_key, fun.(service))
+    update_service(fun)
     :ok
   end
 
   def add_resource(resource) do
-    case {Process.get(@service_key), Process.get(@instance_key)} do
-      {nil, nil} -> update_project(&Project.add_resource(&1, resource))
-      {nil, instance} -> Process.put(@instance_key, Instance.add_resource(instance, resource))
-      {service, _instance} -> Process.put(@service_key, Service.add_resource(service, resource))
-    end
-
-    :ok
+    attach(:resource, resource)
   end
 
   def update_last_resource(fun) do
-    service = Process.get(@service_key) || raise "resources must be declared inside service/2"
+    service_active?() || raise "resources must be declared inside service/2"
+    service = current_service!()
 
     case service.resources do
       [] ->
@@ -776,10 +757,9 @@ defmodule HostKit.DSL.Scope do
       resources ->
         {last, rest_reversed} = resources |> Enum.reverse() |> List.pop_at(0)
 
-        Process.put(@service_key, %{
-          service
-          | resources: Enum.reverse(rest_reversed, [fun.(last)])
-        })
+        update_service(fn service ->
+          %{service | resources: Enum.reverse(rest_reversed, [fun.(last)])}
+        end)
 
         :ok
     end
@@ -795,7 +775,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp service_path(name) do
-    case Process.get(@workspace_key) do
+    case current_workspace() do
       nil ->
         Naming.path_segment(name)
 
@@ -805,7 +785,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp service_identity(name) do
-    case Process.get(@workspace_key) do
+    case current_workspace() do
       nil ->
         Naming.identity_segment(name)
 
@@ -815,7 +795,7 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp maybe_put_workspace(meta) do
-    case Process.get(@workspace_key) do
+    case current_workspace() do
       nil -> meta
       workspace -> Map.put(meta, :workspace, Map.take(workspace, [:name, :owner]))
     end
@@ -849,13 +829,11 @@ defmodule HostKit.DSL.Scope do
   end
 
   defp project_conventions do
-    project = Process.get(@project_key) || raise "no HostKit project in scope"
-    project.conventions
+    current_project().conventions
   end
 
   defp update_project(fun) do
-    project = Process.get(@project_key) || raise "no HostKit project in scope"
-    Process.put(@project_key, fun.(project))
+    DSL.update(@project_key, fun)
     :ok
   end
 end

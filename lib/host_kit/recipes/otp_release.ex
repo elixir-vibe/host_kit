@@ -9,141 +9,139 @@ defmodule HostKit.Recipes.OTPRelease do
   """
 
   use HostKit.Recipe
+  use DSL.Macros
 
   alias HostKit.Naming
+  alias HostKit.Recipes.OTPRelease.Scope
 
   @format :beam_release_artifact
   @format_version 2
 
-  defmacro otp_release(name, opts \\ []) do
-    otp_release_body(name, opts, nil)
+  defaround otp_release(name), optional: true do
+    otp_release name, [] do
+      yield()
+    end
   end
 
-  defmacro otp_release(name, opts, do: block) do
-    otp_release_body(name, opts, block)
-  end
+  defaround otp_release(name, opts), optional: true do
+    recipe_opts = opts
+    artifact = HostKit.Recipes.OTPRelease.assigns(name, recipe_opts)
 
-  defp otp_release_body(name, opts, block) do
-    quote do
-      recipe_opts = unquote(opts)
-      artifact = HostKit.Recipes.OTPRelease.assigns(unquote(name), recipe_opts)
+    service_opts = HostKit.Recipes.OTPRelease.service_opts(name, recipe_opts)
 
-      service_opts = HostKit.Recipes.OTPRelease.service_opts(unquote(name), recipe_opts)
+    service artifact.service_name, service_opts do
+      base_dir = Keyword.get(recipe_opts, :base_dir, path(:opt, service_path()))
+      config_dir = Keyword.get(recipe_opts, :config_dir, path(:config))
+      release_dir = Path.join([base_dir, "releases", artifact.version])
+      current_dir = Path.join(base_dir, "current")
+      env_path = Keyword.get(recipe_opts, :env_path, Path.join(config_dir, "env"))
+      release_bin = Path.join([release_dir, "bin", artifact.release.name])
+      current_bin = Path.join([current_dir, "bin", artifact.release.name])
+      unit = Keyword.get(recipe_opts, :unit, unit_name())
 
-      service artifact.service_name, service_opts do
-        base_dir = Keyword.get(recipe_opts, :base_dir, path(:opt, service_path()))
-        config_dir = Keyword.get(recipe_opts, :config_dir, path(:config))
-        release_dir = Path.join([base_dir, "releases", artifact.version])
-        current_dir = Path.join(base_dir, "current")
-        env_path = Keyword.get(recipe_opts, :env_path, Path.join(config_dir, "env"))
-        release_bin = Path.join([release_dir, "bin", artifact.release.name])
-        current_bin = Path.join([current_dir, "bin", artifact.release.name])
-        unit = Keyword.get(recipe_opts, :unit, unit_name())
+      account(system: true, home: Keyword.get(recipe_opts, :account_home, base_dir))
 
-        account(system: true, home: Keyword.get(recipe_opts, :account_home, base_dir))
-
-        lifecycle_context =
-          HostKit.DSL.Lifecycle.Scope.start_context(%{
-            collect?: true,
-            name: &HostKit.Recipes.OTPRelease.lifecycle_command_name(artifact.name, &1),
-            eval:
-              &HostKit.Recipes.OTPRelease.release_eval_exec(
-                current_bin,
-                env_path,
-                &1,
-                &2
-                |> Keyword.put_new(:user, service_user())
-                |> Keyword.put_new(:stop_unit, unit)
-              ),
-            timeout: artifact.timeout,
-            down: :irreversible,
-            inputs: [release_dir],
-            depends_on: [
-              {:command, artifact.commands.unpack},
-              {:symlink, current_dir}
-            ]
-          })
-
-        unquote(block)
-
-        lifecycle_commands = HostKit.DSL.Lifecycle.Scope.finish_context(lifecycle_context)
-
-        directory(base_dir, owner: service_user(), group: service_user(), mode: 0o755)
-
-        directory(Path.join(base_dir, "releases"),
-          owner: service_user(),
-          group: service_user(),
-          mode: 0o755
-        )
-
-        directory(config_dir, owner: "root", group: service_user(), mode: 0o750)
-
-        HostKit.DSL.Scope.put_release_metadata(artifact.name, %{
-          name: artifact.name,
-          kind: :otp_release,
-          version: artifact.version,
-          releases_dir: Path.join(base_dir, "releases"),
-          release_path: release_dir,
-          current_path: current_dir,
-          artifact_dir: Path.dirname(artifact.manifest_path),
-          artifact_prefix:
-            HostKit.Recipes.OTPRelease.artifact_prefix(
-              artifact.tarball,
-              artifact.release.name,
-              artifact.version
+      lifecycle_context =
+        HostKit.DSL.Lifecycle.Scope.start_context(%{
+          collect?: true,
+          name: &HostKit.Recipes.OTPRelease.lifecycle_command_name(artifact.name, &1),
+          eval:
+            &HostKit.Recipes.OTPRelease.release_eval_exec(
+              current_bin,
+              env_path,
+              &1,
+              &2
+              |> Keyword.put_new(:user, service_user())
+              |> Keyword.put_new(:stop_unit, unit)
             ),
-          keep: Keyword.get(recipe_opts, :keep)
-        })
-
-        dotenv env_path, owner: "root", group: service_user(), mode: 0o640 do
-          for {key, value} <- artifact.env.clear do
-            set(key, value)
-          end
-
-          for key <- artifact.env.secret do
-            secret(key, env: :redacted)
-          end
-        end
-
-        command(artifact.commands.unpack,
-          exec: HostKit.Recipes.OTPRelease.unpack_exec(artifact.tarball, release_dir),
-          creates: release_bin,
           timeout: artifact.timeout,
           down: :irreversible,
-          meta: %{otp_release_artifact: artifact.manifest_path}
-        )
+          inputs: [release_dir],
+          depends_on: [
+            {:command, artifact.commands.unpack},
+            {:symlink, current_dir}
+          ]
+        })
 
-        symlink(current_dir,
-          to: release_dir,
-          depends_on: [{:command, artifact.commands.unpack}]
-        )
+      yield()
 
-        for lifecycle_command <- lifecycle_commands do
-          HostKit.DSL.Scope.add_resource(lifecycle_command)
+      lifecycle_commands = HostKit.DSL.Lifecycle.Scope.finish_context(lifecycle_context)
+
+      directory(base_dir, owner: service_user(), group: service_user(), mode: 0o755)
+
+      directory(Path.join(base_dir, "releases"),
+        owner: service_user(),
+        group: service_user(),
+        mode: 0o755
+      )
+
+      directory(config_dir, owner: "root", group: service_user(), mode: 0o750)
+
+      HostKit.DSL.Scope.put_release_metadata(artifact.name, %{
+        name: artifact.name,
+        kind: :otp_release,
+        version: artifact.version,
+        releases_dir: Path.join(base_dir, "releases"),
+        release_path: release_dir,
+        current_path: current_dir,
+        artifact_dir: Path.dirname(artifact.manifest_path),
+        artifact_prefix:
+          HostKit.Recipes.OTPRelease.artifact_prefix(
+            artifact.tarball,
+            artifact.release.name,
+            artifact.version
+          ),
+        keep: Keyword.get(recipe_opts, :keep)
+      })
+
+      dotenv env_path, owner: "root", group: service_user(), mode: 0o640 do
+        for {key, value} <- artifact.env.clear do
+          set(key, value)
         end
 
-        endpoint(:http,
-          port: artifact.http.port,
-          protocol: :http,
-          health: artifact.health.path
-        )
-
-        daemon unit do
-          description("#{artifact.name} OTP release")
-          environment_file(env_path)
-          working_directory(current_dir)
-          exec_start([current_bin, "start"])
-          service(kill_mode: :mixed, timeout_stop_sec: 10)
-          restart(:on_failure)
-          wanted_by(:multi_user)
+        for key <- artifact.env.secret do
+          secret(key, env: :redacted)
         end
+      end
 
-        ready artifact.commands.ready,
-          timeout: artifact.health.timeout * 1000,
-          depends_on: Enum.map(lifecycle_commands, &HostKit.Resource.id/1) do
-          systemd(unit, restart: true, kill: true)
-          http(artifact.health.url)
-        end
+      command(artifact.commands.unpack,
+        exec: HostKit.Recipes.OTPRelease.unpack_exec(artifact.tarball, release_dir),
+        creates: release_bin,
+        timeout: artifact.timeout,
+        down: :irreversible,
+        meta: %{otp_release_artifact: artifact.manifest_path}
+      )
+
+      symlink(current_dir,
+        to: release_dir,
+        depends_on: [{:command, artifact.commands.unpack}]
+      )
+
+      for lifecycle_command <- lifecycle_commands do
+        HostKit.DSL.Scope.add_resource(lifecycle_command)
+      end
+
+      endpoint(:http,
+        port: artifact.http.port,
+        protocol: :http,
+        health: artifact.health.path
+      )
+
+      daemon unit do
+        description("#{artifact.name} OTP release")
+        environment_file(env_path)
+        working_directory(current_dir)
+        exec_start([current_bin, "start"])
+        service(kill_mode: :mixed, timeout_stop_sec: 10)
+        restart(:on_failure)
+        wanted_by(:multi_user)
+      end
+
+      ready artifact.commands.ready,
+        timeout: artifact.health.timeout * 1000,
+        depends_on: Enum.map(lifecycle_commands, &HostKit.Resource.id/1) do
+        systemd(unit, restart: true, kill: true)
+        http(artifact.health.url)
       end
     end
   end
@@ -170,7 +168,7 @@ defmodule HostKit.Recipes.OTPRelease do
     release_kit = Keyword.get(opts, :release_kit)
     manifest_path = manifest_path(name, opts, release_kit)
 
-    if collecting_release_kit?() and release_kit do
+    if Scope.collecting_release_kit?() and release_kit do
       collect_release_kit!(name, opts, release_kit, manifest_path)
       placeholder_assigns(name, opts, manifest_path)
     else
@@ -217,11 +215,7 @@ defmodule HostKit.Recipes.OTPRelease do
   end
 
   def collect_release_kit(path, opts \\ []) do
-    previous_collecting = Process.get(:hostkit_collect_release_kit?)
-    previous_artifacts = Process.get(:hostkit_release_kit_artifacts)
-
-    Process.put(:hostkit_collect_release_kit?, true)
-    Process.put(:hostkit_release_kit_artifacts, [])
+    previous_collection = Scope.start_release_kit_collection()
 
     previous_compiler_options = Code.compiler_options()
     files = collection_files(path, Keyword.get(opts, :require, []))
@@ -233,14 +227,13 @@ defmodule HostKit.Recipes.OTPRelease do
       Enum.each(Enum.drop(files, 1), &Code.require_file/1)
       Code.eval_file(hd(files))
 
-      Process.get(:hostkit_release_kit_artifacts, [])
+      Scope.release_kit_artifacts_collected()
       |> Enum.reverse()
       |> filter_release_kit_artifacts(opts)
     after
       purge_eval_modules(modules_to_purge, loaded_before)
       Code.compiler_options(previous_compiler_options)
-      restore_process(:hostkit_collect_release_kit?, previous_collecting)
-      restore_process(:hostkit_release_kit_artifacts, previous_artifacts)
+      Scope.restore_release_kit_collection(previous_collection)
     end
   end
 
@@ -376,8 +369,6 @@ defmodule HostKit.Recipes.OTPRelease do
     end
   end
 
-  defp collecting_release_kit?, do: Process.get(:hostkit_collect_release_kit?, false)
-
   defp collect_release_kit!(name, opts, release_kit, manifest_path) do
     artifact = %{
       name: name,
@@ -390,8 +381,7 @@ defmodule HostKit.Recipes.OTPRelease do
       timeout: Keyword.get(release_kit, :timeout, 300_000)
     }
 
-    artifacts = Process.get(:hostkit_release_kit_artifacts, [])
-    Process.put(:hostkit_release_kit_artifacts, [artifact | artifacts])
+    Scope.collect_release_kit_artifact(artifact)
   end
 
   defp placeholder_assigns(name, opts, manifest_path) do
@@ -465,7 +455,7 @@ defmodule HostKit.Recipes.OTPRelease do
       modules
     end)
   rescue
-    _ -> []
+    _exception in [File.Error, SyntaxError, TokenMissingError, ArgumentError] -> []
   end
 
   defp collect_module({:__aliases__, _meta, parts}, modules),
@@ -473,9 +463,6 @@ defmodule HostKit.Recipes.OTPRelease do
 
   defp collect_module(module, modules) when is_atom(module), do: [module | modules]
   defp collect_module(_module, modules), do: modules
-
-  defp restore_process(key, nil), do: Process.delete(key)
-  defp restore_process(key, value), do: Process.put(key, value)
 
   def unpack_exec(tarball, release_dir) do
     script =

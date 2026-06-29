@@ -1,6 +1,7 @@
 defmodule HostKit.Integration.Livebook.NotebookSessionExecutionTest do
   use ExUnit.Case, async: false
 
+  @moduletag :integration
   @moduletag timeout: 600_000
 
   @notebooks [

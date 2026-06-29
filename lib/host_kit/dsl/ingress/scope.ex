@@ -1,79 +1,112 @@
 defmodule HostKit.DSL.Ingress.Scope do
   @moduledoc false
 
-  @ingress_key {__MODULE__, :ingress}
-  @server_key {__MODULE__, :server}
-  @route_key {__MODULE__, :route}
+  use DSL
 
-  def start_ingress(name, opts) do
-    meta = opts |> Keyword.drop([:meta]) |> Map.new() |> Map.merge(Keyword.get(opts, :meta, %{}))
-    Process.put(@ingress_key, %HostKit.Ingress{name: name, meta: meta})
+  options :ingress_opts do
+    field(:path, :string)
+    field(:state, :string)
+    field(:depends_on, {:array, :any}, default: [])
+    field(:meta, :map, default: %{})
+  end
+
+  options :server_opts do
+    field(:meta, :map, default: %{})
+  end
+
+  options :tls_opts do
+    field(:email, :string)
+    field(:meta, :map, default: %{})
+  end
+
+  options :route_opts do
+    field(:host, :string)
+    field(:path, :string)
+    field(:meta, :map, default: %{})
+  end
+
+  options :proxy_opts do
+    field(:to, :any, required: true)
+    field(:rewrite, :string)
+    field(:meta, :map, default: %{})
+  end
+
+  scope :ingress do
+    accepts(:server)
+  end
+
+  scope :server do
+    requires(:ingress)
+    accepts(:route)
+  end
+
+  scope :route do
+    requires(:server)
+  end
+
+  def start_ingress(name, opts, source \\ nil) do
+    opts = validate_ingress_opts!(opts, location: source)
+    meta = opts |> Map.drop([:depends_on, :meta]) |> Map.merge(opts.meta)
+    push_ingress(%HostKit.Ingress{name: name, depends_on: opts.depends_on, meta: meta})
   end
 
   def finish_ingress do
-    Process.delete(@ingress_key) || raise "no HostKit ingress in scope"
+    pop_ingress()
   end
 
-  def start_server(listen, opts) do
-    Process.put(@server_key, %HostKit.Ingress.Server{
+  def start_server(listen, opts, source \\ nil) do
+    opts = validate_server_opts!(opts, location: source)
+
+    push_server(%HostKit.Ingress.Server{
       listen: listen,
-      meta: Keyword.get(opts, :meta, %{})
+      meta: opts.meta
     })
   end
 
   def finish_server do
-    server = Process.delete(@server_key) || raise "no HostKit ingress server in scope"
-    ingress = Process.get(@ingress_key) || raise "ingress server used outside ingress block"
-    Process.put(@ingress_key, %{ingress | servers: ingress.servers ++ [server]})
+    server = pop_server()
+    attach_server(server)
   end
 
-  def put_tls(mode, opts) do
+  def put_tls(mode, opts, source \\ nil) do
+    opts = validate_tls_opts!(opts, location: source)
+
     update_server(
       &%{
         &1
         | tls: %HostKit.Ingress.TLS{
             mode: mode,
-            email: Keyword.get(opts, :email),
-            meta: Keyword.get(opts, :meta, %{})
+            email: opts.email,
+            meta: opts.meta
           }
       }
     )
   end
 
-  def start_route(opts) do
-    Process.put(@route_key, %HostKit.Ingress.Route{
-      host: Keyword.get(opts, :host),
-      path: Keyword.get(opts, :path),
-      meta: Keyword.get(opts, :meta, %{})
+  def start_route(opts, source \\ nil) do
+    opts = validate_route_opts!(opts, location: source)
+
+    push_route(%HostKit.Ingress.Route{
+      host: opts.host,
+      path: opts.path,
+      meta: opts.meta
     })
   end
 
   def finish_route do
-    route = Process.delete(@route_key) || raise "no HostKit ingress route in scope"
-    update_server(&%{&1 | routes: &1.routes ++ [route]})
+    route = pop_route()
+    attach_route(route)
   end
 
-  def put_proxy(opts) do
+  def put_proxy(opts, source \\ nil) do
+    opts = validate_proxy_opts!(opts, location: source)
+
     proxy = %HostKit.Ingress.Proxy{
-      to: Keyword.fetch!(opts, :to),
-      rewrite: Keyword.get(opts, :rewrite),
-      meta: Keyword.get(opts, :meta, %{})
+      to: opts.to,
+      rewrite: opts.rewrite,
+      meta: opts.meta
     }
 
     update_route(&%{&1 | proxy: proxy})
-  end
-
-  defp update_server(fun) do
-    server =
-      Process.get(@server_key) || raise "ingress server directive used outside server block"
-
-    Process.put(@server_key, fun.(server))
-    :ok
-  end
-
-  defp update_route(fun) do
-    route = Process.get(@route_key) || raise "ingress route directive used outside route block"
-    Process.put(@route_key, fun.(route))
-    :ok
   end
 end

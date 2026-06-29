@@ -267,16 +267,16 @@ defmodule HostKit.Resources.ConfigFile do
         table_lines
 
       {[], scalar_lines, []} ->
-        [Enum.join(scalar_lines, "\n") <> "\n"]
+        [toml_lines(scalar_lines)]
 
       {[], scalar_lines, table_lines} ->
-        [Enum.join(scalar_lines, "\n") <> "\n" | table_lines]
+        [toml_lines(scalar_lines) | table_lines]
 
       {_path, [], table_lines} ->
         table_lines
 
       {_path, scalar_lines, table_lines} ->
-        [toml_header(path), Enum.join(scalar_lines, "\n") <> "\n" | table_lines]
+        [toml_header(path), toml_lines(scalar_lines) | table_lines]
     end
   end
 
@@ -305,10 +305,12 @@ defmodule HostKit.Resources.ConfigFile do
 
     [
       toml_array_header(path),
-      Enum.map_join(scalars, "\n", &toml_pair/1) <> "\n"
+      scalars |> Enum.map(&toml_pair/1) |> toml_lines()
       | Enum.flat_map(tables, &toml_table(&1, path))
     ]
   end
+
+  defp toml_lines(entries), do: Enum.map_join(entries, "\n", & &1) <> "\n"
 
   defp toml_header(path), do: "[#{toml_path(path)}]"
   defp toml_array_header(path), do: "[[#{toml_path(path)}]]"
@@ -335,7 +337,7 @@ defmodule HostKit.Resources.ConfigFile do
     if Keyword.keyword?(values) do
       raise ArgumentError, "TOML inline tables are not supported; use nested tables"
     else
-      "[" <> (values |> Enum.map(&toml_value/1) |> Enum.join(", ")) <> "]"
+      values |> Enum.map_join(", ", &toml_value/1) |> then(&IO.iodata_to_binary(["[", &1, "]"]))
     end
   end
 

@@ -1,19 +1,19 @@
 defmodule HostKit.TestPlugin.Scope do
-  @moduledoc false
+  @moduledoc "Process-local scope helpers for the HostKit test plugin DSL."
 
-  @key {__MODULE__, :site}
+  use DSL
+
+  scope(:site)
 
   def start_site(host) do
-    Process.put(@key, %HostKit.TestSite{host: host})
+    push_site(%HostKit.TestSite{host: host})
   end
 
   def put_upstream(upstream) do
-    site = Process.get(@key) || raise "no test site in scope"
-    Process.put(@key, %{site | upstream: upstream})
-    :ok
+    update_site(&%{&1 | upstream: upstream})
   end
 
   def finish_site do
-    Process.delete(@key) || raise "no test site in scope"
+    pop_site()
   end
 end

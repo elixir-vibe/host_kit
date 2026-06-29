@@ -11,4 +11,8 @@ defmodule HostKit.Ingress do
   defstruct [:name, servers: [], depends_on: [], meta: %{}]
 
   def id(%__MODULE__{name: name}), do: {:ingress, name}
+
+  def add_server(%__MODULE__{} = ingress, %HostKit.Ingress.Server{} = server) do
+    %{ingress | servers: ingress.servers ++ [server]}
+  end
 end

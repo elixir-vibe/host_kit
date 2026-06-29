@@ -38,9 +38,13 @@ defmodule HostKit.Clean do
     |> Enum.flat_map(&service_releases/1)
     |> Enum.reduce_while({:ok, []}, fn release, {:ok, commands} ->
       case release_commands(release, opts) do
-        {:ok, release_commands} -> {:cont, {:ok, commands ++ release_commands}}
+        {:ok, release_commands} -> {:cont, {:ok, [release_commands | commands]}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
+    end)
+    |> then(fn
+      {:ok, commands} -> {:ok, commands |> Enum.reverse() |> List.flatten()}
+      {:error, reason} -> {:error, reason}
     end)
   end
 
@@ -54,8 +58,7 @@ defmodule HostKit.Clean do
   defp service_releases(service) do
     service.meta
     |> Map.get(:releases, %{})
-    |> Map.values()
-    |> Enum.map(&Map.put_new(&1, :service, service.name))
+    |> Enum.map(fn {_name, release} -> Map.put_new(release, :service, service.name) end)
   end
 
   defp release_commands(release, opts) do

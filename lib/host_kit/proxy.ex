@@ -38,6 +38,10 @@ defmodule HostKit.Proxy do
     }
   end
 
+  def add_service(%__MODULE__{} = proxy, service) when is_map(service) do
+    %{proxy | services: proxy.services ++ [service]}
+  end
+
   def render(%__MODULE__{} = proxy) do
     proxy
     |> to_quoted()
@@ -54,7 +58,7 @@ defmodule HostKit.Proxy do
       |> Kernel.++(Enum.map(proxy.listeners, &listener_quoted/1))
       |> Kernel.++(Enum.map(proxy.services, &gatehouse_service_quoted/1))
 
-    block(expressions)
+    ast_block(expressions)
   end
 
   def to_quoted(%__MODULE__{provider: provider}) do
@@ -75,7 +79,7 @@ defmodule HostKit.Proxy do
         Enum.map(service.targets, &target_quoted/1) ++
         optional_service_directives(service)
 
-    {:service, [], [service.name, [do: block(expressions)]]}
+    {:service, [], [service.name, [do: ast_block(expressions)]]}
   end
 
   defp optional_service_directives(service) do
@@ -132,6 +136,6 @@ defmodule HostKit.Proxy do
   defp maybe_append(list, false), do: list
   defp maybe_append(list, expression), do: list ++ [expression]
 
-  defp block([expression]), do: expression
-  defp block(expressions), do: {:__block__, [], expressions}
+  defp ast_block([expression]), do: expression
+  defp ast_block(expressions), do: {:__block__, [], expressions}
 end

@@ -1,24 +1,85 @@
 defmodule HostKit.DSL.Lifecycle.Scope do
-  @moduledoc false
+  @moduledoc "Process-local scope helpers for HostKit lifecycle command DSL blocks."
 
-  @scope_key {__MODULE__, :scope}
-  @context_key {__MODULE__, :context}
+  use DSL
 
-  def start(name, phase, opts) do
-    Process.put(@scope_key, %{name: name, phase: phase, opts: opts, exec: nil})
-    :ok
+  defmodule Command do
+    @moduledoc "State accumulated while evaluating a lifecycle command DSL block."
+
+    @enforce_keys [:name, :phase, :opts]
+    defstruct name: nil,
+              phase: nil,
+              opts: [],
+              exec: nil
+
+    @type t :: %__MODULE__{
+            name: atom(),
+            phase: atom(),
+            opts: keyword(),
+            exec: term()
+          }
   end
 
-  def active?, do: Process.get(@scope_key) != nil
+  defmodule Context do
+    @moduledoc "State accumulated while collecting lifecycle commands for a higher-level DSL."
+
+    @enforce_keys [:ref]
+    defstruct ref: nil,
+              commands: [],
+              collect?: false,
+              name: nil,
+              eval: nil,
+              depends_on: nil,
+              cwd: nil,
+              env: nil,
+              timeout: nil,
+              down: nil,
+              inputs: nil,
+              outputs: nil,
+              stamp: nil
+
+    @type t :: %__MODULE__{
+            ref: reference(),
+            commands: [HostKit.Resources.Command.t()],
+            collect?: boolean(),
+            name: (atom() -> atom()) | nil,
+            eval: (String.t(), keyword() -> term()) | nil,
+            depends_on: term(),
+            cwd: term(),
+            env: term(),
+            timeout: term(),
+            down: term(),
+            inputs: term(),
+            outputs: term(),
+            stamp: term()
+          }
+  end
+
+  scope(:lifecycle_command)
+  scope(:lifecycle_context)
+
+  def start(name, phase, opts) do
+    push_lifecycle_command(%Command{name: name, phase: phase, opts: opts})
+  end
+
+  def active?, do: lifecycle_command_active?()
 
   def put_exec(exec) do
-    scope = Process.get(@scope_key) || raise "lifecycle command used outside lifecycle block"
-    Process.put(@scope_key, %{scope | exec: exec})
-    :ok
+    if active?() do
+      update_lifecycle_command(&%{&1 | exec: exec})
+      :ok
+    else
+      raise "lifecycle command used outside lifecycle block"
+    end
   end
 
   def finish do
-    scope = Process.delete(@scope_key) || raise "no HostKit lifecycle command in scope"
+    scope =
+      if active?() do
+        pop_lifecycle_command()
+      else
+        raise "no HostKit lifecycle command in scope"
+      end
 
     exec =
       scope.exec || raise "lifecycle command #{inspect(scope.name)} did not declare an executable"
@@ -49,30 +110,25 @@ defmodule HostKit.DSL.Lifecycle.Scope do
   end
 
   def start_context(attrs) when is_map(attrs) do
-    context = attrs |> Map.put_new(:commands, []) |> Map.put(:ref, make_ref())
-    Process.put(@context_key, [context | context_stack()])
+    context = struct!(Context, Map.put(attrs, :ref, make_ref()))
+    push_lifecycle_context(context)
     context
   end
 
-  def finish_context(%{ref: ref}) do
-    case context_stack() do
-      [%{ref: ^ref} = context | rest] ->
-        Process.put(@context_key, rest)
-        context.commands
-
-      _other ->
-        raise "HostKit lifecycle context stack mismatch"
+  def finish_context(%Context{ref: ref}) do
+    if lifecycle_context_active?() and current_lifecycle_context!().ref == ref do
+      pop_lifecycle_context().commands
+    else
+      raise "HostKit lifecycle context stack mismatch"
     end
   end
 
   defp collect(command) do
-    case context_stack() do
-      [context | rest] ->
-        Process.put(@context_key, [%{context | commands: context.commands ++ [command]} | rest])
-        :ok
-
-      [] ->
-        raise "no HostKit lifecycle context in scope"
+    if lifecycle_context_active?() do
+      update_lifecycle_context(&%{&1 | commands: &1.commands ++ [command]})
+      :ok
+    else
+      raise "no HostKit lifecycle context in scope"
     end
   end
 
@@ -92,11 +148,12 @@ defmodule HostKit.DSL.Lifecycle.Scope do
   end
 
   defp put_new_from_context(opts, key, context) do
-    if Map.has_key?(context, key),
-      do: Keyword.put_new(opts, key, Map.fetch!(context, key)),
-      else: opts
+    case Map.fetch(context, key) do
+      {:ok, nil} -> opts
+      {:ok, value} -> Keyword.put_new(opts, key, value)
+      :error -> opts
+    end
   end
 
-  defp current_context, do: List.first(context_stack(), %{})
-  defp context_stack, do: Process.get(@context_key, [])
+  defp current_context, do: current_lifecycle_context() || %{}
 end
