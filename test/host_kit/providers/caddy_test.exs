@@ -1,6 +1,8 @@
 defmodule HostKit.CaddyProviderTest do
   use HostKit.Case, async: true
 
+  import ExUnit.CaptureIO
+
   alias HostKit.Addr.Resource
   alias HostKit.Caddy.Directive.{Encode, ReverseProxy}
   alias HostKit.Caddy.Site
@@ -99,7 +101,9 @@ defmodule HostKit.CaddyProviderTest do
     end
     """
 
-    assert_raise CompileError, fn -> Code.compile_string(source) end
+    capture_io(:stderr, fn ->
+      assert_raise CompileError, fn -> Code.compile_string(source) end
+    end)
   end
 
   defp restore_env(nil), do: System.delete_env("HOST_KIT_CADDY_TEST_SITES_DIR")

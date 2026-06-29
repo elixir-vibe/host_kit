@@ -143,7 +143,19 @@ defmodule Mix.Tasks.HostKit.Apply do
         Mix.shell().info("✓ #{label} build")
       end
     rescue
-      exception ->
+      exception in [
+        ArgumentError,
+        CaseClauseError,
+        File.Error,
+        FunctionClauseError,
+        KeyError,
+        MatchError,
+        Mix.Error,
+        Protocol.UndefinedError,
+        RuntimeError,
+        UndefinedFunctionError,
+        WithClauseError
+      ] ->
         unless Keyword.get(cli_opts, :quiet, false) do
           Mix.shell().error("✗ #{label} build failed")
         end

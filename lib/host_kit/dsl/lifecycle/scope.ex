@@ -92,9 +92,10 @@ defmodule HostKit.DSL.Lifecycle.Scope do
   end
 
   defp put_new_from_context(opts, key, context) do
-    if Map.has_key?(context, key),
-      do: Keyword.put_new(opts, key, Map.fetch!(context, key)),
-      else: opts
+    case Map.fetch(context, key) do
+      {:ok, value} -> Keyword.put_new(opts, key, value)
+      :error -> opts
+    end
   end
 
   defp current_context, do: List.first(context_stack(), %{})

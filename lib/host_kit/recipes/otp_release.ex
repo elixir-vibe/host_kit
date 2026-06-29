@@ -465,7 +465,7 @@ defmodule HostKit.Recipes.OTPRelease do
       modules
     end)
   rescue
-    _ -> []
+    _exception in [File.Error, SyntaxError, TokenMissingError, ArgumentError] -> []
   end
 
   defp collect_module({:__aliases__, _meta, parts}, modules),
