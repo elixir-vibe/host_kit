@@ -98,7 +98,14 @@ defmodule HostKit.DSLCore.Options do
   end
 
   defp return_data(%__MODULE__{return: :keyword} = schema, data) do
-    Enum.map(field_names(schema), &{&1, Map.fetch!(data, &1)})
+    schema
+    |> field_names()
+    |> Enum.flat_map(fn field ->
+      case Map.fetch!(data, field) do
+        nil -> []
+        value -> [{field, value}]
+      end
+    end)
   end
 
   defp field_names(%__MODULE__{} = schema), do: Enum.map(schema.fields, & &1.name)

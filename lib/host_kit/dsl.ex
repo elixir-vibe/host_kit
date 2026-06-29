@@ -145,8 +145,15 @@ defmodule HostKit.DSL do
   end
 
   defmacro ready(name, opts \\ [], do: block) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
-      HostKit.DSL.Readiness.Scope.start(unquote(name), unquote(opts))
+      HostKit.DSL.Readiness.Scope.start(
+        unquote(name),
+        unquote(opts),
+        unquote(Macro.escape(source))
+      )
+
       unquote(block)
       HostKit.DSL.Scope.add_resource(HostKit.DSL.Readiness.Scope.finish())
     end
@@ -193,19 +200,31 @@ defmodule HostKit.DSL do
   end
 
   defmacro systemd(unit, opts \\ []) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
       HostKit.DSL.Readiness.Scope.add_check(
-        HostKit.Readiness.Systemd.new(unquote(unit), unquote(opts))
+        HostKit.DSL.Readiness.Scope.systemd_check(
+          unquote(unit),
+          unquote(opts),
+          unquote(Macro.escape(source))
+        )
       )
     end
   end
 
   defmacro http(url_or_opts \\ []) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
       cond do
         HostKit.DSL.Readiness.Scope.active?() ->
           HostKit.DSL.Readiness.Scope.add_check(
-            HostKit.Readiness.HTTP.new(unquote(url_or_opts), [])
+            HostKit.DSL.Readiness.Scope.http_check(
+              unquote(url_or_opts),
+              [],
+              unquote(Macro.escape(source))
+            )
           )
 
         HostKit.DSL.Scope.proxy_active?() ->
@@ -218,11 +237,17 @@ defmodule HostKit.DSL do
   end
 
   defmacro http(url, opts) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
       cond do
         HostKit.DSL.Readiness.Scope.active?() ->
           HostKit.DSL.Readiness.Scope.add_check(
-            HostKit.Readiness.HTTP.new(unquote(url), unquote(opts))
+            HostKit.DSL.Readiness.Scope.http_check(
+              unquote(url),
+              unquote(opts),
+              unquote(Macro.escape(source))
+            )
           )
 
         HostKit.DSL.Scope.proxy_active?() ->

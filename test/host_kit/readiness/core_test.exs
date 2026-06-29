@@ -34,6 +34,45 @@ defmodule HostKit.ReadinessTest do
            end)
   end
 
+  test "ready DSL validates options through DSLCore option schemas" do
+    assert_raise ArgumentError, ~r/unknown option :bad for readiness_opts at nofile:4/, fn ->
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :demo do
+        ready :app, bad: true do
+        end
+      end
+      """)
+    end
+
+    assert_raise ArgumentError,
+                 ~r/unknown option :bad for systemd_check_opts at nofile:5/,
+                 fn ->
+                   Code.eval_string("""
+                   use HostKit.DSL
+
+                   project :demo do
+                     ready :app do
+                       systemd "app.service", bad: true
+                     end
+                   end
+                   """)
+                 end
+
+    assert_raise ArgumentError, ~r/unknown option :bad for http_check_opts at nofile:5/, fn ->
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :demo do
+        ready :app do
+          http "http://127.0.0.1:4000/health", bad: true
+        end
+      end
+      """)
+    end
+  end
+
   test "readiness waits until checks pass" do
     {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
     {:ok, port} = :inet.port(listen_socket)
