@@ -81,7 +81,7 @@ defmodule HostKit.FirewallTest do
   end
 
   test "firewall DSL validates options through DSLCore option schemas" do
-    assert_raise ArgumentError, "unknown option :bad for firewall_opts", fn ->
+    assert_raise ArgumentError, ~r/unknown option :bad for firewall_opts at nofile:4/, fn ->
       Code.eval_string("""
       use HostKit.DSL
 
@@ -92,16 +92,18 @@ defmodule HostKit.FirewallTest do
       """)
     end
 
-    assert_raise ArgumentError, ~r/invalid options for firewall_opts: activate is invalid/, fn ->
-      Code.eval_string("""
-      use HostKit.DSL
+    assert_raise ArgumentError,
+                 ~r/invalid options for firewall_opts: activate is invalid at nofile:4/,
+                 fn ->
+                   Code.eval_string("""
+                   use HostKit.DSL
 
-      project :demo do
-        firewall activate: :manual do
-        end
-      end
-      """)
-    end
+                   project :demo do
+                     firewall activate: :manual do
+                     end
+                   end
+                   """)
+                 end
   end
 
   test "firewall activation can be disabled" do

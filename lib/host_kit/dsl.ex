@@ -387,8 +387,10 @@ defmodule HostKit.DSL do
   end
 
   defmacro proxy(name, opts, do: block) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
-      HostKit.DSL.Scope.start_proxy(unquote(name), unquote(opts))
+      HostKit.DSL.Scope.start_proxy(unquote(name), unquote(opts), unquote(Macro.escape(source)))
       unquote(block)
       HostKit.DSL.Scope.finish_proxy()
     end
@@ -582,8 +584,10 @@ defmodule HostKit.DSL do
   end
 
   defmacro firewall(opts \\ [], do: block) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
-      HostKit.DSL.Scope.start_firewall(unquote(opts))
+      HostKit.DSL.Scope.start_firewall(unquote(opts), unquote(Macro.escape(source)))
       unquote(block)
       HostKit.DSL.Scope.finish_firewall()
     end

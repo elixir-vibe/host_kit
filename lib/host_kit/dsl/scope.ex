@@ -126,9 +126,9 @@ defmodule HostKit.DSL.Scope do
     end
   end
 
-  def start_firewall(opts \\ []) do
+  def start_firewall(opts \\ [], source \\ nil) do
     scope = if host_active?(), do: :host, else: :project
-    validated = validate_firewall_opts!(opts)
+    validated = validate_firewall_opts!(opts, location: source)
 
     activation_opts =
       opts
@@ -206,8 +206,8 @@ defmodule HostKit.DSL.Scope do
     update_project(&Project.add_tenant(&1, HostKit.Tenant.new(name, opts)))
   end
 
-  def start_proxy(name, opts) do
-    opts = validate_proxy_opts!(opts)
+  def start_proxy(name, opts, source \\ nil) do
+    opts = validate_proxy_opts!(opts, location: source)
 
     push_proxy(%HostKit.Proxy{
       name: name,

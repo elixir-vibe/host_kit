@@ -57,8 +57,8 @@ defmodule HostKit.DSLCore do
         HostKit.DSLCore.Options.validate(unquote(Macro.escape(schema)), opts)
       end
 
-      def unquote(validate_bang_fun)(opts) do
-        HostKit.DSLCore.Options.validate!(unquote(Macro.escape(schema)), opts)
+      def unquote(validate_bang_fun)(opts, validate_opts \\ []) do
+        HostKit.DSLCore.Options.validate!(unquote(Macro.escape(schema)), opts, validate_opts)
       end
     end
   end

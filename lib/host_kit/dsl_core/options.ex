@@ -27,11 +27,12 @@ defmodule HostKit.DSLCore.Options do
   end
 
   @doc "Validate options and raise `ArgumentError` with DSL-friendly messages on failure."
-  @spec validate!(t(), keyword() | map()) :: map() | keyword()
-  def validate!(%__MODULE__{} = schema, opts) when is_list(opts) or is_map(opts) do
+  @spec validate!(t(), keyword() | map(), keyword()) :: map() | keyword()
+  def validate!(%__MODULE__{} = schema, opts, validate_opts \\ [])
+      when is_list(opts) or is_map(opts) do
     case validate(schema, opts) do
       {:ok, data} -> data
-      {:error, reason} -> raise ArgumentError, message(schema, reason)
+      {:error, reason} -> raise ArgumentError, message(schema, reason, validate_opts)
     end
   end
 
@@ -115,6 +116,12 @@ defmodule HostKit.DSLCore.Options do
   defp ecto_type({:array, type}), do: {:array, ecto_type(type)}
   defp ecto_type(type), do: type
 
+  defp message(%__MODULE__{} = schema, reason, opts) do
+    schema
+    |> message(reason)
+    |> with_location(Keyword.get(opts, :location))
+  end
+
   defp message(%__MODULE__{} = schema, {:unknown_options, [unknown]}) do
     "unknown option #{inspect(unknown)} for #{schema.name}"
   end
@@ -132,6 +139,13 @@ defmodule HostKit.DSLCore.Options do
 
     "invalid options for #{schema.name}: #{errors}"
   end
+
+  defp with_location(message, %{file: file, line: line})
+       when is_binary(file) and is_integer(line) do
+    "#{message} at #{file}:#{line}"
+  end
+
+  defp with_location(message, _location), do: message
 
   defp format_error({message, opts}) do
     Regex.replace(~r"%{(\w+)}", message, fn _, key ->

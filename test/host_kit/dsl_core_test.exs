@@ -79,6 +79,15 @@ defmodule HostKit.DSLCoreTest do
       Fixture.validate_proxy_opts!(provider: :gatehouse, bad: true)
     end
 
+    assert_raise ArgumentError,
+                 "unknown option :bad for proxy_opts at config.hostkit:12",
+                 fn ->
+                   Fixture.validate_proxy_opts!(
+                     [provider: :gatehouse, bad: true],
+                     location: %{file: "config.hostkit", line: 12}
+                   )
+                 end
+
     assert_raise ArgumentError, ~r/invalid options for proxy_opts: provider can't be blank/, fn ->
       Fixture.validate_proxy_opts!([])
     end

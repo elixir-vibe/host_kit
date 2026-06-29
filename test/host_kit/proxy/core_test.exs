@@ -85,7 +85,7 @@ defmodule HostKit.ProxyTest do
   end
 
   test "proxy DSL validates options through DSLCore option schemas" do
-    assert_raise ArgumentError, "unknown option :bad for proxy_opts", fn ->
+    assert_raise ArgumentError, ~r/unknown option :bad for proxy_opts at nofile:4/, fn ->
       Code.eval_string("""
       use HostKit.DSL
 
@@ -96,16 +96,18 @@ defmodule HostKit.ProxyTest do
       """)
     end
 
-    assert_raise ArgumentError, ~r/invalid options for proxy_opts: provider can't be blank/, fn ->
-      Code.eval_string("""
-      use HostKit.DSL
+    assert_raise ArgumentError,
+                 ~r/invalid options for proxy_opts: provider can't be blank at nofile:4/,
+                 fn ->
+                   Code.eval_string("""
+                   use HostKit.DSL
 
-      project :demo do
-        proxy :edge, [] do
-        end
-      end
-      """)
-    end
+                   project :demo do
+                     proxy :edge, [] do
+                     end
+                   end
+                   """)
+                 end
   end
 
   test "plan resolves endpoint targets from service declarations" do

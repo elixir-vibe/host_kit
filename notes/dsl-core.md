@@ -147,11 +147,17 @@ options :command_opts, return: :keyword do
 end
 ```
 
-DSLCore rejects unknown options before casting and raises DSL-oriented messages such as:
+DSLCore rejects unknown options before casting and raises DSL-oriented messages. Callers can pass a source location when validating options:
+
+```elixir
+validate_proxy_opts!(opts, location: %{file: "config.hostkit", line: 12})
+```
+
+Messages include the location when present:
 
 ```text
-unknown option :bad for proxy_opts
-invalid options for proxy_opts: provider can't be blank
+unknown option :bad for proxy_opts at config.hostkit:12
+invalid options for proxy_opts: provider can't be blank at config.hostkit:12
 ```
 
 ## Requirements
