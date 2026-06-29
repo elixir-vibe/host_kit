@@ -160,42 +160,66 @@ defmodule HostKit.DSL do
   end
 
   defmacro ingress(name, opts \\ [], do: block) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
-      HostKit.DSL.Ingress.Scope.start_ingress(unquote(name), unquote(opts))
+      HostKit.DSL.Ingress.Scope.start_ingress(
+        unquote(name),
+        unquote(opts),
+        unquote(Macro.escape(source))
+      )
+
       unquote(block)
       HostKit.DSL.Scope.add_resource(HostKit.DSL.Ingress.Scope.finish_ingress())
     end
   end
 
   defmacro server(listen \\ ":443", opts \\ [], do: block) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
-      HostKit.DSL.Ingress.Scope.start_server(unquote(listen), unquote(opts))
+      HostKit.DSL.Ingress.Scope.start_server(
+        unquote(listen),
+        unquote(opts),
+        unquote(Macro.escape(source))
+      )
+
       unquote(block)
       HostKit.DSL.Ingress.Scope.finish_server()
     end
   end
 
   defmacro tls(mode, opts \\ []) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
       if HostKit.DSL.Scope.proxy_service_active?() do
         HostKit.DSL.Scope.put_proxy_tls(unquote(mode))
       else
-        HostKit.DSL.Ingress.Scope.put_tls(unquote(mode), unquote(opts))
+        HostKit.DSL.Ingress.Scope.put_tls(
+          unquote(mode),
+          unquote(opts),
+          unquote(Macro.escape(source))
+        )
       end
     end
   end
 
   defmacro route(opts, do: block) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
-      HostKit.DSL.Ingress.Scope.start_route(unquote(opts))
+      HostKit.DSL.Ingress.Scope.start_route(unquote(opts), unquote(Macro.escape(source)))
       unquote(block)
       HostKit.DSL.Ingress.Scope.finish_route()
     end
   end
 
   defmacro proxy(opts) do
+    source = HostKit.SourceLocation.from_caller(__CALLER__)
+
     quote do
-      HostKit.DSL.Ingress.Scope.put_proxy(unquote(opts))
+      HostKit.DSL.Ingress.Scope.put_proxy(unquote(opts), unquote(Macro.escape(source)))
     end
   end
 
