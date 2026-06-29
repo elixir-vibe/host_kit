@@ -1,20 +1,21 @@
 defmodule HostKit.DSL.Readiness.Scope do
   @moduledoc false
 
-  @key {__MODULE__, :readiness}
+  use HostKit.DSLCore
+
+  scope(:readiness)
 
   def start(name, opts) do
-    Process.put(@key, HostKit.Resources.Readiness.new(name, opts))
+    push_readiness(HostKit.Resources.Readiness.new(name, opts))
   end
 
   def finish do
-    Process.delete(@key) || raise "no HostKit readiness in scope"
+    pop_readiness()
   end
 
-  def active?, do: Process.get(@key) != nil
+  def active?, do: readiness_active?()
 
   def add_check(check) do
-    readiness = Process.get(@key) || raise "readiness check used outside ready/2 block"
-    Process.put(@key, %{readiness | checks: readiness.checks ++ [check]})
+    update_readiness(&%{&1 | checks: &1.checks ++ [check]})
   end
 end

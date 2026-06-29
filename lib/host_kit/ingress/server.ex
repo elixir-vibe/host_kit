@@ -9,4 +9,8 @@ defmodule HostKit.Ingress.Server do
         }
 
   defstruct [:listen, :tls, routes: [], meta: %{}]
+
+  def add_route(%__MODULE__{} = server, %HostKit.Ingress.Route{} = route) do
+    %{server | routes: server.routes ++ [route]}
+  end
 end
