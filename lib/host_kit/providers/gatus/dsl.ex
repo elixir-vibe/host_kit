@@ -58,6 +58,10 @@ defmodule HostKit.Providers.Gatus.DSL do
     Scope.add_endpoints(endpoints)
   end
 
+  defdirective monitor_endpoints(opts \\ []) do
+    Scope.add_monitor_endpoints(opts)
+  end
+
   defdirective gatus_monitor_endpoints(opts \\ []) do
     Scope.add_monitor_endpoints(opts)
   end
