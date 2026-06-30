@@ -84,9 +84,9 @@ defmodule HostKit.Providers.GatusTest do
         service :monitoring do
           gatus_config "/etc/gatus/gatus.yaml", owner: "root", group: service_user(), mode: 0o640 do
             web address: "127.0.0.1", port: 8080
-            gatus_storage :sqlite, path: "/var/lib/gatus/gatus.db"
+            storage :sqlite, path: "/var/lib/gatus/gatus.db"
 
-            telegram_alerting token: "${MONITORING_TELEGRAM_BOT_TOKEN}", id: "${MONITORING_TELEGRAM_CHAT_ID}" do
+            telegram token: "${MONITORING_TELEGRAM_BOT_TOKEN}", id: "${MONITORING_TELEGRAM_CHAT_ID}" do
               default_alert enabled: true,
                 "failure-threshold": 3,
                 "success-threshold": 2,
@@ -103,6 +103,11 @@ defmodule HostKit.Providers.GatusTest do
                 alerts: [:telegram]
               )
             ])
+
+            external_endpoint "Host health", group: "elixir-toys", token: "${GATUS_HOST_HEALTH_TOKEN}" do
+              heartbeat interval: "30m"
+              alert :telegram, description: "Host health failed", "send-on-resolved": true
+            end
           end
         end
       end
@@ -139,6 +144,21 @@ defmodule HostKit.Providers.GatusTest do
                  interval: "1m",
                  conditions: ["[STATUS] == 200", "[RESPONSE_TIME] < 5000"],
                  alerts: [[type: "telegram"]]
+               ]
+             ],
+             "external-endpoints": [
+               [
+                 name: "Host health",
+                 group: "elixir-toys",
+                 token: "${GATUS_HOST_HEALTH_TOKEN}",
+                 heartbeat: [interval: "30m"],
+                 alerts: [
+                   [
+                     type: "telegram",
+                     description: "Host health failed",
+                     "send-on-resolved": true
+                   ]
+                 ]
                ]
              ]
            ]

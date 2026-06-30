@@ -384,7 +384,12 @@ defmodule HostKit.DSL do
   end
 
   defdirective(storage(name, opts)) do
-    Scope.put_storage(name, opts)
+    if Code.ensure_loaded?(HostKit.Providers.Gatus.Scope) and
+         HostKit.Providers.Gatus.Scope.active?() do
+      HostKit.Providers.Gatus.Scope.put_storage(name, opts)
+    else
+      Scope.put_storage(name, opts)
+    end
   end
 
   defdirective(storage_volume(name)) do

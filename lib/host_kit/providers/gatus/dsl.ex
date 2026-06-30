@@ -11,9 +11,14 @@ defmodule HostKit.Providers.Gatus.DSL do
     finish(HostScope.add_resource(Scope.finish_config()))
   end
 
+  defblock telegram(opts \\ []) do
+    start(Scope.start_telegram(opts))
+    finish(Scope.finish_telegram())
+  end
+
   defblock telegram_alerting(opts \\ []) do
-    start(Scope.start_telegram_alerting(opts))
-    finish(Scope.finish_telegram_alerting())
+    start(Scope.start_telegram(opts))
+    finish(Scope.finish_telegram())
   end
 
   defdirective web(opts) do
@@ -26,6 +31,23 @@ defmodule HostKit.Providers.Gatus.DSL do
 
   defdirective default_alert(opts) do
     Scope.put_default_alert(opts)
+  end
+
+  defblock external_endpoint(name, opts \\ []) do
+    start(Scope.start_external_endpoint(name, opts))
+    finish(Scope.finish_external_endpoint())
+  end
+
+  defdirective heartbeat(opts) do
+    Scope.put_heartbeat(opts)
+  end
+
+  defdirective condition(condition) do
+    Scope.add_condition(condition)
+  end
+
+  defdirective alert(type, opts \\ []) do
+    Scope.add_alert(type, opts)
   end
 
   defdirective gatus_endpoint(name, opts) do
