@@ -1,278 +1,116 @@
 ---
-name: hostkit-config-authoring
-description: Write, review, and migrate HostKit desired-state configs using current HostKit DSL conventions.
+name: hostkit
+description: Use HostKit to model, plan, apply, audit, and recover Linux host desired state from existing HostKit configs. Use when working with HostKit-managed deployments, infra/config.exs, systemd/services, files, secrets, monitoring, backups, bootstrap, drift, or disaster recovery.
 ---
 
-# HostKit config authoring
+# HostKit
 
-Use this skill when writing or reviewing HostKit project configs such as `infra/config.exs`, examples, deployment guides, and executable snippets.
+Use this skill when operating or editing a HostKit-managed host or project. HostKit configs are the source of truth for host state; live server edits are temporary inspection/emergency actions and must be reconciled back into HostKit.
 
-## Core principles
+## What HostKit is for
 
-- HostKit configs are executable Elixir, but should read as declarative desired state.
-- Prefer the public DSL over ad hoc helper code.
-- Keep declarations inspectable: DSL must compile to ordinary HostKit structs/resources.
-- Do not hide runtime behavior in recipes, helper modules, or templates.
-- Keep service and host concepts separate:
-  - `host` is a connection endpoint.
-  - `instance` is lifecycle-managed compute.
-  - nested `host` inside `instance` is the connection endpoint into that instance.
+HostKit models Linux host desired state in Elixir and produces inspectable plans before applying changes. Typical managed state includes:
+
+- directories, files, symlinks, templates, and structured config files
+- system users/groups and service accounts
+- systemd daemons, oneshot jobs, and timers
+- releases and current symlinks
+- Caddy/Gatus/provider-specific config through existing provider DSL
+- backups, restore inputs, monitoring, and readiness checks
+- externally managed secret files represented as redacted resources
+
+## Operating rules
+
+- Plan before apply unless the user explicitly asks for emergency action.
+- Change HostKit source, not generated live files.
+- Use existing DSL and existing project patterns; do not invent new DSL while operating an end-user project.
+- Avoid raw systemd/YAML/shell escape hatches when an existing HostKit DSL form already exists.
+- Do not hardcode repeated absolute paths. Use declared roots and .
+- Do not render or commit secrets. Model external secret files as redacted.
+- Do not introduce stack drift: no dependency, web server, database, queue, storage, or deployment-model swaps without explicit approval.
+- Keep operational logic Elixir-first when practical; shell belongs at OS/tool boundaries.
+
+## Standard workflow
+
+1. Read the relevant project instructions and HostKit config.
+2. Find existing examples in the same config before editing.
+3. Edit HostKit source (, , docs), not live generated files.
+4. Run syntax/format checks.
+5. Run  for the smallest relevant service set.
+6. Apply only after the plan is understood.
+7. Verify service state and public/internal health.
+8. Commit/push source changes and update docs if bootstrap/recovery behavior changed.
+
+## Common commands
+
+
+
+Use the consuming project’s exact paths. Production configs often live at paths such as ; do not assume the current directory is the deployment checkout.
 
 ## Paths
 
-Use the unified `path/2` helper.
+Declare roots once in the project and use  everywhere:
 
-Declare project roots once:
 
-```elixir
-roots source: "/opt/toys/src",
-      data: "/srv/toys",
-      state: "/var/lib/toys",
-      cache: "/var/cache/toys",
-      config: "/etc/toys",
-      opt: "/opt/toys",
-      caddy: "/etc/caddy",
-      systemd: "/etc/systemd/system",
-      sbin: "/usr/local/sbin"
-```
 
-Then use `path/2` everywhere:
+Inside a service, conventional roots are service-scoped:
 
-```elixir
-path(:data)
-path(:config, "app.ini")
-path(:opt, "current/forgejo")
-path(:sbin, "toys-route")
-```
 
-Inside a `service`, conventional service roots are scoped by service context:
 
-```elixir
-service :forgejo do
-  path(:data)                 # /srv/toys/forgejo
-  path(:config, "app.ini")    # /etc/toys/forgejo/app.ini
-end
-```
+Global/custom roots remain global:
 
-Custom/global roots remain root-relative, even inside a service:
 
-```elixir
-service :forgejo do
-  path(:opt, "current/forgejo") # /opt/toys/current/forgejo
-end
-```
 
-Do not reintroduce `root_path`. Do not create anonymous path helpers such as `opt_current.("forgejo")`; add/use project roots and `path/2` instead.
+When a path is reused, bind it once near the declaration:
 
-### Path expansion/resolution
 
-`path/2` joins configured roots and children. It does not perform shell-style expansion such as `~user`, environment substitution, globbing, or realpath resolution. If a root really needs expansion, make that explicit in the config:
 
-```elixir
-roots local_cache: Path.expand("~/.cache/hostkit-demo")
-```
+Store managed payloads under a target-shaped  tree, then read them from the config helper:
 
-Prefer absolute roots for production configs.
 
-## RPC service bindings
 
-Use `listen :rpc, protocol: :rpc` for same-host RPC listeners. With no `port:` or `socket:`, HostKit defaults to a Unix socket under the configured `:run` root and current service path, for example `/run/apps/catalog/rpc.sock` when `roots run: "/run/apps"` and `service :catalog`.
-
-Provider services declare broad RPC surfaces:
+## Files and secrets
 
-```elixir
-service :catalog do
-  daemon do
-    listen :rpc, protocol: :rpc
-  end
+For managed static files:
 
-  rpc do
-    expose :query
-    expose :control
-  end
-end
-```
 
-Caller services declare Docker-like bindings:
 
-```elixir
-service :web do
-  bind :catalog, rpc: [:query]
-end
-```
+For externally provisioned secret-bearing files that HostKit must not render:
 
-HostKit owns service names, listener/socket locations, broad surface bindings, validation, caller-local binding files such as `/etc/apps/web/rpc.exs`, and derived local socket access. By default, RPC sockets are owned by the provider service user/group with mode `0660`, and `bind` adds the caller service account to the provider service group when the caller declares an account resource. Do not list exact operation names in HostKit; SafeRPC or another runtime handshake owns concrete ops and schemas.
 
-## Service identity and paths
 
-Prefer the `service` `path:` option when the on-disk slug differs from the logical service name:
+Redacted content is for existence/metadata/drift modeling. It is intentionally not renderable.
 
-```elixir
-service :hex_mirror, path: "hex-mirror" do
-  path(:data) # /srv/toys/hex-mirror
-end
-```
+## Systemd
 
-Use logical service names for readability. Use `path:` only when an existing external path/unit/user convention requires a different path segment. Do not add a separate directive for this concept.
+Prefer existing high-level systemd DSL in configs:
 
-When adding recipes, providers, workspace helpers, readiness checks, ingress renderers, or generated resource names, use `HostKit.Naming` instead of hand-rolled string replacement/interpolation for path, identity, unit, user, readiness, route, or command names. Prefer suffixless `daemon`/`schedule` names; HostKit normalizes `.service` and `.timer`.
 
-## Files and templates
 
-Prefer managed file payloads under a target-shaped hierarchy:
+For periodic oneshot work:
 
-```text
-infra/files/root/usr/local/sbin/tool
-infra/files/root/etc/caddy/Caddyfile
-```
-
-Read them through a tiny config-local file helper, for example:
-
-```elixir
-defmodule Infra.Files do
-  @root Path.expand("files/root", __DIR__)
-  def read(path), do: File.read!(Path.join(@root, path))
-end
-
-file path(:sbin, "tool"), content: Infra.Files.read("usr/local/sbin/tool")
-```
-
-Prefer format-specific resources for dotenv/INI/YAML when the file is naturally data, especially service config such as env files, Forgejo `app.ini`, and Gatus YAML. Use `Keyword` syntax for ordered config data:
-
-```elixir
-dotenv path(:config, "env"), owner: "root", group: service_user(), mode: 0o640 do
-  set "MIX_ENV", "prod"
-  secret "GENERATED_TOKEN", env: :redacted
-end
-
-ini path(:config, "app.ini"), owner: "root", group: service_user(), mode: 0o640 do
-  set "APP_NAME", "elixir.toys git"
-
-  section "server" do
-    set "DOMAIN", "git.elixir.toys"
-    set "ROOT_URL", "https://git.elixir.toys/"
-    secret "LFS_JWT_SECRET", env: :redacted
-  end
-end
-
-yaml path(:config, "gatus.yaml"),
-  content: %{
-    "storage" => %{"type" => "sqlite", "path" => path(:state, "gatus.db")},
-    "endpoints" => [
-      %{"name" => "Forgejo", "url" => "https://git.elixir.toys", "conditions" => ["[STATUS] == 200"]}
-    ]
-  }
-```
-
-Use first-class EEx templates for deterministic rendered text files with small assign maps:
-
-```elixir
-template path(:config, "app.ini"),
-  from: "templates/app.ini.eex",
-  assigns: %{
-    domain: "git.elixir.toys",
-    data_dir: path(:data)
-  },
-  owner: "root",
-  group: service_user(),
-  mode: 0o640
-```
 
-`from:` paths in DSL configs are resolved relative to the declaring config file. Runtime structs may use absolute `from:` paths or inline `source:`. Templates, dotenv files, and structured config resources are first-class resources in plans and render to ordinary managed files during read/apply. Secret/redacted env/config values compare only public dotenv entries, INI keys, or YAML paths during plan reads; `:redacted` values are intentionally not renderable for apply. Secret sources support `env:`, `file:`, and `command:`. Template assigns containing secrets or `:redacted` are rejected until redacted template diffs exist. Use `argv/2` for long structured CLI commands instead of raw flag lists.
 
-Keep templates inspectable and deterministic. Do not hide runtime behavior or shell workflows in templates. Do not commit secrets; use `content: :redacted` for existing secret-bearing files managed elsewhere, and avoid passing raw secrets as template assigns until redacted template diffs are explicitly supported.
+Use raw , , , , or  only when the low-level systemd directive itself is the requirement or no higher-level DSL exists.
 
-## Symlinks
+## Monitoring
 
-Use first-class symlink resources for current-release pointers:
+Prefer one alerting surface. If Gatus is the alerting dashboard, push internal host checks into Gatus external endpoints instead of sending separate Telegram alerts from another script.
 
-```elixir
-symlink path(:opt, "current/forgejo"),
-  to: path(:opt, "releases/forgejo/15.0.3"),
-  owner: "root",
-  group: "root"
-```
+Good shape:
 
-Do not model symlinks as directories or command-only operations.
 
-## Systemd and services
 
-Prefer human service DSL for ordinary daemons:
+Keep Gatus private unless the project explicitly documents protected public exposure.
 
-```elixir
-daemon do
-  exec [path(:opt, "current/app/bin/app"), "start"]
-  isolate do
-    writable :data
-    network :loopback
-  end
-end
-```
+## Red flags
 
-Use raw `systemd_service`, `unit`, `service`, `timer`, and `read_write_paths` only when exact low-level systemd state is the point.
+Stop and ask before proceeding if you are about to:
 
-For existing production units, first model the current unit exactly and require a no-op plan before making improvements.
-
-## Instances
-
-Use `instance`, not `machine`, for lifecycle-managed compute.
-
-```elixir
-instance :demo do
-  backend :incus
-  image "images:ubuntu/24.04"
-  kind :container
-  lifecycle :ephemeral
-
-  host :guest, at: "127.0.0.1" do
-    ssh do
-      user "root"
-      port 2222
-      accept_hosts true
-    end
-  end
-end
-```
-
-Use `backend`, not `with:`, for implementation selection. Provider registration/config and backend selection are different concepts.
-
-## Tests and snippets
-
-Do not build HostKit DSL snippets with interpolated strings. Use quoted AST with `unquote` or plain runtime structs/APIs:
-
-```elixir
-Code.eval_quoted(
-  quote do
-    use HostKit.DSL
-
-    project :demo do
-      symlink unquote(link), to: unquote(target)
-    end
-  end
-)
-```
-
-Prefer semantic tests that validate resources/plans over regex style checks.
-
-## Migration workflow
-
-For real hosts:
-
-1. Model current state first.
-2. Run read-only plan.
-3. Require `0 create, 0 update, 0 delete, 0 read errors` before refactoring behavior.
-4. Make one small slice at a time.
-5. Commit each stable no-op slice separately.
-6. Do not apply unless explicitly approved.
-
-On the target host itself, prefer local read-only planning:
-
-```sh
-mix host_kit.plan /path/to/infra/config.exs --local --sudo
-```
-
-Remote planning is for off-host control planes and depends on HostKit SSH credentials, not OpenSSH/tssh control sockets.
-
-## Keep this skill current
-
-When HostKit DSL, resource semantics, path conventions, file/template behavior, instance behavior, or config-writing conventions change, update this `SKILL.md` in the same change.
+- hand-edit a live generated config/unit/script as the lasting fix
+- add hardcoded absolute paths repeatedly instead of 
+- bypass existing HostKit DSL with raw systemd/YAML/shell
+- render redacted or secret values into source
+- install new server runtimes or production dependencies to work around a blocker
+- leave a manual step undocumented
+- make Gatus/status dashboards public without explicit protection and docs
