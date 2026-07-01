@@ -52,7 +52,6 @@ defmodule HostKit.Recipes.OTPRelease do
               &1,
               &2
               |> Keyword.put_new(:user, service_user())
-              |> Keyword.put_new(:stop_unit, unit)
             ),
           timeout: artifact.timeout,
           down: :irreversible,
@@ -66,6 +65,12 @@ defmodule HostKit.Recipes.OTPRelease do
       yield()
 
       lifecycle_commands = HostKit.DSL.Lifecycle.Scope.finish_context(lifecycle_context)
+
+      lifecycle_commands =
+        HostKit.Recipes.OTPRelease.with_stop_dependency(
+          lifecycle_commands,
+          artifact.commands.stop
+        )
 
       package(:tar, as: "tar")
 
@@ -136,6 +141,21 @@ defmodule HostKit.Recipes.OTPRelease do
         to: release_dir,
         depends_on: [{:command, artifact.commands.unpack}]
       )
+
+      if lifecycle_commands != [] do
+        command(artifact.commands.stop,
+          exec: {"systemctl", ["stop", unit]},
+          success_codes: [0, 5],
+          timeout: artifact.timeout,
+          down: :irreversible,
+          inputs: [release_dir],
+          depends_on: [
+            {:command, artifact.commands.unpack},
+            {:symlink, current_dir}
+          ],
+          meta: %{otp_release_artifact: artifact.manifest_path}
+        )
+      end
 
       for lifecycle_command <- lifecycle_commands do
         HostKit.DSL.Scope.add_resource(lifecycle_command)
@@ -229,6 +249,7 @@ defmodule HostKit.Recipes.OTPRelease do
       release: %{name: release_name},
       commands: %{
         unpack: Naming.resource([app_name, :unpack]),
+        stop: Naming.resource([app_name, :stop_for_lifecycle]),
         ready: Naming.resource([app_name, :ready])
       }
     }
@@ -405,6 +426,15 @@ defmodule HostKit.Recipes.OTPRelease do
     end
   end
 
+  def with_stop_dependency([], _stop_command), do: []
+
+  def with_stop_dependency(commands, stop_command) do
+    Enum.map(commands, fn command ->
+      depends_on = [{:command, stop_command} | command.depends_on]
+      %{command | depends_on: Enum.uniq(depends_on)}
+    end)
+  end
+
   def build_release_kit_artifact!(artifact, opts \\ []) do
     cwd = Map.fetch!(artifact, :cwd)
     mix_env = Map.fetch!(artifact, :mix_env)
@@ -445,28 +475,13 @@ defmodule HostKit.Recipes.OTPRelease do
   def lifecycle_command_name(app_name, step), do: Naming.resource([app_name, step])
 
   def release_eval_exec(release_bin, env_path, expression, opts \\ []) do
-    env_path = HostKit.Shell.escape(env_path)
-    release_bin = HostKit.Shell.escape(release_bin)
-    expression = HostKit.Shell.escape(expression)
+    script = "set -a && . \"$1\" && set +a && exec \"$2\" eval \"$3\""
+    args = ["sh", env_path, release_bin, expression]
 
-    eval_script = "set -a && . #{env_path} && set +a && exec #{release_bin} eval #{expression}"
-
-    user_script =
-      case Keyword.get(opts, :user) do
-        nil ->
-          eval_script
-
-        user ->
-          "exec sudo -u #{HostKit.Shell.escape(user)} -H sh -c #{HostKit.Shell.escape(eval_script)}"
-      end
-
-    script =
-      case Keyword.get(opts, :stop_unit) do
-        nil -> user_script
-        unit -> "systemctl stop #{HostKit.Shell.escape(unit)} || true; #{user_script}"
-      end
-
-    {"sh", ["-c", script]}
+    case Keyword.get(opts, :user) do
+      nil -> {"sh", ["-c", script | args]}
+      user -> {"sudo", ["-u", user, "-H", "sh", "-c", script | args]}
+    end
   end
 
   def release_kit_command(%{out_dir: out_dir}) do
@@ -551,6 +566,7 @@ defmodule HostKit.Recipes.OTPRelease do
       release: %{name: to_string(name)},
       commands: %{
         unpack: Naming.resource([app_name, :unpack]),
+        stop: Naming.resource([app_name, :stop_for_lifecycle]),
         ready: Naming.resource([app_name, :ready])
       }
     }

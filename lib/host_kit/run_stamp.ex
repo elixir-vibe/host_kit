@@ -22,6 +22,7 @@ defmodule HostKit.RunStamp do
     |> Map.put("kind", "command")
     |> Map.put("exec", Tuple.to_list(resource.exec))
     |> Map.put("runtime", dump_runtime(resource.runtime))
+    |> Map.put("success_codes", resource.success_codes)
   end
 
   def desired(%Shell{} = resource, opts) do

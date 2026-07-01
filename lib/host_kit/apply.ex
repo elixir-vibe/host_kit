@@ -768,6 +768,7 @@ defmodule HostKit.Apply do
     |> maybe_put(:cd, command.cwd)
     |> maybe_put(:env, command.env)
     |> maybe_put(:timeout, command.timeout)
+    |> maybe_put(:success_codes, command.success_codes)
   end
 
   defp maybe_put(opts, _key, nil), do: opts

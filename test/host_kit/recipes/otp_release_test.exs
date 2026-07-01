@@ -128,19 +128,49 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert Enum.any?(resources, fn
              %HostKit.Resources.Command{
-               name: "demo_app_migrate",
-               phase: :before_start,
+               name: "demo_app_stop_for_lifecycle",
+               exec: {"systemctl", ["stop", "demo-app.service"]},
+               success_codes: [0, 5],
+               inputs: ["/opt/example/demo_app/releases/abc123"],
                depends_on: [
                  {:command, "demo_app_unpack"},
                  {:symlink, "/opt/example/demo_app/current"}
                ],
-               inputs: ["/opt/example/demo_app/releases/abc123"],
-               exec: {"sh", ["-c", migrate]}
+               down: :irreversible,
+               meta: %{otp_release_artifact: ^manifest_path}
              } ->
-               migrate =~ "systemctl stop 'demo-app.service'" and
-                 migrate =~ "sudo -u 'demo-app' -H sh -c" and
-                 migrate =~ "'/opt/example/demo_app/current/bin/demo_app'" and
-                 migrate =~ "DemoApp.ReleaseTasks.migrate()"
+               true
+
+             _resource ->
+               false
+           end)
+
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Command{
+               name: "demo_app_migrate",
+               phase: :before_start,
+               depends_on: [
+                 {:command, "demo_app_stop_for_lifecycle"},
+                 {:command, "demo_app_unpack"},
+                 {:symlink, "/opt/example/demo_app/current"}
+               ],
+               inputs: ["/opt/example/demo_app/releases/abc123"],
+               exec:
+                 {"sudo",
+                  [
+                    "-u",
+                    "demo-app",
+                    "-H",
+                    "sh",
+                    "-c",
+                    "set -a && . \"$1\" && set +a && exec \"$2\" eval \"$3\"",
+                    "sh",
+                    "/etc/example/demo_app/env",
+                    "/opt/example/demo_app/current/bin/demo_app",
+                    "DemoApp.ReleaseTasks.migrate()"
+                  ]}
+             } ->
+               true
 
              _resource ->
                false

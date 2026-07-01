@@ -26,16 +26,22 @@ defmodule HostKit.Runner.Ops do
 
   @spec cmd(keyword(), String.t(), [String.t()], keyword()) :: :ok | {:error, term()}
   def cmd(opts, command, args, command_opts \\ []) do
+    {success_codes, command_opts} = Keyword.pop(command_opts, :success_codes, [0])
+    success_codes = MapSet.new(success_codes)
     {command, args} = maybe_sudo(command, args, opts)
 
-    case Runner.cmd(
-           runner(opts),
-           command,
-           args,
-           command_run_opts(opts, command_opts)
-         ) do
-      {_output, 0} -> :ok
-      {output, status} -> {:error, {:command_failed, command, args, status, output}}
+    {output, status} =
+      Runner.cmd(
+        runner(opts),
+        command,
+        args,
+        command_run_opts(opts, command_opts)
+      )
+
+    if MapSet.member?(success_codes, status) do
+      :ok
+    else
+      {:error, {:command_failed, command, args, status, output}}
     end
   end
 
