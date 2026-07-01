@@ -253,7 +253,7 @@ defmodule HostKit.Recipes.OTPRelease do
     prepare_resources =
       resources
       |> Enum.filter(&prepare_dependency?/1)
-      |> Kernel.++(Enum.map(artifacts, &prepare_command(&1, resources)))
+      |> Kernel.++(Enum.flat_map(artifacts, &prepare_commands(&1, resources)))
 
     %{
       project
@@ -275,22 +275,42 @@ defmodule HostKit.Recipes.OTPRelease do
   defp prepare_dependency?(%HostKit.Resources.Mise{}), do: true
   defp prepare_dependency?(_resource), do: false
 
-  defp prepare_command(artifact, resources) do
+  defp prepare_commands(artifact, resources) do
     source_inputs = release_kit_source_inputs(artifact, resources)
+    deps = release_kit_deps_command(artifact, source_inputs)
+    artifact_command = release_kit_artifact_command(artifact, source_inputs, deps)
 
-    HostKit.Resources.Command.new(release_kit_command_name(artifact),
-      exec: release_kit_exec(artifact),
+    [deps, artifact_command]
+  end
+
+  defp release_kit_deps_command(artifact, source_inputs) do
+    HostKit.Resources.Command.new(release_kit_command_name(artifact, :deps),
+      exec: release_kit_exec(artifact, ["deps.get", "--only", artifact.mix_env]),
+      cwd: artifact.cwd,
+      env: release_kit_env(artifact),
+      inputs:
+        source_inputs ++ release_kit_existing_path_inputs(artifact, ["mix.exs", "mix.lock"]),
+      outputs: ["deps"],
+      timeout: artifact.timeout,
+      meta: release_kit_command_meta(artifact)
+    )
+  end
+
+  defp release_kit_artifact_command(artifact, source_inputs, deps) do
+    HostKit.Resources.Command.new(release_kit_command_name(artifact, :artifact),
+      exec: release_kit_exec(artifact, release_kit_command(artifact)),
       cwd: artifact.cwd,
       env: release_kit_env(artifact),
       inputs: source_inputs ++ release_kit_path_inputs(artifact),
       outputs: [release_kit_manifest_output(artifact)],
       timeout: artifact.timeout,
-      meta: %{release_kit_artifact: artifact.manifest}
+      depends_on: [HostKit.Resource.id(deps)],
+      meta: release_kit_command_meta(artifact)
     )
   end
 
-  defp release_kit_command_name(%{name: name}),
-    do: Naming.resource([name, :release_kit, :artifact])
+  defp release_kit_command_name(%{name: name}, step),
+    do: Naming.resource([name, :release_kit, step])
 
   defp release_kit_source_inputs(%{cwd: cwd}, resources) do
     cwd = Path.expand(cwd)
@@ -308,9 +328,12 @@ defmodule HostKit.Recipes.OTPRelease do
     cwd == app_path or cwd == checkout or String.starts_with?(cwd <> "/", app_path <> "/")
   end
 
-  defp release_kit_path_inputs(%{cwd: cwd}) do
-    ["mix.exs", "mix.lock", "config", "lib", "assets"]
-    |> Enum.filter(&File.exists?(Path.join(cwd, &1)))
+  defp release_kit_path_inputs(artifact) do
+    release_kit_existing_path_inputs(artifact, ["mix.exs", "mix.lock", "config", "lib", "assets"])
+  end
+
+  defp release_kit_existing_path_inputs(%{cwd: cwd}, paths) do
+    Enum.filter(paths, &File.exists?(Path.join(cwd, &1)))
   end
 
   defp release_kit_manifest_output(%{cwd: cwd, manifest: manifest}) do
@@ -319,24 +342,24 @@ defmodule HostKit.Recipes.OTPRelease do
     |> Path.relative_to(Path.expand(cwd))
   end
 
-  defp release_kit_exec(%{user: nil} = artifact) do
-    {"mix", release_kit_command(artifact)}
+  defp release_kit_exec(%{user: nil}, args) do
+    {"mix", args}
   end
 
-  defp release_kit_exec(%{user: user} = artifact) do
-    {"sudo",
-     [
-       "-u",
-       user,
-       "-H",
-       "env",
-       "MIX_ENV=#{artifact.mix_env}",
-       "mix" | release_kit_command(artifact)
-     ]}
+  defp release_kit_exec(%{user: user, mix_env: mix_env}, args) do
+    {"sudo", ["-u", user, "-H", "env", "MIX_ENV=#{mix_env}", "mix" | args]}
   end
 
   defp release_kit_env(%{user: nil, mix_env: mix_env}), do: %{"MIX_ENV" => mix_env}
   defp release_kit_env(%{user: user}) when is_binary(user), do: %{}
+
+  defp release_kit_command_meta(%{manifest: manifest, user: nil}) do
+    %{release_kit_artifact: manifest}
+  end
+
+  defp release_kit_command_meta(%{manifest: manifest, user: user}) when is_binary(user) do
+    %{release_kit_artifact: manifest, target_opts: [sudo: false]}
+  end
 
   defp filter_release_kit_artifacts(artifacts, opts) do
     case Keyword.get(opts, :services) do

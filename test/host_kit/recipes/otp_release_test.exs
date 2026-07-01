@@ -297,6 +297,22 @@ defmodule HostKit.OTPReleaseRecipeTest do
     assert Enum.any?(resources, &match?(%HostKit.Resources.Source{name: :demo_app}, &1))
 
     assert %HostKit.Resources.Command{
+             name: "demo_app_release_kit_deps",
+             exec:
+               {"sudo",
+                ["-u", "deploy", "-H", "env", "MIX_ENV=prod", "mix", "deps.get", "--only", "prod"]},
+             env: %{},
+             cwd: ^app,
+             inputs: [:demo_app, "mix.exs", "mix.lock"],
+             outputs: ["deps"],
+             meta: %{release_kit_artifact: manifest, target_opts: [sudo: false]}
+           } =
+             Enum.find(
+               resources,
+               &match?(%HostKit.Resources.Command{name: "demo_app_release_kit_deps"}, &1)
+             )
+
+    assert %HostKit.Resources.Command{
              name: "demo_app_release_kit_artifact",
              exec:
                {"sudo",
@@ -315,20 +331,28 @@ defmodule HostKit.OTPReleaseRecipeTest do
              cwd: ^app,
              inputs: [:demo_app, "mix.exs", "mix.lock", "lib"],
              outputs: ["_build/prod/artifacts/demo_app.etf"],
-             meta: %{release_kit_artifact: manifest}
-           } = Enum.find(resources, &match?(%HostKit.Resources.Command{}, &1))
+             depends_on: [{:command, "demo_app_release_kit_deps"}],
+             meta: %{release_kit_artifact: ^manifest, target_opts: [sudo: false]}
+           } =
+             Enum.find(
+               resources,
+               &match?(%HostKit.Resources.Command{name: "demo_app_release_kit_artifact"}, &1)
+             )
 
     assert manifest == artifact.manifest
 
     no_user = HostKit.Recipes.OTPRelease.prepare_project(project, [%{artifact | user: nil}])
 
-    no_user_command =
-      Enum.find(HostKit.Project.resources(no_user), &match?(%HostKit.Resources.Command{}, &1))
+    no_user_artifact =
+      no_user
+      |> HostKit.Project.resources()
+      |> Enum.find(&match?(%HostKit.Resources.Command{name: "demo_app_release_kit_artifact"}, &1))
 
     assert %HostKit.Resources.Command{
              exec: {"mix", ["release_kit.artifact", "--out-dir", "_build/prod/artifacts"]},
-             env: %{"MIX_ENV" => "prod"}
-           } = no_user_command
+             env: %{"MIX_ENV" => "prod"},
+             meta: %{release_kit_artifact: ^manifest}
+           } = no_user_artifact
   end
 
   test "ReleaseKit build failures include command context" do
