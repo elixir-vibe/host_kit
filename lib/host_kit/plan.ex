@@ -688,6 +688,10 @@ defmodule HostKit.Plan do
       HostKit.Env.public_entries(desired) == Map.get(actual.meta, :actual_public_entries, %{})
   end
 
+  defp equivalent?(%Source{dirty: :ignore} = desired, %Source{} = actual) do
+    comparable(desired, actual, [:type, :uri, :revision])
+  end
+
   defp equivalent?(%Source{} = desired, %Source{} = actual) do
     comparable(desired, actual, [:type, :uri, :revision]) and
       not Map.get(actual.meta, :dirty, false)

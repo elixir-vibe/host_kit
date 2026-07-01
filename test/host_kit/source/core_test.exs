@@ -135,6 +135,38 @@ defmodule HostKit.SourceTest do
     assert diagnostic.details.checkout == checkout
   end
 
+  test "dirty ignore source is in sync when resolved revision matches" do
+    repo = create_repo!()
+    checkout = Path.join(repo.root, "checkout")
+
+    source =
+      Source.new(:app,
+        git: repo.uri,
+        ref: "main",
+        checkout: checkout,
+        dirty: :ignore
+      )
+
+    assert {:ok, resolved} = HostKit.Source.Git.resolve(source)
+    assert :ok = HostKit.Source.Git.apply(resolved, [])
+    File.write!(Path.join(checkout, "README.md"), "dirty\n")
+
+    project = %HostKit.Project{
+      name: :source_dirty_ignore,
+      services: [
+        %HostKit.Service{
+          name: :app,
+          resources: [HostKit.Resources.Package.new(:git, as: "git"), source]
+        }
+      ]
+    }
+
+    assert {:ok, plan} = HostKit.plan(project, reader: HostKit.Local)
+
+    assert %HostKit.Change{action: :no_op, reason: :in_sync} =
+             Enum.find(plan.changes, &(&1.resource_id == {:source, :app}))
+  end
+
   test "git source resolves branch refs from ls-remote semantics" do
     repo = create_repo!()
 
