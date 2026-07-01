@@ -201,20 +201,22 @@ defmodule HostKit.Plan.Format do
     "systemd #{unit} #{state}#{restart}"
   end
 
-  defp format_readiness_check(%HostKit.Readiness.HTTP{
-         url: url,
-         expect_status: status,
-         expect_body: nil
-       }) do
-    "http #{url}#{format_http_status(status)}"
+  defp format_readiness_check(
+         %HostKit.Readiness.HTTP{
+           expect_status: status,
+           expect_body: nil
+         } = http
+       ) do
+    "http #{HostKit.Readiness.HTTP.url(http)}#{format_http_status(status)}"
   end
 
-  defp format_readiness_check(%HostKit.Readiness.HTTP{
-         url: url,
-         expect_status: status,
-         expect_body: body
-       }) do
-    "http #{url}#{format_http_status(status)} contains #{inspect(body)}"
+  defp format_readiness_check(
+         %HostKit.Readiness.HTTP{
+           expect_status: status,
+           expect_body: body
+         } = http
+       ) do
+    "http #{HostKit.Readiness.HTTP.url(http)}#{format_http_status(status)} contains #{inspect(body)}"
   end
 
   defp format_http_status(200), do: ""

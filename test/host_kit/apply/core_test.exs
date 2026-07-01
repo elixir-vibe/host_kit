@@ -6,7 +6,7 @@ defmodule HostKit.ApplyTest do
   alias HostKit.Apply
   alias HostKit.Change
   alias HostKit.Plan
-  alias HostKit.Resources.{Account, Directory, File}
+  alias HostKit.Resources.{Account, Command, Directory, File, Readiness}
   alias HostKit.Systemd
 
   test "requires confirmation outside dry-run" do
@@ -56,6 +56,30 @@ defmodule HostKit.ApplyTest do
     assert_received {HostKit.Apply, %HostKit.Apply.Event{type: :apply_finished}}
 
     Elixir.File.rm_rf!(path)
+  end
+
+  test "orders apply changes by declared dependencies" do
+    command = %Command{name: :prepare, exec: {"true", []}}
+
+    readiness = %Readiness{
+      name: :smoke,
+      checks: [],
+      depends_on: [{:command, :prepare}]
+    }
+
+    plan = %Plan{
+      changes: [
+        %Change{action: :create, resource_id: {:readiness, :smoke}, after: readiness},
+        %Change{action: :create, resource_id: {:command, :prepare}, after: command}
+      ]
+    }
+
+    assert {:ok, results} = Apply.run(plan, dry_run: true)
+
+    assert Enum.map(results, & &1.change.resource_id) == [
+             {:command, :prepare},
+             {:readiness, :smoke}
+           ]
   end
 
   test "dry-runs supported changes without touching filesystem" do

@@ -22,6 +22,32 @@ defmodule HostKit.EndpointTest do
     end
   end
 
+  test "resolves endpoint references in readiness HTTP checks" do
+    project =
+      Code.eval_string("""
+      use HostKit.DSL
+
+      project :demo do
+        service :app do
+          endpoint :http, port: 4000
+
+          ready :smoke do
+            http endpoint(:app, :http), path: "/admin", status: 404
+          end
+        end
+      end
+      """)
+      |> elem(0)
+
+    assert {:ok, plan} = HostKit.plan(project)
+
+    assert %HostKit.Resources.Readiness{checks: [%HostKit.Readiness.HTTP{} = http]} =
+             Enum.find(plan.resources, &match?(%HostKit.Resources.Readiness{name: :smoke}, &1))
+
+    assert HostKit.Readiness.HTTP.url(http) == "http://127.0.0.1:4000/admin"
+    assert http.expect_status == 404
+  end
+
   test "unresolved endpoint diagnostics include suggestions" do
     project =
       Code.eval_string("""

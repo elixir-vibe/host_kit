@@ -18,6 +18,7 @@ defmodule HostKit.DSL.Readiness.Scope do
   end
 
   options :http_check_opts, return: :keyword do
+    field(:path, :string)
     field(:status, :integer)
     field(:expect_status, :integer)
     field(:body, :string)

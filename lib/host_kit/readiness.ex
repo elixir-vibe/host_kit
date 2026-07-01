@@ -111,25 +111,27 @@ defmodule HostKit.Readiness do
   end
 
   defp check_one(%HTTP{} = http, _opts) do
-    case Req.get(http.url, retry: false, receive_timeout: 5_000) do
+    url = HTTP.url(http)
+
+    case Req.get(url, retry: false, receive_timeout: 5_000) do
       {:ok, %{status: status, body: body}} when status == http.expect_status ->
         check_http_body(http, body)
 
       {:ok, %{status: status}} ->
-        {http, {:error, {:unexpected_http_status, http.url, http.expect_status, status}}}
+        {http, {:error, {:unexpected_http_status, url, http.expect_status, status}}}
 
       {:error, reason} ->
-        {http, {:error, {:http_request_failed, http.url, reason}}}
+        {http, {:error, {:http_request_failed, url, reason}}}
     end
   end
 
   defp check_http_body(%HTTP{expect_body: nil}, _body), do: :ok
 
-  defp check_http_body(%HTTP{url: url, expect_body: expected} = http, body) do
+  defp check_http_body(%HTTP{expect_body: expected} = http, body) do
     if body |> body_text() |> String.contains?(expected) do
       :ok
     else
-      {http, {:error, {:http_body_missing_text, url, expected}}}
+      {http, {:error, {:http_body_missing_text, HTTP.url(http), expected}}}
     end
   end
 
@@ -180,7 +182,7 @@ defmodule HostKit.Readiness do
         :ok
 
       %HTTP{} = http ->
-        emit_apply(opts, :health_check_started, readiness, details: %{url: http.url})
+        emit_apply(opts, :health_check_started, readiness, details: %{url: HTTP.url(http)})
     end)
   end
 
@@ -190,7 +192,7 @@ defmodule HostKit.Readiness do
         emit_service_restart(opts, readiness, systemd, :service_active)
 
       %HTTP{} = http ->
-        emit_apply(opts, :health_check_passed, readiness, details: %{url: http.url})
+        emit_apply(opts, :health_check_passed, readiness, details: %{url: HTTP.url(http)})
     end)
   end
 
@@ -202,7 +204,7 @@ defmodule HostKit.Readiness do
       %HTTP{} = http ->
         emit_apply(opts, :health_check_failed, readiness,
           reason: reason,
-          details: %{url: http.url}
+          details: %{url: HTTP.url(http)}
         )
     end)
   end
@@ -211,7 +213,7 @@ defmodule HostKit.Readiness do
     Enum.each(checks, fn
       %HTTP{} = http ->
         emit_apply(opts, :health_check_waiting, readiness,
-          details: Map.merge(details, %{url: http.url})
+          details: Map.merge(details, %{url: HTTP.url(http)})
         )
 
       _check ->

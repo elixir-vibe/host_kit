@@ -73,6 +73,13 @@ defmodule HostKit.Endpoint.Resolver do
     end
   end
 
+  defp resolve_resource(%HostKit.Resources.Readiness{} = readiness, index) do
+    with {:ok, checks} <-
+           resolve_readiness_checks(readiness.checks, index, Resource.id(readiness)) do
+      {:ok, %{readiness | checks: checks}}
+    end
+  end
+
   defp resolve_resource(resource, _index), do: {:ok, resource}
 
   defp resolve_directives(directives, index, resource_id) do
@@ -136,6 +143,18 @@ defmodule HostKit.Endpoint.Resolver do
 
       route ->
         {:ok, route}
+    end)
+  end
+
+  defp resolve_readiness_checks(checks, index, resource_id) do
+    map_while_ok(checks, fn
+      %HostKit.Readiness.HTTP{url: %Endpoint{} = endpoint} = http ->
+        with {:ok, endpoint} <- resolve_endpoint(endpoint, index, resource_id) do
+          {:ok, %{http | url: endpoint}}
+        end
+
+      check ->
+        {:ok, check}
     end)
   end
 

@@ -98,6 +98,7 @@ defmodule HostKit.Apply do
     emit(opts, :apply_started)
 
     changes
+    |> order_changes_by_dependencies()
     |> chunk_package_changes()
     |> Enum.reduce_while({:ok, [], false}, &apply_change_chunk(&1, &2, opts))
     |> then(fn
@@ -114,6 +115,93 @@ defmodule HostKit.Apply do
         error
     end)
   end
+
+  defp order_changes_by_dependencies(changes) do
+    graph = HostKit.Plan.ExecutionGraph.build(%Plan{changes: changes}, include: :all)
+
+    if HostKit.Plan.ExecutionGraph.acyclic?(graph) do
+      stable_topological_order(changes, graph.edges)
+    else
+      changes
+    end
+  end
+
+  defp stable_topological_order(changes, edges) do
+    ids = Enum.map(changes, & &1.resource_id)
+    positions = ids |> Enum.with_index() |> Map.new()
+
+    incoming = Map.new(ids, &{&1, MapSet.new()})
+    dependents = Map.new(ids, &{&1, MapSet.new()})
+
+    {incoming, dependents} =
+      Enum.reduce(edges, {incoming, dependents}, fn edge, {incoming, dependents} ->
+        if Map.has_key?(incoming, edge.from) and Map.has_key?(incoming, edge.to) do
+          {
+            Map.update!(incoming, edge.to, &MapSet.put(&1, edge.from)),
+            Map.update!(dependents, edge.from, &MapSet.put(&1, edge.to))
+          }
+        else
+          {incoming, dependents}
+        end
+      end)
+
+    ready = ready_ids(ids, incoming, positions)
+
+    do_stable_topological_order(
+      changes_by_id(changes),
+      incoming,
+      dependents,
+      positions,
+      ready,
+      []
+    )
+  end
+
+  defp do_stable_topological_order(changes_by_id, incoming, dependents, positions, ready, ordered) do
+    case ready do
+      [] ->
+        if map_size(incoming) == 0 do
+          Enum.reverse(ordered)
+        else
+          changes_by_id |> Map.values() |> Enum.sort_by(&positions[&1.resource_id])
+        end
+
+      [id | rest] ->
+        change = Map.fetch!(changes_by_id, id)
+        dependent_ids = Map.get(dependents, id, MapSet.new())
+
+        {incoming, newly_ready} =
+          Enum.reduce(dependent_ids, {Map.delete(incoming, id), []}, fn dependent_id,
+                                                                        {incoming, newly_ready} ->
+            incoming = Map.update!(incoming, dependent_id, &MapSet.delete(&1, id))
+
+            if incoming |> Map.fetch!(dependent_id) |> MapSet.size() == 0 do
+              {incoming, [dependent_id | newly_ready]}
+            else
+              {incoming, newly_ready}
+            end
+          end)
+
+        ready = (rest ++ newly_ready) |> Enum.uniq() |> Enum.sort_by(&positions[&1])
+
+        do_stable_topological_order(
+          Map.delete(changes_by_id, id),
+          incoming,
+          dependents,
+          positions,
+          ready,
+          [change | ordered]
+        )
+    end
+  end
+
+  defp ready_ids(ids, incoming, positions) do
+    ids
+    |> Enum.filter(&(incoming |> Map.fetch!(&1) |> MapSet.size() == 0))
+    |> Enum.sort_by(&positions[&1])
+  end
+
+  defp changes_by_id(changes), do: Map.new(changes, &{&1.resource_id, &1})
 
   defp chunk_package_changes(changes), do: chunk_package_changes(changes, []) |> Enum.reverse()
 
