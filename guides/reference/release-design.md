@@ -66,7 +66,7 @@ otp_release :my_app,
   manifest: "/opt/apps/my_app/_build/prod/artifacts/my_app.etf"
 ```
 
-During `host_kit.apply`, HostKit first collects these ReleaseKit build specs, runs `mix release_kit.artifact` through the HostKit runner boundary, then reloads the project and consumes the generated manifest normally. Dry runs do not build artifacts. Plain `manifest:` remains supported for workflows that build artifacts outside HostKit.
+During `host_kit.apply`, HostKit first collects these ReleaseKit build specs and builds a normal preparation plan from existing HostKit resources. That preparation plan includes selected `source` resources and generated `command` resources that run `mix release_kit.artifact` through the HostKit runner boundary. Build commands declare source inputs, path inputs, outputs, and stamps, so source checkout and artifact preparation are ordered and reported through the same plan/apply machinery as other resources. HostKit then reloads the project and consumes the generated manifest normally for the deployment plan. Dry runs do not build artifacts. Plain `manifest:` remains supported for workflows that build artifacts outside HostKit.
 
 Release declarations also record release metadata on the existing service. `mix host_kit.clean` uses that metadata to build explicit cleanup command plans for inactive versions. This keeps cleanup out of normal convergence plans while still using inspectable HostKit plan/apply data.
 

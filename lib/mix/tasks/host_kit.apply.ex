@@ -50,13 +50,18 @@ defmodule Mix.Tasks.HostKit.Apply do
         aliases: [dry_run: :dry_run]
       )
 
-    project = load_project(opts, positional)
+    path = List.first(positional) || "infra/config.exs"
+    context = load_project_context(path, opts)
 
-    Options.with_target_opts(opts, project, fn target_opts ->
-      plan = load_plan(opts, project, positional, target_opts)
+    Options.with_target_opts(opts, context.project, fn target_opts ->
       reporter = start_reporter(opts)
 
       try do
+        maybe_prepare_release_kit!(context, opts, target_opts, reporter)
+
+        project = load_project(opts, positional)
+        plan = load_plan(opts, project, positional, target_opts)
+
         case HostKit.apply(plan, Keyword.put(apply_opts(opts, target_opts), :reporter, reporter)) do
           {:ok, results} -> print_results(results)
           {:error, reason} -> Mix.raise("HostKit apply failed: #{inspect(reason)}")
@@ -72,8 +77,32 @@ defmodule Mix.Tasks.HostKit.Apply do
       nil
     else
       path = List.first(positional) || "infra/config.exs"
-      maybe_build_release_kit_artifacts!(path, opts, [])
       HostKit.load!(path, require: Keyword.get_values(opts, :require))
+    end
+  end
+
+  defp load_project_context(path, opts) do
+    cond do
+      Keyword.has_key?(opts, :plan) && !Keyword.has_key?(opts, :host) ->
+        %{path: path, project: nil, artifacts: []}
+
+      Keyword.has_key?(opts, :plan) ->
+        context =
+          HostKit.Recipes.OTPRelease.collect_release_kit_context(path,
+            require: Keyword.get_values(opts, :require),
+            services: Options.selected_services(opts)
+          )
+
+        context |> Map.put(:path, path) |> Map.put(:artifacts, [])
+
+      true ->
+        context =
+          HostKit.Recipes.OTPRelease.collect_release_kit_context(path,
+            require: Keyword.get_values(opts, :require),
+            services: Options.selected_services(opts)
+          )
+
+        Map.put(context, :path, path)
     end
   end
 
@@ -107,60 +136,38 @@ defmodule Mix.Tasks.HostKit.Apply do
     end
   end
 
-  defp maybe_build_release_kit_artifacts!(path, opts, target_opts) do
+  defp maybe_prepare_release_kit!(%{artifacts: []}, _opts, _target_opts, _reporter), do: :ok
+
+  defp maybe_prepare_release_kit!(context, opts, target_opts, reporter) do
     if Keyword.get(opts, :dry_run, false) do
       :ok
     else
-      do_build_release_kit_artifacts!(path, opts, target_opts)
-    end
-  end
+      prepare_project =
+        HostKit.Recipes.OTPRelease.prepare_project(context.project, context.artifacts,
+          services: Options.selected_services(opts)
+        )
 
-  defp do_build_release_kit_artifacts!(path, opts, target_opts) do
-    artifacts =
-      HostKit.Recipes.OTPRelease.collect_release_kit(path,
-        require: Keyword.get_values(opts, :require),
-        services: Options.selected_services(opts)
-      )
+      plan_opts = opts |> plan_opts(target_opts) |> Keyword.delete(:services)
 
-    build_opts = apply_opts(opts, target_opts)
+      case HostKit.plan(prepare_project, plan_opts) do
+        {:ok, plan} ->
+          case HostKit.apply(
+                 plan,
+                 Keyword.put(apply_opts(opts, target_opts), :reporter, reporter)
+               ) do
+            {:ok, _results} ->
+              :ok
 
-    Enum.each(artifacts, fn artifact ->
-      build_release_kit_artifact!(artifact, build_opts, opts)
-    end)
-  end
+            {:error, reason} ->
+              Mix.raise("HostKit ReleaseKit preparation failed: #{inspect(reason)}")
+          end
 
-  defp build_release_kit_artifact!(artifact, build_opts, cli_opts) do
-    label = HostKit.Recipes.OTPRelease.release_kit_label(artifact)
+        {:error, %HostKit.Diagnostics{} = diagnostics} ->
+          Mix.raise(HostKit.Diagnostics.Format.format(diagnostics))
 
-    unless Keyword.get(cli_opts, :quiet, false) do
-      Mix.shell().info("▶ #{label} build")
-    end
-
-    try do
-      HostKit.Recipes.OTPRelease.build_release_kit_artifact!(artifact, build_opts)
-
-      unless Keyword.get(cli_opts, :quiet, false) do
-        Mix.shell().info("✓ #{label} build")
+        {:error, reason} ->
+          Mix.raise("HostKit ReleaseKit preparation plan failed: #{inspect(reason)}")
       end
-    rescue
-      exception in [
-        ArgumentError,
-        CaseClauseError,
-        File.Error,
-        FunctionClauseError,
-        KeyError,
-        MatchError,
-        Mix.Error,
-        Protocol.UndefinedError,
-        RuntimeError,
-        UndefinedFunctionError,
-        WithClauseError
-      ] ->
-        unless Keyword.get(cli_opts, :quiet, false) do
-          Mix.shell().error("✗ #{label} build failed")
-        end
-
-        reraise exception, __STACKTRACE__
     end
   end
 

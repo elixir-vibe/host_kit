@@ -250,6 +250,67 @@ defmodule HostKit.OTPReleaseRecipeTest do
     assert Keyword.fetch!(opts, :env) == %{"MIX_ENV" => "prod"}
   end
 
+  test "builds ReleaseKit preparation project from existing source and command resources" do
+    app =
+      Path.join(
+        System.tmp_dir!(),
+        "hostkit-release-kit-prep-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(Path.join(app, "lib"))
+    File.write!(Path.join(app, "mix.exs"), "defmodule Demo.MixProject do end")
+    File.write!(Path.join(app, "mix.lock"), "%{}")
+
+    artifact = %{
+      name: :demo_app,
+      service_name: :demo_app,
+      cwd: app,
+      manifest: Path.join(app, "_build/prod/artifacts/demo_app.etf"),
+      user: "deploy",
+      mix_env: "prod",
+      out_dir: "_build/prod/artifacts",
+      timeout: 300_000
+    }
+
+    project = %HostKit.Project{
+      name: :demo,
+      meta: %{firewall: :ignored_for_prepare},
+      services: [
+        %HostKit.Service{
+          name: :demo_app,
+          resources: [
+            HostKit.Resources.Package.new(:git, as: "git"),
+            HostKit.Resources.Source.new(:demo_app,
+              git: "https://example.test/demo.git",
+              ref: "main",
+              checkout: app
+            )
+          ]
+        }
+      ]
+    }
+
+    prepare_project = HostKit.Recipes.OTPRelease.prepare_project(project, [artifact])
+    resources = HostKit.Project.resources(prepare_project)
+
+    refute Map.has_key?(prepare_project.meta, :firewall)
+    assert Enum.any?(resources, &match?(%HostKit.Resources.Source{name: :demo_app}, &1))
+
+    assert %HostKit.Resources.Command{
+             name: "demo_app_release_kit_artifact",
+             exec: {"sh", ["-c", script]},
+             cwd: ^app,
+             inputs: [:demo_app, "mix.exs", "mix.lock", "lib"],
+             outputs: ["_build/prod/artifacts/demo_app.etf"],
+             meta: %{release_kit_artifact: manifest}
+           } = Enum.find(resources, &match?(%HostKit.Resources.Command{}, &1))
+
+    assert script =~ "sudo -u 'deploy'"
+    assert script =~ "MIX_ENV='prod'"
+    assert script =~ "'mix' 'release_kit.artifact' '--out-dir' '_build/prod/artifacts'"
+    assert manifest == artifact.manifest
+  end
+
   test "ReleaseKit build failures include command context" do
     test_pid = self()
     runner = Module.concat(__MODULE__, "FailingReleaseKitRunner")

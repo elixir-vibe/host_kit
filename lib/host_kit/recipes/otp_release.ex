@@ -215,6 +215,12 @@ defmodule HostKit.Recipes.OTPRelease do
   end
 
   def collect_release_kit(path, opts \\ []) do
+    path
+    |> collect_release_kit_context(opts)
+    |> Map.fetch!(:artifacts)
+  end
+
+  def collect_release_kit_context(path, opts \\ []) do
     previous_collection = Scope.start_release_kit_collection()
 
     previous_compiler_options = Code.compiler_options()
@@ -225,11 +231,14 @@ defmodule HostKit.Recipes.OTPRelease do
     try do
       Code.compiler_options(ignore_module_conflict: true)
       Enum.each(Enum.drop(files, 1), &Code.require_file/1)
-      Code.eval_file(hd(files))
+      {project, _binding} = Code.eval_file(hd(files))
 
-      Scope.release_kit_artifacts_collected()
-      |> Enum.reverse()
-      |> filter_release_kit_artifacts(opts)
+      artifacts =
+        Scope.release_kit_artifacts_collected()
+        |> Enum.reverse()
+        |> filter_release_kit_artifacts(opts)
+
+      %{project: project, artifacts: artifacts}
     after
       purge_eval_modules(modules_to_purge, loaded_before)
       Code.compiler_options(previous_compiler_options)
@@ -237,8 +246,95 @@ defmodule HostKit.Recipes.OTPRelease do
     end
   end
 
+  def prepare_project(%HostKit.Project{} = project, artifacts, opts \\ []) do
+    project = %{project | meta: Map.delete(project.meta, :firewall)}
+    resources = HostKit.Project.resources(project, services: Keyword.get(opts, :services))
+
+    prepare_resources =
+      resources
+      |> Enum.filter(&prepare_dependency?/1)
+      |> Kernel.++(Enum.map(artifacts, &prepare_command(&1, resources)))
+
+    %{
+      project
+      | services: [],
+        instances: [],
+        proxies: [],
+        resources: prepare_resources,
+        meta: Map.delete(project.meta, :firewall)
+    }
+  end
+
   def build_release_kit_artifacts!(artifacts, opts \\ []) do
     Enum.each(artifacts, &build_release_kit_artifact!(&1, opts))
+  end
+
+  defp prepare_dependency?(%HostKit.Resources.Source{}), do: true
+  defp prepare_dependency?(%HostKit.Resources.Package{}), do: true
+  defp prepare_dependency?(%HostKit.Resources.Capability{}), do: true
+  defp prepare_dependency?(%HostKit.Resources.Mise{}), do: true
+  defp prepare_dependency?(_resource), do: false
+
+  defp prepare_command(artifact, resources) do
+    source_inputs = release_kit_source_inputs(artifact, resources)
+
+    HostKit.Resources.Command.new(release_kit_command_name(artifact),
+      exec: release_kit_exec(artifact),
+      cwd: artifact.cwd,
+      inputs: source_inputs ++ release_kit_path_inputs(artifact),
+      outputs: [release_kit_manifest_output(artifact)],
+      timeout: artifact.timeout,
+      meta: %{release_kit_artifact: artifact.manifest}
+    )
+  end
+
+  defp release_kit_command_name(%{name: name}),
+    do: Naming.resource([name, :release_kit, :artifact])
+
+  defp release_kit_source_inputs(%{cwd: cwd}, resources) do
+    cwd = Path.expand(cwd)
+
+    resources
+    |> Enum.filter(&match?(%HostKit.Resources.Source{}, &1))
+    |> Enum.filter(fn source -> release_kit_cwd_inside_source?(cwd, source) end)
+    |> Enum.map(& &1.name)
+  end
+
+  defp release_kit_cwd_inside_source?(cwd, source) do
+    app_path = source |> HostKit.Resources.Source.app_path() |> Path.expand()
+    checkout = Path.expand(source.checkout)
+
+    cwd == app_path or cwd == checkout or String.starts_with?(cwd <> "/", app_path <> "/")
+  end
+
+  defp release_kit_path_inputs(%{cwd: cwd}) do
+    ["mix.exs", "mix.lock", "config", "lib", "assets"]
+    |> Enum.filter(&File.exists?(Path.join(cwd, &1)))
+  end
+
+  defp release_kit_manifest_output(%{cwd: cwd, manifest: manifest}) do
+    manifest
+    |> Path.expand()
+    |> Path.relative_to(Path.expand(cwd))
+  end
+
+  defp release_kit_exec(%{user: nil} = artifact) do
+    {"sh",
+     [
+       "-c",
+       "exec env MIX_ENV=#{HostKit.Shell.escape(artifact.mix_env)} #{release_kit_shell_command(artifact)}"
+     ]}
+  end
+
+  defp release_kit_exec(%{user: user} = artifact) do
+    script =
+      "exec sudo -u #{HostKit.Shell.escape(user)} -H env MIX_ENV=#{HostKit.Shell.escape(artifact.mix_env)} #{release_kit_shell_command(artifact)}"
+
+    {"sh", ["-c", script]}
+  end
+
+  defp release_kit_shell_command(artifact) do
+    ["mix" | release_kit_command(artifact)] |> Enum.map_join(" ", &HostKit.Shell.escape/1)
   end
 
   defp filter_release_kit_artifacts(artifacts, opts) do
