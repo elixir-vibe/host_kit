@@ -62,14 +62,8 @@ defmodule HostKit.Env do
     error in [System.EnvError] -> {:error, {:missing_secret_env, error.env}}
   end
 
-  defp validate_dotenv(content) do
-    case parse(content) do
-      {:ok, _env} -> {:ok, content}
-      {:error, reason} -> {:error, {:invalid_env_file, reason}}
-    end
-  end
-
-  defp parse(content) do
+  @spec parse(String.t()) :: {:ok, map()} | {:error, term()}
+  def parse(content) do
     path = Path.join(System.tmp_dir!(), "host-kit-env-#{System.unique_integer([:positive])}.env")
 
     try do
@@ -77,6 +71,13 @@ defmodule HostKit.Env do
       Dotenvy.source(path, side_effect: fn _env -> :ok end)
     after
       File.rm(path)
+    end
+  end
+
+  defp validate_dotenv(content) do
+    case parse(content) do
+      {:ok, _env} -> {:ok, content}
+      {:error, reason} -> {:error, {:invalid_env_file, reason}}
     end
   end
 

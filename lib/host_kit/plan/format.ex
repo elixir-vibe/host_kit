@@ -107,6 +107,8 @@ defmodule HostKit.Plan.Format do
       "\n  exec: ",
       format_exec(command.exec),
       format_runtime(command.runtime),
+      format_command_user(command.user),
+      format_paths("env_files", command.env_files),
       format_paths("inputs", command.inputs),
       format_paths("outputs", command.outputs),
       format_stamp(command)
@@ -232,6 +234,9 @@ defmodule HostKit.Plan.Format do
 
   defp format_runtime(nil), do: []
   defp format_runtime({kind, name}), do: ["\n  runtime: ", to_string(kind), ".", to_string(name)]
+
+  defp format_command_user(nil), do: []
+  defp format_command_user(user), do: ["\n  user: ", user]
 
   defp format_paths(_label, []), do: []
 

@@ -64,6 +64,24 @@ defmodule HostKit.CommandAnalysisTest do
     assert {:ok, %HostKit.Plan{}} = HostKit.plan(project)
   end
 
+  test "absolute path executables do not require package providers" do
+    project = %HostKit.Project{
+      name: :absolute_command,
+      services: [
+        %HostKit.Service{
+          name: :demo,
+          resources: [
+            HostKit.Resources.Command.new(:migrate,
+              exec: {"/opt/app/current/bin/app", ["eval", "App.Release.migrate()"]}
+            )
+          ]
+        }
+      ]
+    }
+
+    assert {:ok, %HostKit.Plan{}} = HostKit.plan(project)
+  end
+
   test "mise beam runtime satisfies mix commands" do
     mise =
       HostKit.Resources.Mise.new(name: :beam, packages: false)

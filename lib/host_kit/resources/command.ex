@@ -9,7 +9,9 @@ defmodule HostKit.Resources.Command do
           exec: exec(),
           runtime: runtime(),
           cwd: String.t() | nil,
+          user: String.t() | nil,
           env: %{String.t() => String.t()},
+          env_files: [String.t()],
           creates: String.t() | nil,
           unless: String.t() | nil,
           inputs: [String.t() | atom()],
@@ -27,7 +29,9 @@ defmodule HostKit.Resources.Command do
             exec: nil,
             runtime: nil,
             cwd: nil,
+            user: nil,
             env: %{},
+            env_files: [],
             creates: nil,
             unless: nil,
             inputs: [],
@@ -47,7 +51,9 @@ defmodule HostKit.Resources.Command do
       exec: opts |> Keyword.fetch!(:exec) |> normalize_exec(),
       runtime: Keyword.get(opts, :runtime),
       cwd: Keyword.get(opts, :cwd),
+      user: opts |> Keyword.get(:user) |> normalize_account_name(),
       env: opts |> Keyword.get(:env, %{}) |> HostKit.Env.Normalize.string_map(),
+      env_files: opts |> Keyword.get(:env_files, []) |> List.wrap() |> Enum.map(&to_string/1),
       creates: Keyword.get(opts, :creates),
       unless: Keyword.get(opts, :unless),
       inputs:
@@ -70,6 +76,9 @@ defmodule HostKit.Resources.Command do
 
   defp normalize_input(input) when is_atom(input), do: input
   defp normalize_input(input), do: to_string(input)
+
+  defp normalize_account_name(nil), do: nil
+  defp normalize_account_name(name), do: HostKit.Account.name!(name)
 
   defp normalize_down(_name, policy, _opts) when policy in [nil, :noop, :irreversible], do: policy
   defp normalize_down(_name, %__MODULE__{} = command, _opts), do: command

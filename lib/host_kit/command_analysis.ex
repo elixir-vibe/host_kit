@@ -32,9 +32,9 @@ defmodule HostKit.CommandAnalysis do
   def required_commands(resource), do: Enum.map(required_command_refs(resource), & &1.name)
 
   def required_command_refs(%Command{exec: {command, _args}, runtime: {:mise, _name}}),
-    do: [%{name: command}]
+    do: command_refs(command)
 
-  def required_command_refs(%Command{exec: {command, _args}}), do: [%{name: command}]
+  def required_command_refs(%Command{exec: {command, _args}}), do: command_refs(command)
 
   def required_command_refs(%Shell{script: %HostKit.ShellScript{commands: commands}}),
     do: commands
@@ -44,6 +44,10 @@ defmodule HostKit.CommandAnalysis do
   def required_command_refs(%Readiness{}), do: []
 
   def required_command_refs(_resource), do: []
+
+  defp command_refs(command) do
+    if String.contains?(command, "/"), do: [], else: [%{name: command}]
+  end
 
   defp required_command_diagnostics(resource, provided) do
     resource

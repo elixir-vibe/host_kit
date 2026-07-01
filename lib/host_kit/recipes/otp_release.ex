@@ -45,14 +45,9 @@ defmodule HostKit.Recipes.OTPRelease do
         HostKit.DSL.Lifecycle.Scope.start_context(%{
           collect?: true,
           name: &HostKit.Recipes.OTPRelease.lifecycle_command_name(artifact.name, &1),
-          eval:
-            &HostKit.Recipes.OTPRelease.release_eval_exec(
-              current_bin,
-              env_path,
-              &1,
-              &2
-              |> Keyword.put_new(:user, service_user())
-            ),
+          eval: &HostKit.Recipes.OTPRelease.release_eval_exec(current_bin, env_path, &1, &2),
+          user: service_user(),
+          env_files: [env_path],
           timeout: artifact.timeout,
           down: :irreversible,
           inputs: [release_dir],
@@ -474,14 +469,8 @@ defmodule HostKit.Recipes.OTPRelease do
 
   def lifecycle_command_name(app_name, step), do: Naming.resource([app_name, step])
 
-  def release_eval_exec(release_bin, env_path, expression, opts \\ []) do
-    script = "set -a && . \"$1\" && set +a && exec \"$2\" eval \"$3\""
-    args = ["sh", env_path, release_bin, expression]
-
-    case Keyword.get(opts, :user) do
-      nil -> {"sh", ["-c", script | args]}
-      user -> {"sudo", ["-u", user, "-H", "sh", "-c", script | args]}
-    end
+  def release_eval_exec(release_bin, _env_path, expression, _opts \\ []) do
+    {release_bin, ["eval", expression]}
   end
 
   def release_kit_command(%{out_dir: out_dir}) do

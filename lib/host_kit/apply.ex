@@ -681,9 +681,8 @@ defmodule HostKit.Apply do
     with :ok <- command_current(command, opts),
          :ok <- command_creates(command, opts),
          :ok <- command_unless(command, opts) do
-      {executable, args, command_opts} = command_exec(command, opts)
-
-      with :ok <- Ops.cmd(opts, executable, args, command_opts) do
+      with {:ok, executable, args, command_opts, run_opts} <- command_exec(command, opts),
+           :ok <- Ops.cmd(run_opts, executable, args, command_opts) do
         HostKit.RunStamp.write(command, opts)
       end
     else
@@ -737,38 +736,81 @@ defmodule HostKit.Apply do
   end
 
   defp command_exec(%Command{exec: {command, args}, runtime: nil} = resource, opts) do
-    command_env(command, args, command_opts(resource), opts)
+    with {:ok, command_opts} <- command_opts(resource, opts) do
+      {:ok, command, args, command_opts, opts}
+      |> command_env(resource)
+    end
   end
 
   defp command_exec(%Command{exec: {command, args}, runtime: {:mise, name}} = resource, opts) do
     mise = find_mise!(name, opts)
     tool_args = Enum.map(mise.tools, &"#{&1.name}@#{&1.version}")
 
-    command_opts =
-      resource
-      |> command_opts()
-      |> Keyword.update(:env, mise_env(mise), &Map.merge(mise_env(mise), &1))
+    with {:ok, command_opts} <- command_opts(resource, opts) do
+      command_opts =
+        Keyword.update(command_opts, :env, mise_env(mise), &Map.merge(mise_env(mise), &1))
 
-    command_env(mise.path, ["exec"] ++ tool_args ++ ["--", command | args], command_opts, opts)
-  end
-
-  defp command_env(command, args, command_opts, opts) do
-    case {Keyword.get(opts, :sudo, false), Keyword.pop(command_opts, :env)} do
-      {true, {env, command_opts}} when is_map(env) and map_size(env) > 0 ->
-        env_args = Enum.map(env, fn {key, value} -> "#{key}=#{value}" end)
-        {"env", env_args ++ [command | args], command_opts}
-
-      _other ->
-        {command, args, command_opts}
+      {:ok, mise.path, ["exec"] ++ tool_args ++ ["--", command | args], command_opts, opts}
+      |> command_env(resource)
     end
   end
 
-  defp command_opts(%Command{} = command) do
-    []
-    |> maybe_put(:cd, command.cwd)
-    |> maybe_put(:env, command.env)
-    |> maybe_put(:timeout, command.timeout)
-    |> maybe_put(:success_codes, command.success_codes)
+  defp command_env({:ok, command, args, command_opts, opts}, %Command{user: user})
+       when is_binary(user) do
+    {env, command_opts} = Keyword.pop(command_opts, :env, %{})
+    env_args = env_args(env)
+    run_opts = Keyword.put(opts, :sudo, false)
+
+    {:ok, "sudo", ["-u", user, "-H", "env"] ++ env_args ++ [command | args], command_opts,
+     run_opts}
+  end
+
+  defp command_env({:ok, command, args, command_opts, opts}, _resource) do
+    case {Keyword.get(opts, :sudo, false), Keyword.pop(command_opts, :env)} do
+      {true, {env, command_opts}} when is_map(env) and map_size(env) > 0 ->
+        env_args = env_args(env)
+        {:ok, "env", env_args ++ [command | args], command_opts, opts}
+
+      _other ->
+        {:ok, command, args, command_opts, opts}
+    end
+  end
+
+  defp env_args(env) do
+    env
+    |> Enum.sort_by(fn {key, _value} -> key end)
+    |> Enum.map(fn {key, value} -> "#{key}=#{value}" end)
+  end
+
+  defp command_opts(%Command{} = command, opts) do
+    with {:ok, env} <- command_env_vars(command, opts) do
+      {:ok,
+       []
+       |> maybe_put(:cd, command.cwd)
+       |> maybe_put(:env, env)
+       |> maybe_put(:timeout, command.timeout)
+       |> maybe_put(:success_codes, command.success_codes)}
+    end
+  end
+
+  defp command_env_vars(%Command{env_files: env_files, env: env}, opts) do
+    Enum.reduce_while(env_files, {:ok, %{}}, fn path, {:ok, acc} ->
+      case read_env_file_vars(path, opts) do
+        {:ok, vars} -> {:cont, {:ok, Map.merge(acc, vars)}}
+        {:error, reason} -> {:halt, {:error, {:env_file_load_failed, path, reason}}}
+      end
+    end)
+    |> case do
+      {:ok, vars} -> {:ok, Map.merge(vars, env)}
+      error -> error
+    end
+  end
+
+  defp read_env_file_vars(path, opts) do
+    with {:ok, content} <- HostKit.Runner.read_file(path, opts),
+         {:ok, vars} <- HostKit.Env.parse(content) do
+      {:ok, HostKit.Env.Normalize.string_map(vars)}
+    end
   end
 
   defp maybe_put(opts, _key, nil), do: opts

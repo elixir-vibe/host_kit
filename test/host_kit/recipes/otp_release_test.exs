@@ -155,20 +155,11 @@ defmodule HostKit.OTPReleaseRecipeTest do
                  {:symlink, "/opt/example/demo_app/current"}
                ],
                inputs: ["/opt/example/demo_app/releases/abc123"],
+               user: "demo-app",
+               env_files: ["/etc/example/demo_app/env"],
                exec:
-                 {"sudo",
-                  [
-                    "-u",
-                    "demo-app",
-                    "-H",
-                    "sh",
-                    "-c",
-                    "set -a && . \"$1\" && set +a && exec \"$2\" eval \"$3\"",
-                    "sh",
-                    "/etc/example/demo_app/env",
-                    "/opt/example/demo_app/current/bin/demo_app",
-                    "DemoApp.ReleaseTasks.migrate()"
-                  ]}
+                 {"/opt/example/demo_app/current/bin/demo_app",
+                  ["eval", "DemoApp.ReleaseTasks.migrate()"]}
              } ->
                true
 

@@ -31,7 +31,9 @@ defmodule HostKit.DSL.Lifecycle.Scope do
               eval: nil,
               depends_on: nil,
               cwd: nil,
+              user: nil,
               env: nil,
+              env_files: nil,
               timeout: nil,
               down: nil,
               inputs: nil,
@@ -46,7 +48,9 @@ defmodule HostKit.DSL.Lifecycle.Scope do
             eval: (String.t(), keyword() -> term()) | nil,
             depends_on: term(),
             cwd: term(),
+            user: term(),
             env: term(),
+            env_files: term(),
             timeout: term(),
             down: term(),
             inputs: term(),
@@ -139,7 +143,9 @@ defmodule HostKit.DSL.Lifecycle.Scope do
     opts
     |> put_new_from_context(:depends_on, context)
     |> put_new_from_context(:cwd, context)
+    |> put_new_from_context(:user, context)
     |> put_new_from_context(:env, context)
+    |> put_new_from_context(:env_files, context)
     |> put_new_from_context(:timeout, context)
     |> put_new_from_context(:down, context)
     |> put_new_from_context(:inputs, context)
