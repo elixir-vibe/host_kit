@@ -291,6 +291,7 @@ defmodule HostKit.Recipes.OTPRelease do
       inputs:
         source_inputs ++ release_kit_existing_path_inputs(artifact, ["mix.exs", "mix.lock"]),
       outputs: ["deps"],
+      stamp: release_kit_command_stamp(artifact, :deps),
       timeout: artifact.timeout,
       meta: release_kit_command_meta(artifact)
     )
@@ -303,6 +304,7 @@ defmodule HostKit.Recipes.OTPRelease do
       env: release_kit_env(artifact),
       inputs: source_inputs ++ release_kit_path_inputs(artifact),
       outputs: [release_kit_manifest_output(artifact)],
+      stamp: release_kit_command_stamp(artifact, :artifact),
       timeout: artifact.timeout,
       depends_on: [HostKit.Resource.id(deps)],
       meta: release_kit_command_meta(artifact)
@@ -311,6 +313,10 @@ defmodule HostKit.Recipes.OTPRelease do
 
   defp release_kit_command_name(%{name: name}, step),
     do: Naming.resource([name, :release_kit, step])
+
+  defp release_kit_command_stamp(%{cwd: cwd} = artifact, step) do
+    Path.join([cwd, "_build/hostkit", "#{release_kit_command_name(artifact, step)}.json"])
+  end
 
   defp release_kit_source_inputs(%{cwd: cwd}, resources) do
     cwd = Path.expand(cwd)

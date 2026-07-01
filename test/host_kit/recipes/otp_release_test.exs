@@ -296,6 +296,9 @@ defmodule HostKit.OTPReleaseRecipeTest do
     refute Map.has_key?(prepare_project.meta, :firewall)
     assert Enum.any?(resources, &match?(%HostKit.Resources.Source{name: :demo_app}, &1))
 
+    deps_stamp = Path.join(app, "_build/hostkit/demo_app_release_kit_deps.json")
+    artifact_stamp = Path.join(app, "_build/hostkit/demo_app_release_kit_artifact.json")
+
     assert %HostKit.Resources.Command{
              name: "demo_app_release_kit_deps",
              exec:
@@ -305,6 +308,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
              cwd: ^app,
              inputs: [:demo_app, "mix.exs", "mix.lock"],
              outputs: ["deps"],
+             stamp: ^deps_stamp,
              meta: %{release_kit_artifact: manifest, target_opts: [sudo: false]}
            } =
              Enum.find(
@@ -331,6 +335,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
              cwd: ^app,
              inputs: [:demo_app, "mix.exs", "mix.lock", "lib"],
              outputs: ["_build/prod/artifacts/demo_app.etf"],
+             stamp: ^artifact_stamp,
              depends_on: [{:command, "demo_app_release_kit_deps"}],
              meta: %{release_kit_artifact: ^manifest, target_opts: [sudo: false]}
            } =
