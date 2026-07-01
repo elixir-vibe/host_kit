@@ -402,7 +402,7 @@ The instance owns compute lifecycle metadata (`backend`, `image`, `kind`, `lifec
 
 Down plans delete `lifecycle :ephemeral` instances after their nested content has been rolled back. Persistent instances are intentionally skipped in down plans and reported as warnings rather than destroyed implicitly.
 
-Backend implementations are intentionally separate from the generic DSL. Incus is implemented as a backend for `instance`, not as a user-facing `incus_machine` DSL. The Incus backend maps `expose` declarations to Incus proxy devices.
+Backend implementations are intentionally separate from the generic DSL. Incus is implemented as a backend for `instance`, not as a user-facing `incus_machine` DSL. The Incus backend maps `expose` declarations to Incus proxy devices. The Libvirt backend uses local structured `virsh`, `qemu-img`, and `cloud-localds` commands to define and start KVM domains without adding a libvirt HTTP/control-plane dependency.
 
 Backend configuration stays on the `backend` declaration instead of leaking backend-specific flags into generic plan/apply commands:
 
@@ -422,6 +422,40 @@ instance :demo_vm do
   end
 end
 ```
+
+A minimal persistent Libvirt/KVM staging VM can be declared with the same generic `instance` block:
+
+```elixir
+instance :elixir_parts do
+  backend :libvirt do
+    option :sudo, true
+    option :disk, "/var/lib/libvirt/images/elixir-parts.qcow2"
+    option :base_image, "/var/lib/libvirt/images/debian-12-base.qcow2"
+    option :disk_size, "40G"
+    option :seed_image, "/var/lib/libvirt/images/elixir-parts-seed.iso"
+    option :memory_mb, 4096
+    option :vcpus, 2
+    option :network, "default"
+    option :mac, "52:54:00:12:34:56"
+  end
+
+  kind :vm
+  lifecycle :persistent
+
+  host :guest, at: "192.168.122.50" do
+    ssh do
+      user "root"
+      identity_file "/root/.ssh/hostkit_elixir_parts"
+      accept_hosts true
+      retry attempts: 20, base_delay: 1_000, max_delay: 5_000
+    end
+  end
+
+  target_host :guest
+end
+```
+
+Libvirt backend options include `:virsh`/`:command`, `:qemu_img`, `:cloud_localds`, `:sudo`, `:disk`, `:base_image`, `:disk_size`, `:seed_image`, `:user_data`, `:meta_data`, `:memory_mb`, `:vcpus`, `:network`, `:mac`, `:remove_storage`, and `:remove_nvram`. Storage removal is opt-in for safety.
 
 Backend authors implement `HostKit.Instance.Backend`:
 
