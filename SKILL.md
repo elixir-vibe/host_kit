@@ -25,8 +25,9 @@ HostKit models Linux host desired state in Elixir and produces inspectable plans
 - Change HostKit source, not generated live files.
 - Use existing DSL and existing project patterns; do not invent new DSL while operating an end-user project.
 - Before proposing deployment wrappers or new HostKit entities, reread the relevant HostKit source and prefer existing resources such as `source`, `ready`, `command`/`bash`, `monitor`, services, and recipes.
-- For `otp_release ... release_kit:`, remember artifact builds currently run before normal plan/apply resources, so a `source` resource alone does not update the checkout before the ReleaseKit build.
+- For `otp_release ... release_kit:`, HostKit prepares ReleaseKit artifacts through a normal preparation plan, so selected `source` resources and generated artifact build commands are ordered and reported through plan/apply.
 - Avoid raw systemd/YAML/shell escape hatches when an existing HostKit DSL form already exists.
+- Prefer structured command forms (`argv`, `~SH`, `{command, args}`, `env:`) over `sh -c`; use `bash`/`~BASH` only when shell features are actually required.
 - Do not hardcode repeated absolute paths. Use declared roots and `path/2`.
 - Do not render or commit secrets. Model external secret files as redacted.
 - Do not introduce stack drift: no dependency, web server, database, queue, storage, or deployment-model swaps without explicit approval.

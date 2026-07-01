@@ -15,6 +15,7 @@ mix ci
 - Integrations like Caddy, Forgejo, object storage, and monitoring are providers.
 - Recipes compose higher-level deployments from plain resources; they must not hide uninspectable runtime behavior.
 - DSLs must compile to plain, inspectable structs; runtime API must be primary and Mix tasks should wrap it.
+- Prefer structured command forms (`argv`, `~SH`, `{command, args}`, `env:`) over `sh -c`. Use shell strings only at real shell boundaries, and document/escape them with `HostKit.Shell` helpers.
 - For HostKit config authoring conventions, use `SKILL.md`; keep it current whenever DSL/resource/path/file/template conventions change.
 - Rollback is modeled as a down plan. Keep changes centered on `Project -> Plan -> Apply` and avoid introducing new entities unless existing plan/change/resource abstractions cannot express the behavior.
 - Apply progress is mailbox-first: use `reporter: pid` and `%HostKit.Apply.Event{}` for user-facing progress. Telemetry may mirror events but must not become the primary apply API.

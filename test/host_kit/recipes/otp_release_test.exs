@@ -298,17 +298,37 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert %HostKit.Resources.Command{
              name: "demo_app_release_kit_artifact",
-             exec: {"sh", ["-c", script]},
+             exec:
+               {"sudo",
+                [
+                  "-u",
+                  "deploy",
+                  "-H",
+                  "env",
+                  "MIX_ENV=prod",
+                  "mix",
+                  "release_kit.artifact",
+                  "--out-dir",
+                  "_build/prod/artifacts"
+                ]},
+             env: %{},
              cwd: ^app,
              inputs: [:demo_app, "mix.exs", "mix.lock", "lib"],
              outputs: ["_build/prod/artifacts/demo_app.etf"],
              meta: %{release_kit_artifact: manifest}
            } = Enum.find(resources, &match?(%HostKit.Resources.Command{}, &1))
 
-    assert script =~ "sudo -u 'deploy'"
-    assert script =~ "MIX_ENV='prod'"
-    assert script =~ "'mix' 'release_kit.artifact' '--out-dir' '_build/prod/artifacts'"
     assert manifest == artifact.manifest
+
+    no_user = HostKit.Recipes.OTPRelease.prepare_project(project, [%{artifact | user: nil}])
+
+    no_user_command =
+      Enum.find(HostKit.Project.resources(no_user), &match?(%HostKit.Resources.Command{}, &1))
+
+    assert %HostKit.Resources.Command{
+             exec: {"mix", ["release_kit.artifact", "--out-dir", "_build/prod/artifacts"]},
+             env: %{"MIX_ENV" => "prod"}
+           } = no_user_command
   end
 
   test "ReleaseKit build failures include command context" do

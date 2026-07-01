@@ -281,6 +281,7 @@ defmodule HostKit.Recipes.OTPRelease do
     HostKit.Resources.Command.new(release_kit_command_name(artifact),
       exec: release_kit_exec(artifact),
       cwd: artifact.cwd,
+      env: release_kit_env(artifact),
       inputs: source_inputs ++ release_kit_path_inputs(artifact),
       outputs: [release_kit_manifest_output(artifact)],
       timeout: artifact.timeout,
@@ -319,23 +320,23 @@ defmodule HostKit.Recipes.OTPRelease do
   end
 
   defp release_kit_exec(%{user: nil} = artifact) do
-    {"sh",
-     [
-       "-c",
-       "exec env MIX_ENV=#{HostKit.Shell.escape(artifact.mix_env)} #{release_kit_shell_command(artifact)}"
-     ]}
+    {"mix", release_kit_command(artifact)}
   end
 
   defp release_kit_exec(%{user: user} = artifact) do
-    script =
-      "exec sudo -u #{HostKit.Shell.escape(user)} -H env MIX_ENV=#{HostKit.Shell.escape(artifact.mix_env)} #{release_kit_shell_command(artifact)}"
-
-    {"sh", ["-c", script]}
+    {"sudo",
+     [
+       "-u",
+       user,
+       "-H",
+       "env",
+       "MIX_ENV=#{artifact.mix_env}",
+       "mix" | release_kit_command(artifact)
+     ]}
   end
 
-  defp release_kit_shell_command(artifact) do
-    ["mix" | release_kit_command(artifact)] |> Enum.map_join(" ", &HostKit.Shell.escape/1)
-  end
+  defp release_kit_env(%{user: nil, mix_env: mix_env}), do: %{"MIX_ENV" => mix_env}
+  defp release_kit_env(%{user: user}) when is_binary(user), do: %{}
 
   defp filter_release_kit_artifacts(artifacts, opts) do
     case Keyword.get(opts, :services) do
