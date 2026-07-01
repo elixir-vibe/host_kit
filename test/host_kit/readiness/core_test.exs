@@ -73,6 +73,36 @@ defmodule HostKit.ReadinessTest do
     end
   end
 
+  test "readiness matches decoded JSON response bodies" do
+    {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
+    {:ok, port} = :inet.port(listen_socket)
+
+    server =
+      Task.async(fn ->
+        body = Jason.encode!(%{data: [%{id: "llm_proxy"}]})
+
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        {:ok, _request} = :gen_tcp.recv(socket, 0)
+
+        :ok =
+          :gen_tcp.send(
+            socket,
+            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: #{byte_size(body)}\r\n\r\n#{body}"
+          )
+
+        :gen_tcp.close(socket)
+        :gen_tcp.close(listen_socket)
+      end)
+
+    readiness =
+      HostKit.Resources.Readiness.new(:demo,
+        checks: [HostKit.Readiness.HTTP.new("http://127.0.0.1:#{port}", body: "llm_proxy")]
+      )
+
+    assert :ok = HostKit.Readiness.wait(readiness, [])
+    assert :ok = Task.await(server)
+  end
+
   test "readiness waits until checks pass" do
     {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
     {:ok, port} = :inet.port(listen_socket)

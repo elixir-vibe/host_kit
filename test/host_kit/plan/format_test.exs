@@ -113,6 +113,30 @@ defmodule HostKit.PlanFormatTest do
              """)
   end
 
+  test "formats readiness HTTP status expectations" do
+    plan = %HostKit.Plan{
+      changes: [
+        %Change{
+          action: :create,
+          resource_id: {:readiness, :not_public},
+          after: %HostKit.Resources.Readiness{
+            name: :not_public,
+            checks: [
+              %HostKit.Readiness.HTTP{
+                url: "https://example.com/admin",
+                expect_status: 404,
+                expect_body: nil
+              }
+            ]
+          },
+          reason: :missing
+        }
+      ]
+    }
+
+    assert Format.format(plan) =~ "checks: http https://example.com/admin status 404"
+  end
+
   test "formats source details" do
     plan = %HostKit.Plan{
       changes: [

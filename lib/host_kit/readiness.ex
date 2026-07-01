@@ -126,11 +126,19 @@ defmodule HostKit.Readiness do
   defp check_http_body(%HTTP{expect_body: nil}, _body), do: :ok
 
   defp check_http_body(%HTTP{url: url, expect_body: expected} = http, body) do
-    if body |> to_string() |> String.contains?(expected) do
+    if body |> body_text() |> String.contains?(expected) do
       :ok
     else
       {http, {:error, {:http_body_missing_text, url, expected}}}
     end
+  end
+
+  defp body_text(body) when is_binary(body), do: body
+
+  defp body_text(body) do
+    Jason.encode!(body)
+  rescue
+    _exception -> inspect(body)
   end
 
   defp effective_interval(%Readiness{interval: 500}, opts) do
