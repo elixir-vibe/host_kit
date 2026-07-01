@@ -25,6 +25,8 @@ defmodule HostKit.Source.Git do
   end
 
   def read(%Source{} = desired, opts) do
+    opts = source_opts(desired, opts)
+
     cond do
       not exists?(desired.checkout, opts) ->
         {:ok, nil}
@@ -57,6 +59,8 @@ defmodule HostKit.Source.Git do
   end
 
   def apply(%Source{} = source, opts) do
+    opts = source_opts(source, opts)
+
     if exists?(source.checkout, opts) do
       update(source, opts)
     else
@@ -65,6 +69,8 @@ defmodule HostKit.Source.Git do
   end
 
   defp clone(source, opts) do
+    opts = source_opts(source, opts)
+
     with :ok <- Runner.mkdir_p(Ops.runner(opts), Path.dirname(source.checkout), opts),
          :ok <- Ops.cmd(opts, "git", ["clone", source.uri, source.checkout]) do
       checkout(source, opts)
@@ -72,6 +78,8 @@ defmodule HostKit.Source.Git do
   end
 
   defp update(source, opts) do
+    opts = source_opts(source, opts)
+
     with :ok <- ensure_clean(source, opts),
          :ok <-
            Ops.cmd(opts, "git", ["-C", source.checkout, "remote", "set-url", "origin", source.uri]),
@@ -123,6 +131,8 @@ defmodule HostKit.Source.Git do
   end
 
   defp exists?(path, opts), do: match?(:ok, Ops.cmd(opts, "test", ["-e", path]))
+
+  defp source_opts(%Source{sudo: sudo}, opts), do: Keyword.put(opts, :sudo, sudo)
 
   defp maybe_sudo(command, args, opts) do
     if Keyword.get(opts, :sudo, false), do: {"sudo", [command | args]}, else: {command, args}

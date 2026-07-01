@@ -3,6 +3,22 @@ defmodule HostKit.SourceTest do
 
   alias HostKit.Resources.Source
 
+  defmodule SourceGitRunner do
+    @behaviour HostKit.Runner
+
+    @impl true
+    def cmd(command, args, opts) do
+      send(opts[:test_pid], {:cmd, command, args})
+      {"", 0}
+    end
+
+    @impl true
+    def mkdir_p(_path, _opts), do: :ok
+
+    @impl true
+    def write_file(_path, _content, _opts), do: :ok
+  end
+
   test "source DSL records git source metadata" do
     defmodule SourceDslProject do
       use HostKit
@@ -128,6 +144,46 @@ defmodule HostKit.SourceTest do
     assert {:ok, resolved} = HostKit.Source.Git.resolve(source)
     assert resolved.ref_kind == :branch
     assert resolved.revision == repo.revision
+  end
+
+  test "git source operations do not inherit global sudo by default" do
+    source =
+      Source.new(:app,
+        git: "git@example.test:app.git",
+        ref: "main",
+        checkout: "/opt/app/source"
+      )
+
+    test_pid = self()
+
+    assert :ok =
+             HostKit.Source.Git.apply(source,
+               sudo: true,
+               runner: {SourceGitRunner, test_pid: test_pid}
+             )
+
+    refute_received {:cmd, "sudo", ["git" | _]}
+    assert_received {:cmd, "git", ["-C", "/opt/app/source", "fetch", "--tags", "origin"]}
+  end
+
+  test "git source can opt into sudo" do
+    source =
+      Source.new(:app,
+        git: "git@example.test:app.git",
+        ref: "main",
+        checkout: "/opt/app/source",
+        sudo: true
+      )
+
+    test_pid = self()
+
+    assert :ok =
+             HostKit.Source.Git.apply(source,
+               sudo: false,
+               runner: {SourceGitRunner, test_pid: test_pid}
+             )
+
+    assert_received {:cmd, "sudo", ["git", "-C", "/opt/app/source", "fetch", "--tags", "origin"]}
   end
 
   test "git source apply pins resolved revision and plans no-op when current" do

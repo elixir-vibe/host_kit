@@ -15,6 +15,7 @@ defmodule HostKit.Resources.Source do
           checkout: String.t(),
           path: String.t(),
           dirty: dirty_policy(),
+          sudo: boolean(),
           depends_on: [term()],
           meta: map()
         }
@@ -28,6 +29,7 @@ defmodule HostKit.Resources.Source do
             checkout: nil,
             path: ".",
             dirty: :error,
+            sudo: false,
             depends_on: [],
             meta: %{}
 
@@ -41,6 +43,7 @@ defmodule HostKit.Resources.Source do
       checkout: Keyword.fetch!(opts, :checkout),
       path: opts |> Keyword.get(:path, ".") |> to_string(),
       dirty: Keyword.get(opts, :dirty, :error),
+      sudo: Keyword.get(opts, :sudo, false),
       depends_on: Keyword.get(opts, :depends_on, []),
       meta: Keyword.get(opts, :meta, %{})
     }
