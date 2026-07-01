@@ -67,6 +67,8 @@ defmodule HostKit.Recipes.OTPRelease do
 
       lifecycle_commands = HostKit.DSL.Lifecycle.Scope.finish_context(lifecycle_context)
 
+      package(:tar, as: "tar")
+
       directory(base_dir, owner: service_user(), group: service_user(), mode: 0o755)
 
       directory(Path.join(base_dir, "releases"),
@@ -104,11 +106,29 @@ defmodule HostKit.Recipes.OTPRelease do
         end
       end
 
-      command(artifact.commands.unpack,
-        exec: HostKit.Recipes.OTPRelease.unpack_exec(artifact.tarball, release_dir),
+      command(HostKit.Recipes.OTPRelease.unpack_clean_command(artifact),
+        exec: {"rm", ["-rf", release_dir]},
         creates: release_bin,
         timeout: artifact.timeout,
         down: :irreversible,
+        meta: %{otp_release_artifact: artifact.manifest_path}
+      )
+
+      command(HostKit.Recipes.OTPRelease.unpack_mkdir_command(artifact),
+        exec: {"mkdir", ["-p", release_dir]},
+        creates: release_dir,
+        timeout: artifact.timeout,
+        down: :irreversible,
+        depends_on: [{:command, HostKit.Recipes.OTPRelease.unpack_clean_command(artifact)}],
+        meta: %{otp_release_artifact: artifact.manifest_path}
+      )
+
+      command(artifact.commands.unpack,
+        exec: {"tar", ["-xzf", artifact.tarball, "-C", release_dir]},
+        creates: release_bin,
+        timeout: artifact.timeout,
+        down: :irreversible,
+        depends_on: [{:command, HostKit.Recipes.OTPRelease.unpack_mkdir_command(artifact)}],
         meta: %{otp_release_artifact: artifact.manifest_path}
       )
 
@@ -590,16 +610,8 @@ defmodule HostKit.Recipes.OTPRelease do
   defp collect_module(module, modules) when is_atom(module), do: [module | modules]
   defp collect_module(_module, modules), do: modules
 
-  def unpack_exec(tarball, release_dir) do
-    script =
-      bash("""
-      rm -rf #{release_dir}
-      mkdir -p #{release_dir}
-      tar -xzf #{tarball} -C #{release_dir}
-      """)
-
-    {"bash", ["-euo", "pipefail", "-c", script.source]}
-  end
+  def unpack_clean_command(%{name: name}), do: Naming.resource([name, :unpack, :clean])
+  def unpack_mkdir_command(%{name: name}), do: Naming.resource([name, :unpack, :mkdir])
 
   def load_manifest!(path) when is_binary(path) do
     unless Code.ensure_loaded?(ReleaseKit.Manifest) do

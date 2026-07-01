@@ -46,6 +46,11 @@ defmodule HostKit.OTPReleaseRecipeTest do
              )
            )
 
+    assert Enum.any?(
+             resources,
+             &match?(%HostKit.Resources.Package{name: :tar, system_name: "tar"}, &1)
+           )
+
     assert Enum.any?(resources, fn
              %HostKit.Resources.EnvFile{path: "/etc/example/demo_app/env", entries: entries} ->
                {:set, "PHX_HOST", "app.example.com"} in entries and
@@ -58,13 +63,50 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert Enum.any?(resources, fn
              %HostKit.Resources.Command{
-               name: "demo_app_unpack",
-               exec: {"bash", ["-euo", "pipefail", "-c", command]},
+               name: "demo_app_unpack_clean",
+               exec: {"rm", ["-rf", "/opt/example/demo_app/releases/abc123"]},
                creates: "/opt/example/demo_app/releases/abc123/bin/demo_app",
                down: :irreversible,
                meta: %{otp_release_artifact: ^manifest_path}
              } ->
-               command =~ "tar -xzf '/tmp/demo_app-abc123.tar.gz'"
+               true
+
+             _resource ->
+               false
+           end)
+
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Command{
+               name: "demo_app_unpack_mkdir",
+               exec: {"mkdir", ["-p", "/opt/example/demo_app/releases/abc123"]},
+               creates: "/opt/example/demo_app/releases/abc123",
+               down: :irreversible,
+               depends_on: [{:command, "demo_app_unpack_clean"}],
+               meta: %{otp_release_artifact: ^manifest_path}
+             } ->
+               true
+
+             _resource ->
+               false
+           end)
+
+    assert Enum.any?(resources, fn
+             %HostKit.Resources.Command{
+               name: "demo_app_unpack",
+               exec:
+                 {"tar",
+                  [
+                    "-xzf",
+                    "/tmp/demo_app-abc123.tar.gz",
+                    "-C",
+                    "/opt/example/demo_app/releases/abc123"
+                  ]},
+               creates: "/opt/example/demo_app/releases/abc123/bin/demo_app",
+               down: :irreversible,
+               depends_on: [{:command, "demo_app_unpack_mkdir"}],
+               meta: %{otp_release_artifact: ^manifest_path}
+             } ->
+               true
 
              _resource ->
                false
