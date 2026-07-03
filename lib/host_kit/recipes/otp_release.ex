@@ -323,6 +323,7 @@ defmodule HostKit.Recipes.OTPRelease do
     HostKit.Resources.Command.new(release_kit_command_name(artifact, :deps),
       exec: release_kit_exec(artifact, ["deps.get", "--only", artifact.mix_env]),
       cwd: artifact.cwd,
+      user: artifact.user,
       env: release_kit_env(artifact),
       inputs:
         source_inputs ++ release_kit_existing_path_inputs(artifact, ["mix.exs", "mix.lock"]),
@@ -337,6 +338,7 @@ defmodule HostKit.Recipes.OTPRelease do
     HostKit.Resources.Command.new(release_kit_command_name(artifact, :artifact),
       exec: release_kit_exec(artifact, release_kit_command(artifact)),
       cwd: artifact.cwd,
+      user: artifact.user,
       env: release_kit_env(artifact),
       inputs: source_inputs ++ release_kit_path_inputs(artifact),
       outputs: [release_kit_manifest_output(artifact)],
@@ -384,23 +386,12 @@ defmodule HostKit.Recipes.OTPRelease do
     |> Path.relative_to(Path.expand(cwd))
   end
 
-  defp release_kit_exec(%{user: nil}, args) do
-    {"mix", args}
-  end
+  defp release_kit_exec(_artifact, args), do: {"mix", args}
 
-  defp release_kit_exec(%{user: user, mix_env: mix_env}, args) do
-    {"sudo", ["-u", user, "-H", "env", "MIX_ENV=#{mix_env}", "mix" | args]}
-  end
+  defp release_kit_env(%{mix_env: mix_env}), do: %{"MIX_ENV" => mix_env}
 
-  defp release_kit_env(%{user: nil, mix_env: mix_env}), do: %{"MIX_ENV" => mix_env}
-  defp release_kit_env(%{user: user}) when is_binary(user), do: %{}
-
-  defp release_kit_command_meta(%{manifest: manifest, user: nil}) do
+  defp release_kit_command_meta(%{manifest: manifest}) do
     %{release_kit_artifact: manifest}
-  end
-
-  defp release_kit_command_meta(%{manifest: manifest, user: user}) when is_binary(user) do
-    %{release_kit_artifact: manifest, target_opts: [sudo: false]}
   end
 
   defp filter_release_kit_artifacts(artifacts, opts) do

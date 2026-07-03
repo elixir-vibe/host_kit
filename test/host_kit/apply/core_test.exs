@@ -188,6 +188,76 @@ defmodule HostKit.ApplyTest do
              Apply.run(plan, confirm: true)
   end
 
+  test "runs user commands as the user but writes stamps with apply privileges" do
+    stamp = "/opt/app/_build/hostkit/deps.json"
+
+    command = %Command{
+      name: :deps,
+      exec: {"mix", ["deps.get"]},
+      cwd: "/opt/app",
+      user: "deploy",
+      env: %{"MIX_ENV" => "prod"},
+      stamp: stamp
+    }
+
+    plan = %Plan{
+      changes: [%Change{action: :create, resource_id: {:command, :deps}, after: command}]
+    }
+
+    parent = self()
+
+    defmodule UserCommandStampRunner do
+      @behaviour HostKit.Runner
+
+      @impl true
+      def cmd("sh", ["-c", "base64 " <> _path], _opts), do: {"", 1}
+
+      def cmd(command, args, opts) do
+        send(opts[:test_pid], {:cmd, command, args, Keyword.delete(opts, :test_pid)})
+        {"", 0}
+      end
+
+      @impl true
+      def mkdir_p(path, opts) do
+        send(opts[:test_pid], {:mkdir_p, path, Keyword.delete(opts, :test_pid)})
+        :ok
+      end
+
+      @impl true
+      def write_file(path, _content, opts) do
+        send(opts[:test_pid], {:write_file, path, Keyword.delete(opts, :test_pid)})
+        :ok
+      end
+    end
+
+    assert {:ok, [%{status: :applied}]} =
+             Apply.run(plan,
+               confirm: true,
+               sudo: true,
+               runner: {UserCommandStampRunner, test_pid: parent}
+             )
+
+    assert_received {:cmd, "sudo",
+                     [
+                       "-u",
+                       "deploy",
+                       "-H",
+                       "env",
+                       "MIX_ENV=prod",
+                       "mix",
+                       "deps.get"
+                     ], cmd_opts}
+
+    assert Keyword.fetch!(cmd_opts, :cd) == "/opt/app"
+    refute Keyword.get(cmd_opts, :sudo)
+
+    assert_received {:mkdir_p, "/opt/app/_build/hostkit", mkdir_opts}
+    assert Keyword.fetch!(mkdir_opts, :sudo)
+
+    assert_received {:write_file, ^stamp, write_opts}
+    assert Keyword.fetch!(write_opts, :sudo)
+  end
+
   test "writes systemd units and can skip daemon reload in tests" do
     root = Path.join(System.tmp_dir!(), "host-kit-systemd-#{System.unique_integer([:positive])}")
 

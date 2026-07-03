@@ -364,15 +364,14 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert %HostKit.Resources.Command{
              name: "demo_app_release_kit_deps",
-             exec:
-               {"sudo",
-                ["-u", "deploy", "-H", "env", "MIX_ENV=prod", "mix", "deps.get", "--only", "prod"]},
-             env: %{},
+             exec: {"mix", ["deps.get", "--only", "prod"]},
+             user: "deploy",
+             env: %{"MIX_ENV" => "prod"},
              cwd: ^app,
              inputs: [:demo_app, "mix.exs", "mix.lock"],
              outputs: ["deps"],
              stamp: ^deps_stamp,
-             meta: %{release_kit_artifact: manifest, target_opts: [sudo: false]}
+             meta: %{release_kit_artifact: manifest}
            } =
              Enum.find(
                resources,
@@ -381,26 +380,15 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert %HostKit.Resources.Command{
              name: "demo_app_release_kit_artifact",
-             exec:
-               {"sudo",
-                [
-                  "-u",
-                  "deploy",
-                  "-H",
-                  "env",
-                  "MIX_ENV=prod",
-                  "mix",
-                  "release_kit.artifact",
-                  "--out-dir",
-                  "_build/prod/artifacts"
-                ]},
-             env: %{},
+             exec: {"mix", ["release_kit.artifact", "--out-dir", "_build/prod/artifacts"]},
+             user: "deploy",
+             env: %{"MIX_ENV" => "prod"},
              cwd: ^app,
              inputs: [:demo_app, "mix.exs", "mix.lock", "lib"],
              outputs: ["_build/prod/artifacts/demo_app.etf"],
              stamp: ^artifact_stamp,
              depends_on: [{:command, "demo_app_release_kit_deps"}],
-             meta: %{release_kit_artifact: ^manifest, target_opts: [sudo: false]}
+             meta: %{release_kit_artifact: ^manifest}
            } =
              Enum.find(
                resources,
