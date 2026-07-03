@@ -361,10 +361,11 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     deps_stamp = Path.join(app, "_build/hostkit/demo_app_release_kit_deps.json")
     artifact_stamp = Path.join(app, "_build/hostkit/demo_app_release_kit_artifact.json")
+    mix = System.find_executable("mix") || "mix"
 
     assert %HostKit.Resources.Command{
              name: "demo_app_release_kit_deps",
-             exec: {"mix", ["deps.get", "--only", "prod"]},
+             exec: {^mix, ["deps.get", "--only", "prod"]},
              user: "deploy",
              env: %{"MIX_ENV" => "prod"},
              cwd: ^app,
@@ -380,7 +381,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
 
     assert %HostKit.Resources.Command{
              name: "demo_app_release_kit_artifact",
-             exec: {"mix", ["release_kit.artifact", "--out-dir", "_build/prod/artifacts"]},
+             exec: {^mix, ["release_kit.artifact", "--out-dir", "_build/prod/artifacts"]},
              user: "deploy",
              env: %{"MIX_ENV" => "prod"},
              cwd: ^app,
@@ -405,7 +406,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
       |> Enum.find(&match?(%HostKit.Resources.Command{name: "demo_app_release_kit_artifact"}, &1))
 
     assert %HostKit.Resources.Command{
-             exec: {"mix", ["release_kit.artifact", "--out-dir", "_build/prod/artifacts"]},
+             exec: {^mix, ["release_kit.artifact", "--out-dir", "_build/prod/artifacts"]},
              env: %{"MIX_ENV" => "prod"},
              meta: %{release_kit_artifact: ^manifest}
            } = no_user_artifact

@@ -386,7 +386,7 @@ defmodule HostKit.Recipes.OTPRelease do
     |> Path.relative_to(Path.expand(cwd))
   end
 
-  defp release_kit_exec(_artifact, args), do: {"mix", args}
+  defp release_kit_exec(_artifact, args), do: {System.find_executable("mix") || "mix", args}
 
   defp release_kit_env(%{mix_env: mix_env}), do: %{"MIX_ENV" => mix_env}
 
