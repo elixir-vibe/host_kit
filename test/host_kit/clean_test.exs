@@ -17,6 +17,9 @@ defmodule HostKit.CleanTest do
       File.write!(Path.join(artifacts, "llm_proxy-#{version}.tar.gz.sha256"), version)
     end
 
+    File.write!(Path.join(artifacts, "llm_proxy-20260627-orphaned.tar.gz"), "orphaned")
+    File.write!(Path.join(artifacts, "llm_proxy-20260627-orphaned.tar.gz.sha256"), "orphaned")
+
     File.ln_s!(Path.join(releases, "20260629-deadbee"), Path.join(base, "current"))
 
     manifest_path = Path.join(artifacts, "llm_proxy.etf")
@@ -46,6 +49,8 @@ defmodule HostKit.CleanTest do
     assert Path.join(releases, "20260626-a05f74e") in paths
     assert Path.join(artifacts, "llm_proxy-20260626-a05f74e.tar.gz") in paths
     assert Path.join(artifacts, "llm_proxy-20260626-a05f74e.tar.gz.sha256") in paths
+    assert Path.join(artifacts, "llm_proxy-20260627-orphaned.tar.gz") in paths
+    assert Path.join(artifacts, "llm_proxy-20260627-orphaned.tar.gz.sha256") in paths
 
     refute Path.join(releases, "20260628-71a3975") in paths
     refute Path.join(releases, "20260629-deadbee") in paths

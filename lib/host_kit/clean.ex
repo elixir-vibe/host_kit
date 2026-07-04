@@ -69,9 +69,12 @@ defmodule HostKit.Clean do
          {:ok, artifact_entries} <- list_artifacts(release, opts) do
       active_version = Path.basename(active_path)
 
+      release_versions = release_versions(release_entries)
       stale_versions = stale_versions(release_entries, active_version, keep)
       stale_release_paths = paths_for_versions(release_entries, stale_versions)
-      stale_artifact_paths = artifact_paths_for_versions(artifact_entries, stale_versions)
+
+      stale_artifact_paths =
+        artifact_paths_for_cleanup(artifact_entries, release, stale_versions, release_versions)
 
       commands =
         stale_release_paths
@@ -145,6 +148,9 @@ defmodule HostKit.Clean do
     end)
   end
 
+  defp release_versions(entries),
+    do: entries |> Enum.map(fn {version, _path} -> version end) |> MapSet.new()
+
   defp stale_versions(entries, active_version, keep) do
     entries
     |> Enum.map(fn {version, _path} -> version end)
@@ -160,20 +166,41 @@ defmodule HostKit.Clean do
     |> Enum.map(fn {_version, path} -> path end)
   end
 
-  defp artifact_paths_for_versions(entries, versions) do
-    versions
-    |> MapSet.to_list()
-    |> Enum.sort()
-    |> Enum.flat_map(fn version ->
-      Enum.flat_map(entries, fn {name, path} ->
-        if artifact_for_version?(name, version), do: [path], else: []
-      end)
+  defp artifact_paths_for_cleanup(entries, release, stale_versions, release_versions) do
+    prefix = Map.fetch!(release, :artifact_prefix)
+
+    entries
+    |> Enum.flat_map(fn {name, path} ->
+      with {:ok, version} <- artifact_version(name, prefix),
+           true <-
+             MapSet.member?(stale_versions, version) or
+               not MapSet.member?(release_versions, version) do
+        [path]
+      else
+        _other -> []
+      end
     end)
+    |> Enum.sort()
   end
 
-  defp artifact_for_version?(name, version) do
-    String.ends_with?(name, "-#{version}.tar.gz") or
-      String.ends_with?(name, "-#{version}.tar.gz.sha256")
+  defp artifact_version(name, prefix) do
+    name = to_string(name)
+    prefix = to_string(prefix)
+
+    cond do
+      String.starts_with?(name, prefix <> "-") and String.ends_with?(name, ".tar.gz.sha256") ->
+        version =
+          name |> String.trim_leading(prefix <> "-") |> String.trim_trailing(".tar.gz.sha256")
+
+        {:ok, version}
+
+      String.starts_with?(name, prefix <> "-") and String.ends_with?(name, ".tar.gz") ->
+        version = name |> String.trim_leading(prefix <> "-") |> String.trim_trailing(".tar.gz")
+        {:ok, version}
+
+      true ->
+        :error
+    end
   end
 
   defp rm_command(release, kind, path) do
