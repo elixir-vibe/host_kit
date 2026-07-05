@@ -92,7 +92,7 @@ defmodule HostKit.Resource do
     %{
       "$type" => "struct",
       "module" => Atom.to_string(module),
-      "fields" => dump(Map.from_struct(struct))
+      "fields" => dump_struct_fields(struct)
     }
   end
 
@@ -124,8 +124,7 @@ defmodule HostKit.Resource do
   @spec load(term()) :: term()
   def load(%{"$type" => "struct", "module" => module, "fields" => fields}) do
     module = allowed_artifact_module!(module)
-    fields = fields |> load() |> struct_fields(module)
-    struct(module, fields)
+    struct(module, load_struct_fields(fields, module))
   end
 
   def load(%{"$type" => "tuple", "items" => items}), do: items |> load() |> List.to_tuple()
@@ -143,26 +142,26 @@ defmodule HostKit.Resource do
   def load(values) when is_list(values), do: Enum.map(values, &load/1)
   def load(value), do: value
 
-  defp struct_fields(fields, module) when is_map(fields) do
-    known_fields = module |> struct() |> Map.from_struct() |> Map.keys() |> MapSet.new()
+  defp dump_struct_fields(struct) do
+    struct
+    |> Map.from_struct()
+    |> Map.new(fn {key, value} -> {Atom.to_string(key), dump(value)} end)
+  end
 
-    Map.new(fields, fn
-      {key, value} when is_binary(key) ->
-        case existing_struct_field(key, known_fields) do
-          {:ok, atom} -> {atom, value}
-          :error -> {key, value}
-        end
+  defp load_struct_fields(fields, module) when is_map(fields) do
+    known_fields = struct_field_names(module)
 
-      entry ->
-        entry
+    Map.new(fields, fn {key, value} ->
+      {Map.fetch!(known_fields, key), load(value)}
     end)
   end
 
-  defp existing_struct_field(key, known_fields) do
-    atom = String.to_existing_atom(key)
-    if MapSet.member?(known_fields, atom), do: {:ok, atom}, else: :error
-  rescue
-    ArgumentError -> :error
+  defp struct_field_names(module) do
+    module
+    |> struct()
+    |> Map.from_struct()
+    |> Map.keys()
+    |> Map.new(&{Atom.to_string(&1), &1})
   end
 
   defp load_atom(value) do

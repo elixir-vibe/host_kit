@@ -132,16 +132,8 @@ defmodule HostKit.Plan.ArtifactTest do
     assert :ok = Artifact.save(path, plan)
     assert {:ok, json} = path |> File.read!() |> Jason.decode()
 
-    assert [
-             %{
-               "fields" => %{
-                 "entries" => entries
-               }
-             }
-           ] = json["resources"]
-
-    assert [_key, %{"$type" => "binary", "encoding" => "base64"}] =
-             Enum.find(entries, fn [key, _value] -> key["value"] == "content" end)
+    assert [%{"fields" => %{"content" => %{"$type" => "binary", "encoding" => "base64"}}}] =
+             json["resources"]
 
     assert {:ok, loaded} = Artifact.load(path)
     assert loaded.resources == [file]
