@@ -65,11 +65,13 @@ defmodule HostKit.Resource do
                       HostKit.Readiness.Systemd,
                       HostKit.Source.Identity,
                       HostKit.Service,
+                      HostKit.Storage.Volume,
                       HostKit.ShellScript,
                       HostKit.Systemd.Service,
                       HostKit.Systemd.Timer,
                       HostKit.Tenant,
-                      HostKit.Workspace.Egress
+                      HostKit.Workspace.Egress,
+                      Range
                     ])
   @artifact_module_names @artifact_modules |> Enum.map(&Atom.to_string/1) |> MapSet.new()
   @spec id(struct()) :: term()
@@ -106,13 +108,24 @@ defmodule HostKit.Resource do
   end
 
   def dump(values) when is_list(values), do: Enum.map(values, &dump/1)
+  def dump(value) when is_boolean(value), do: value
   def dump(value) when is_atom(value), do: %{"$type" => "atom", "value" => Atom.to_string(value)}
+
+  def dump(value) when is_binary(value) do
+    if String.valid?(value) do
+      value
+    else
+      %{"$type" => "binary", "encoding" => "base64", "value" => Base.encode64(value)}
+    end
+  end
+
   def dump(value), do: value
 
   @spec load(term()) :: term()
   def load(%{"$type" => "struct", "module" => module, "fields" => fields}) do
     module = allowed_artifact_module!(module)
-    struct(module, load(fields))
+    fields = fields |> load() |> struct_fields(module)
+    struct(module, fields)
   end
 
   def load(%{"$type" => "tuple", "items" => items}), do: items |> load() |> List.to_tuple()
@@ -122,8 +135,35 @@ defmodule HostKit.Resource do
   end
 
   def load(%{"$type" => "atom", "value" => value}), do: load_atom(value)
+
+  def load(%{"$type" => "binary", "encoding" => "base64", "value" => value}) do
+    Base.decode64!(value)
+  end
+
   def load(values) when is_list(values), do: Enum.map(values, &load/1)
   def load(value), do: value
+
+  defp struct_fields(fields, module) when is_map(fields) do
+    known_fields = module |> struct() |> Map.from_struct() |> Map.keys() |> MapSet.new()
+
+    Map.new(fields, fn
+      {key, value} when is_binary(key) ->
+        case existing_struct_field(key, known_fields) do
+          {:ok, atom} -> {atom, value}
+          :error -> {key, value}
+        end
+
+      entry ->
+        entry
+    end)
+  end
+
+  defp existing_struct_field(key, known_fields) do
+    atom = String.to_existing_atom(key)
+    if MapSet.member?(known_fields, atom), do: {:ok, atom}, else: :error
+  rescue
+    ArgumentError -> :error
+  end
 
   defp load_atom(value) do
     String.to_existing_atom(value)

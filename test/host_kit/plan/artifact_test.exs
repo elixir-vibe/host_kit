@@ -55,6 +55,98 @@ defmodule HostKit.Plan.ArtifactTest do
     assert loaded.opts == []
   end
 
+  test "saves and loads plans with project metadata structs" do
+    firewall = %HostKit.Firewall{
+      name: :demo,
+      path: "/etc/nftables.d/demo.nft",
+      rules: [%HostKit.Firewall.Rule{action: :allow, protocol: :udp, ports: 1024..65_535}]
+    }
+
+    storage = %{
+      state: %HostKit.Storage.Volume{name: :state, path: "/var/lib/demo", backup: true}
+    }
+
+    plan = %HostKit.Plan{
+      project: %HostKit.Project{name: :demo, meta: %{firewall: firewall, storage: storage}},
+      resources: [firewall]
+    }
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "host-kit-range-plan-#{System.unique_integer([:positive])}.json"
+      )
+
+    assert :ok = Artifact.save(path, plan)
+    assert {:ok, loaded} = Artifact.load(path)
+    assert loaded.project.meta.firewall.rules |> hd() |> Map.fetch!(:ports) == 1024..65_535
+    assert loaded.project.meta.storage == storage
+    assert loaded.resources == [firewall]
+  end
+
+  test "saves and loads plans with readiness checks" do
+    readiness =
+      HostKit.Resources.Readiness.new(:ready,
+        checks: [
+          %HostKit.Readiness.Systemd{unit: "demo.service", restart: true, kill: true},
+          %HostKit.Readiness.HTTP{url: "http://127.0.0.1:4000/health"}
+        ]
+      )
+
+    plan = %HostKit.Plan{
+      project: %HostKit.Project{name: :demo},
+      resources: [readiness],
+      changes: [
+        %HostKit.Change{
+          action: :update,
+          resource_id: HostKit.Resources.Readiness.id(readiness),
+          after: readiness,
+          reason: {:triggered_by, []}
+        }
+      ]
+    }
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "host-kit-readiness-plan-#{System.unique_integer([:positive])}.json"
+      )
+
+    assert :ok = Artifact.save(path, plan)
+    assert {:ok, loaded} = Artifact.load(path)
+    assert loaded.resources == [readiness]
+    assert [%HostKit.Change{after: ^readiness}] = loaded.changes
+  end
+
+  test "saves and loads plans with binary resource content" do
+    content = <<0x89, ?P, ?N, ?G, 0, 255>>
+    file = HostKit.Resources.File.new("/srv/demo/card.png", content: content)
+    plan = %HostKit.Plan{project: %HostKit.Project{name: :demo}, resources: [file]}
+
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "host-kit-binary-plan-#{System.unique_integer([:positive])}.json"
+      )
+
+    assert :ok = Artifact.save(path, plan)
+    assert {:ok, json} = path |> File.read!() |> Jason.decode()
+
+    assert [
+             %{
+               "fields" => %{
+                 "entries" => entries
+               }
+             }
+           ] = json["resources"]
+
+    assert [_key, %{"$type" => "binary", "encoding" => "base64"}] =
+             Enum.find(entries, fn [key, _value] -> key["value"] == "content" end)
+
+    assert {:ok, loaded} = Artifact.load(path)
+    assert loaded.resources == [file]
+  end
+
   test "includes down plan stats" do
     package = HostKit.Resources.Package.new(:git, as: "git")
 
@@ -194,7 +286,12 @@ defmodule HostKit.Plan.ArtifactTest do
 
     assert {:ok, loaded} = Artifact.load(path)
 
-    assert [%HostKit.Change{diff: %HostKit.Diff{changes: [%HostKit.Diff.Entry{}]}}] =
+    assert [
+             %HostKit.Change{
+               action: :no_op,
+               diff: %HostKit.Diff{changes: [%HostKit.Diff.Entry{}]}
+             }
+           ] =
              loaded.changes
   end
 
