@@ -63,7 +63,7 @@ defmodule HostKit.Plan.ExecutionGraph do
   end
 
   defp missing_dependency_diagnostics(changes) do
-    ids = MapSet.new(changes, & &1.resource_id)
+    ids = MapSet.new(changes, &normalize_dependency(&1.resource_id))
 
     changes
     |> Enum.flat_map(fn %Change{} = change ->

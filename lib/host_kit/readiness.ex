@@ -3,7 +3,7 @@ defmodule HostKit.Readiness do
 
   alias HostKit.Readiness.{HTTP, Systemd}
   alias HostKit.Resources.Readiness
-  alias HostKit.SystemdRuntime
+  alias HostKit.{Runner, SystemdRuntime}
 
   @spec current?(Readiness.t(), keyword()) :: boolean()
   def current?(%Readiness{} = readiness, opts) do
@@ -116,7 +116,17 @@ defmodule HostKit.Readiness do
     end
   end
 
-  defp check_one(%HTTP{} = http, _opts) do
+  defp check_one(%HTTP{} = http, opts) do
+    runner = Keyword.get(opts, :runner, HostKit.Runner.Local)
+
+    if remote_runner?(runner) do
+      check_remote_http(http, runner, opts)
+    else
+      check_local_http(http)
+    end
+  end
+
+  defp check_local_http(%HTTP{} = http) do
     url = HTTP.url(http)
 
     case Req.get(url, retry: false, receive_timeout: 5_000) do
@@ -128,6 +138,38 @@ defmodule HostKit.Readiness do
 
       {:error, reason} ->
         {http, {:error, {:http_request_failed, url, reason}}}
+    end
+  end
+
+  defp check_remote_http(%HTTP{} = http, runner, opts) do
+    url = HTTP.url(http)
+    args = ["--silent", "--show-error", "--max-time", "5", "--write-out", "\n%{http_code}", url]
+
+    case Runner.cmd(runner, "curl", args, opts) do
+      {output, 0} -> check_remote_http_response(http, url, output)
+      {output, status} -> {http, {:error, {:http_request_failed, url, {status, output}}}}
+    end
+  end
+
+  defp check_remote_http_response(http, url, output) do
+    case String.split(output, "\n") do
+      [_body_without_status] ->
+        {http, {:error, {:http_request_failed, url, :missing_http_status}}}
+
+      parts ->
+        {status_text, body_parts} = List.pop_at(parts, -1)
+        body = Enum.join(body_parts, "\n")
+
+        case Integer.parse(status_text) do
+          {status, ""} when status == http.expect_status ->
+            check_http_body(http, body)
+
+          {status, ""} ->
+            {http, {:error, {:unexpected_http_status, url, http.expect_status, status}}}
+
+          :error ->
+            {http, {:error, {:http_request_failed, url, :invalid_http_status}}}
+        end
     end
   end
 

@@ -194,7 +194,7 @@ project =
       ]
 
     service :phoenix_public do
-      ready :phoenix_public do
+      ready :phoenix_public, depends_on: [{:readiness, "#{app_name}_ready"}] do
         systemd caddy_service_name, restart: true
         http public_url
       end

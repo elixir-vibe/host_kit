@@ -99,6 +99,18 @@ defmodule HostKit.Plan.ExecutionGraphTest do
     assert edge?(graph, {:package, :caddy}, {:file, "/etc/app.conf"}, :explicit_dependency)
   end
 
+  test "validates tuple dependencies against Addr.Resource ids" do
+    site_id = Resource.new(:caddy_site, ":4000")
+    site = %HostKit.Caddy.Site{name: ":4000", host: ":4000"}
+    readiness = %Readiness{name: :web, depends_on: [{:caddy_site, ":4000"}]}
+
+    plan = %HostKit.Plan{
+      changes: [create(site_id, site), create({:readiness, :web}, readiness)]
+    }
+
+    assert :ok = ExecutionGraph.validate(plan)
+  end
+
   test "derives source input and systemd readiness edges" do
     source = %Source{name: :app, checkout: "/srv/app/source", uri: "https://example.test/app.git"}
     command = %Command{name: :build, exec: {"mix", ["compile"]}, inputs: [:app]}

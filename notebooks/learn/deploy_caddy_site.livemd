@@ -139,12 +139,13 @@ project =
         restart :on_failure
       end
 
-      caddy_site site_address do
+      caddy_site :hello, site_address do
         root site_root
         file_server()
       end
 
-      ready :hello_site do
+      ready :hello_site,
+        depends_on: [{:caddy_site, :hello}, {:file, Path.join(site_root, "index.html")}] do
         systemd caddy_service_name, restart: true
         http verify_url
       end

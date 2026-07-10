@@ -672,6 +672,8 @@ end
 
 Plans can also be inspected as an execution dependency graph. The graph is derived from active create/update/delete changes and records why ordering exists: declared `depends_on`, parent directories, owner/group accounts, command source inputs, symlink target paths, systemd timer/service relationships, systemd service file/path references, and systemd readiness checks. Plan construction and apply reject duplicate resource identities, missing declared dependencies, and dependency cycles. Future parallel apply can consume the same graph without changing the plan format.
 
+HTTP readiness checks run on the managed host when apply uses an SSH runner, so loopback URLs such as `http://127.0.0.1:4000/health` refer to that host rather than the controller. Remote HTTP readiness requires `curl`; declare its package resource and use `depends_on` when a readiness check must wait for files, routes, or another readiness resource beyond its derived systemd dependency.
+
 ```sh
 mix host_kit.plan infra/config.exs --host prod --show-graph
 mix host_kit.plan infra/config.exs --host prod --graph-format json

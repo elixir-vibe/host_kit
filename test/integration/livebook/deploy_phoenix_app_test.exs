@@ -331,12 +331,16 @@ defmodule HostKit.Integration.LivebookDeployPhoenixAppTest do
   end
 
   defp notebook_dsl! do
-    content = File.read!("notebooks/learn/deploy_phoenix_app.livemd")
-    regex = ~r/```elixir\n(?<source>.*?project\s+:deploy_phoenix_app\s+do.*?)\n```/s
+    source =
+      HostKit.LivebookNotebook.code_cell_containing!(
+        "notebooks/learn/deploy_phoenix_app.livemd",
+        "project :deploy_phoenix_app do"
+      )
 
-    case Regex.run(regex, content, capture: ["source"]) do
-      [source] -> source
-      nil -> raise "could not find HostKit DSL cell in deploy_phoenix_app.livemd"
-    end
+    """
+    alias HostKit, as: HK
+    alias HostKit.Providers.Caddy
+    alias HostKit.Providers.Elixir, as: ElixirProvider
+    """ <> source
   end
 end

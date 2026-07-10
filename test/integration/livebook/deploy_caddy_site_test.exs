@@ -102,7 +102,7 @@ defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
       caddy_config_dir: Path.dirname(caddy_config_path),
       caddy_sites_dir: caddy_sites_dir,
       caddy_service_name: caddy_service_name,
-      verify_url: "http://127.0.0.1:#{port}",
+      verify_url: "http://#{host.hostname}:#{port}",
       message: "Integration #{unique}"
     ]
 
@@ -134,13 +134,12 @@ defmodule HostKit.Integration.LivebookDeployCaddySiteTest do
   end
 
   defp notebook_dsl! do
-    content = File.read!("notebooks/learn/deploy_caddy_site.livemd")
+    source =
+      HostKit.LivebookNotebook.code_cell_containing!(
+        "notebooks/learn/deploy_caddy_site.livemd",
+        "project :deploy_caddy_site do"
+      )
 
-    regex = ~r/```elixir\n(?<source>.*?project\s+:deploy_caddy_site\s+do.*?)\n```/s
-
-    case Regex.run(regex, content, capture: ["source"]) do
-      [source] -> source
-      nil -> raise "could not find HostKit DSL cell in deploy_caddy_site.livemd"
-    end
+    "alias HostKit, as: HK\nalias HostKit.Providers.Caddy\n" <> source
   end
 end
