@@ -8,7 +8,7 @@ defmodule HostKit.Instance.IncusBackendTest do
     instance = Instance.new(:demo, backend: :incus, image: "images:ubuntu/24.04")
 
     assert {:error, {:incus_command_failed, reason}} =
-             Incus.read(instance, incus: "/definitely/missing/incus")
+             Incus.read(instance, incus: "/definitely/missing/incus", incus_sudo: false)
 
     assert reason =~ ":enoent"
   end

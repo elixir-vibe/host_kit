@@ -28,12 +28,15 @@ defmodule HostKit.Integration.InstanceCLITest do
     log = Path.join(bin_dir, "incus.log")
     old_path = System.get_env("PATH", "")
     old_log = System.get_env("HOSTKIT_FAKE_INCUS_LOG")
+    old_sudo = System.get_env("HOSTKIT_INCUS_SUDO")
     System.put_env("PATH", bin_dir <> ":" <> old_path)
     System.put_env("HOSTKIT_FAKE_INCUS_LOG", log)
+    System.put_env("HOSTKIT_INCUS_SUDO", "false")
 
     on_exit(fn ->
       System.put_env("PATH", old_path)
       restore_env("HOSTKIT_FAKE_INCUS_LOG", old_log)
+      restore_env("HOSTKIT_INCUS_SUDO", old_sudo)
       File.rm_rf!(bin_dir)
     end)
 

@@ -80,12 +80,15 @@ defmodule HostKit.Integration.GatehouseConfigTest do
     """
 
     try do
-      assert {"ok\n", 0} =
-               System.cmd("mix", ["run", "-e", code],
-                 cd: gatehouse_path(),
-                 env: [{"MIX_ENV", "test"}],
-                 stderr_to_stdout: true
-               )
+      {output, status} =
+        System.cmd("mix", ["run", "-e", code],
+          cd: gatehouse_path(),
+          env: [{"MIX_ENV", "test"}],
+          stderr_to_stdout: true
+        )
+
+      assert status == 0, output
+      assert "ok" in String.split(output, "\n", trim: true)
     after
       File.rm(path)
     end

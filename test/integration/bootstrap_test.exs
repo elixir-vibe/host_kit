@@ -2,6 +2,7 @@ defmodule HostKit.BootstrapIntegrationTest do
   use HostKit.Case, async: false
 
   @moduletag :integration
+  @moduletag :lima
 
   defmodule LimaRunner do
     @behaviour HostKit.Runner
@@ -138,7 +139,10 @@ defmodule HostKit.BootstrapIntegrationTest do
   end
 
   defp cleanup(vm, path) do
-    LimaRunner.cmd("rm", ["-rf", path], vm: vm)
+    if System.find_executable(System.get_env("LIMACTL", "limactl")) do
+      LimaRunner.cmd("rm", ["-rf", path], vm: vm)
+    end
+
     :ok
   end
 end
