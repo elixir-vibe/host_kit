@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Reject duplicate resource identities, missing declared dependencies, invalid resources, and dependency cycles before apply; execution graph algorithms now use `libgraph`.
+- Publish managed files, plan/state artifacts, run records, and rollback payloads atomically with restrictive permissions; run ids are collision-resistant and pruning validates tracked paths.
+- Route provider-owned observed-state reads through the provider contract, including Caddy site reads.
+- Bound workspace-agent requests, concurrency, command output, and SSH output; normalize secret failures without exposing command output or creating atoms from state-file keys.
+- Enforce security advisories, coverage, Credo, Dialyzer filters, clone checks, architecture policy, and smell checks through `mix ci`.
+
 ## v0.1.0-beta.7 - 2026-06-28
 
 - Added TOML structured config support through `toml/2`, including deterministic rendering and public-path drift comparison.

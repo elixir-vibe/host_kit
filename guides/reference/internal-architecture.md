@@ -290,7 +290,7 @@ Recipes such as `elixir_app` can emit readiness automatically. Readiness plannin
 
 ### `HostKit.RunRecord`
 
-Run records are minimal tracking artifacts written when apply is called with `track: true` or `mix host_kit.apply --track`.
+Run records are minimal tracking artifacts written when apply is called with `track: true` or `mix host_kit.apply --track`. Run ids include subsecond time and random entropy to avoid collisions. Records, copied artifacts, backup payloads, state snapshots, and managed files are staged with restrictive permissions and atomically renamed into place; corrupt run records are surfaced to callers.
 
 ```mermaid
 flowchart LR
@@ -325,7 +325,7 @@ roots hostkit_state: "/var/lib/hostkit"
 ```mermaid
 flowchart TD
   Provider[Provider] --> DSL[Provider DSL]
-  Provider --> Render[Render/apply integration]
+  Provider --> Render[Read/validate/render/apply integration]
   Recipe[Recipe] --> Resources[Plain resources]
   Ingress[Semantic ingress] --> Caddy[Caddy resources]
   Ingress --> Gatehouse[Gatehouse proxy]
@@ -360,7 +360,7 @@ Structured config resources render through explicit format modules but remain or
 
 ## Execution dependency graph
 
-`HostKit.Plan.ExecutionGraph.build/2` derives an inspectable graph from active plan changes. Nodes wrap `%HostKit.Change{}` values and edges carry stable reasons instead of flattening everything into anonymous ordering. Derived reasons include declared `depends_on`, parent directory, owner/group account, command source input, symlink target path, systemd timer/service, systemd service file/path references, and systemd readiness dependencies. Delete changes reverse dependency direction so children are removed before parents.
+`HostKit.Plan.ExecutionGraph.build/2` derives an inspectable graph from active plan changes. Nodes wrap `%HostKit.Change{}` values and edges carry stable reasons instead of flattening everything into anonymous ordering. Derived reasons include declared `depends_on`, parent directory, owner/group account, command source input, symlink target path, systemd timer/service, systemd service file/path references, and systemd readiness dependencies. Delete changes reverse dependency direction so children are removed before parents. HostKit uses `libgraph` for graph algorithms and rejects duplicate resource identities, missing declared dependencies, and strongly connected dependency cycles during both plan construction and apply validation.
 
 ```mermaid
 flowchart TD
@@ -373,7 +373,7 @@ flowchart TD
   Graph -. future .-> Scheduler[parallel apply scheduler]
 ```
 
-The graph is intentionally graph-only today: it improves diagnostics and establishes deterministic layering before any parallel executor is introduced. Machine-readable graph output uses explicit JSON-safe maps with display labels and `HostKit.Resource.dump/1` resource-id terms; it must not rely on Jason struct encoders or embed full before/after resources. See [Parallel apply design](parallel-apply-design.md) for the intended scheduler direction.
+The graph remains inspectable plan data rather than a separate runtime entity: it validates ordering and establishes deterministic layering before any parallel executor is introduced. Machine-readable graph output uses explicit JSON-safe maps with display labels and `HostKit.Resource.dump/1` resource-id terms; it must not rely on Jason struct encoders or embed full before/after resources. See [Parallel apply design](parallel-apply-design.md) for the intended scheduler direction.
 
 ## Design constraints
 

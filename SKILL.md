@@ -112,6 +112,8 @@ infra/files/root/usr/local/sbin/app-tool
 
 ## Files and secrets
 
+HostKit stages managed content with restrictive permissions and atomically publishes it at the destination. Always declare the intended `owner`, `group`, and `mode`; do not add hand-written temporary-file commands around file resources.
+
 For managed static files:
 
 ```elixir

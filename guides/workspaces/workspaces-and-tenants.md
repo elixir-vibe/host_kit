@@ -50,4 +50,4 @@ Useful pieces:
 - `inside` and `inside_monitor` describe checks intended to run inside the sandbox.
 - Ordinary HostKit DSL still works inside a workspace: `directory`, `daemon`, `isolate`, `listen`, `monitor`, and provider resources.
 
-Workspaces are intentionally inspectable. They are not a separate runtime system hidden behind opaque state; they compile to HostKit services/resources plus metadata.
+Workspaces are intentionally inspectable. They are not a separate runtime system hidden behind opaque state; they compile to HostKit services/resources plus metadata. The optional Unix-socket agent uses a `0600` socket and bounds request size, retained command output, command time, and concurrent client tasks.

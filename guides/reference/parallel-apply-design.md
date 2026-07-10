@@ -34,7 +34,7 @@ This note describes the intended direction. It is not an implementation contract
 - systemd file/path references,
 - readiness checks.
 
-The graph also computes topological layers and cycle diagnostics. A future scheduler should reject cyclic graphs before any resource is applied.
+The graph also computes topological layers and strongly connected cycle diagnostics with `libgraph`. Plan construction and apply reject duplicate resource identities, missing declared dependencies, and cyclic graphs before any resource is applied.
 
 ```mermaid
 flowchart TD
