@@ -72,9 +72,9 @@ defmodule HostKit.RunRecord do
 
   @spec list(keyword()) :: {:ok, [t()]} | {:error, term()}
   def list(opts \\ []) do
-    case list_files(opts) do
-      {:ok, files} -> {:ok, files |> load_records(opts) |> sort_records()}
-      {:error, reason} -> {:error, reason}
+    with {:ok, files} <- list_files(opts),
+         {:ok, records} <- load_records(files, opts) do
+      {:ok, sort_records(records)}
     end
   end
 
@@ -159,10 +159,10 @@ defmodule HostKit.RunRecord do
   end
 
   defp load_records(files, opts) do
-    Enum.flat_map(files, fn path ->
+    Enum.reduce_while(files, {:ok, []}, fn path, {:ok, records} ->
       case load(Path.basename(path), opts) do
-        {:ok, record} -> [record]
-        {:error, _reason} -> []
+        {:ok, record} -> {:cont, {:ok, [record | records]}}
+        {:error, reason} -> {:halt, {:error, {:invalid_run_record, path, reason}}}
       end
     end)
   end
@@ -181,11 +181,27 @@ defmodule HostKit.RunRecord do
     paths = [run_path(record.id, opts) | prune_paths(record)]
 
     Enum.reduce_while(paths, :ok, fn path, :ok ->
-      case rm_rf(path, opts) do
-        :ok -> {:cont, :ok}
+      with :ok <- validate_prune_path(path, opts),
+           :ok <- rm_rf(path, opts) do
+        {:cont, :ok}
+      else
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
+  end
+
+  defp validate_prune_path(path, opts) do
+    allowed_roots = [runs_root(nil, opts), backups_root(nil, opts)]
+
+    if Enum.any?(allowed_roots, &under_dir?(path, &1)),
+      do: :ok,
+      else: {:error, {:unsafe_run_record_path, path}}
+  end
+
+  defp under_dir?(path, root) do
+    path = Path.expand(path)
+    root = Path.expand(root)
+    String.starts_with?(path, root <> "/")
   end
 
   defp prune_paths(record) do
@@ -371,10 +387,11 @@ defmodule HostKit.RunRecord do
   defp record_path(plan, opts, id), do: Path.join(runs_root(plan, opts), id <> ".json")
 
   defp run_id(plan) do
-    stamp = DateTime.utc_now() |> Calendar.strftime("%Y%m%d-%H%M%S")
+    stamp = DateTime.utc_now() |> Calendar.strftime("%Y%m%d-%H%M%S-%f")
+    suffix = :crypto.strong_rand_bytes(6) |> Base.encode16(case: :lower)
     project = if plan.project && plan.project.name, do: to_string(plan.project.name), else: "plan"
     direction = plan.opts |> Keyword.get(:direction, :up) |> to_string()
-    "#{stamp}-#{project}-#{direction}"
+    "#{stamp}-#{project}-#{direction}-#{suffix}"
   end
 
   defp project_name(project), do: to_string(project.name)

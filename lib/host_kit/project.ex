@@ -204,18 +204,23 @@ defmodule HostKit.Project do
         {:ok, nil}
 
       selectors ->
-        Enum.reduce_while(selectors, {:ok, []}, fn selector, {:ok, services} ->
-          case resolve_service(project, selector) do
-            {:ok, service} -> {:cont, {:ok, [service | services]}}
-            {:error, reason} -> {:halt, {:error, reason}}
-          end
-        end)
-        |> case do
-          {:ok, services} -> {:ok, services |> Enum.reverse() |> Enum.uniq_by(& &1.name)}
-          {:error, reason} -> {:error, reason}
-        end
+        selectors
+        |> Enum.reduce_while({:ok, []}, &resolve_selected_service(project, &1, &2))
+        |> normalize_selected_services()
     end
   end
+
+  defp resolve_selected_service(project, selector, {:ok, services}) do
+    case resolve_service(project, selector) do
+      {:ok, service} -> {:cont, {:ok, [service | services]}}
+      {:error, reason} -> {:halt, {:error, reason}}
+    end
+  end
+
+  defp normalize_selected_services({:ok, services}),
+    do: {:ok, services |> Enum.reverse() |> Enum.uniq_by(& &1.name)}
+
+  defp normalize_selected_services({:error, reason}), do: {:error, reason}
 
   defp resolve_service(%__MODULE__{} = project, selector) do
     matches = Enum.filter(project.services, &service_matches?(&1, selector))

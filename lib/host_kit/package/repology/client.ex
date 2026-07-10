@@ -41,6 +41,8 @@ defmodule HostKit.Package.Repology.Client do
   @spec project_by_package(String.t(), String.t(), [option()]) ::
           {:ok, [Record.t()]} | {:error, error()}
   def project_by_package(repo, package, opts \\ []) when is_binary(repo) and is_binary(package) do
+    :ok = HostKit.Package.Repology.RateLimit.wait(opts)
+
     query =
       URI.encode_query(%{
         repo: repo,

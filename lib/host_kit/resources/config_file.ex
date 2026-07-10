@@ -421,11 +421,7 @@ defmodule HostKit.Resources.ConfigFile do
     |> Enum.sort_by(& &1.path)
   end
 
-  defp resolve_secrets(%HostKit.Secret{} = secret) do
-    {:ok, HostKit.Secret.resolve!(secret)}
-  rescue
-    error in [System.EnvError] -> {:error, {:missing_secret_env, error.env}}
-  end
+  defp resolve_secrets(%HostKit.Secret{} = secret), do: HostKit.Secret.resolve(secret)
 
   defp resolve_secrets(:redacted), do: {:error, :redacted_secret_not_renderable}
 
@@ -515,6 +511,8 @@ defmodule HostKit.Resources.ConfigFile do
     error in [YamlElixir.ParsingError] -> {:error, {:invalid_yaml, Exception.message(error)}}
   end
 
+  # toml 0.7 accepts :strings at runtime but its published typespec says :string.
+  @dialyzer {:nowarn_function, parse_toml: 1}
   defp parse_toml(content) do
     Toml.decode(content, keys: :strings)
   end

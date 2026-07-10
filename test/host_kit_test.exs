@@ -13,6 +13,15 @@ defmodule HostKitTest do
     assert %HostKit.Systemd.Service{name: "toys-exograph.service"} = Enum.at(resources, 2)
   end
 
+  test "load returns config evaluation exceptions as errors" do
+    path = Path.join(System.tmp_dir!(), "hostkit-load-#{System.unique_integer([:positive])}.exs")
+    File.write!(path, "raise KeyError, key: :missing, term: %{}\n")
+    on_exit(fn -> File.rm(path) end)
+
+    assert {:error, {%KeyError{key: :missing}, stacktrace}} = HostKit.load(path)
+    assert is_list(stacktrace)
+  end
+
   test "plan summarizes resource kinds" do
     project = HostKit.load!(fixture_path("project.hostkit"))
 

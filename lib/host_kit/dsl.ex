@@ -176,7 +176,7 @@ defmodule HostKit.DSL do
   end
 
   defdirective tls(mode, opts \\ []), source: true do
-    if Scope.proxy_service_active?() do
+    if DSL.active?({Scope, :proxy_service}) do
       Scope.put_proxy_tls(mode)
     else
       Ingress.Scope.put_tls(mode, opts, source)
@@ -198,10 +198,10 @@ defmodule HostKit.DSL do
 
   defdirective http(url_or_opts \\ []), source: true do
     cond do
-      Readiness.Scope.active?() ->
+      DSL.active?({Readiness.Scope, :readiness}) ->
         Readiness.Scope.add_check(Readiness.Scope.http_check(url_or_opts, [], source))
 
-      Scope.proxy_active?() ->
+      DSL.active?({Scope, :proxy}) ->
         Scope.put_proxy_listener(:http, url_or_opts)
 
       true ->
@@ -211,10 +211,10 @@ defmodule HostKit.DSL do
 
   defdirective http(url, opts), source: true do
     cond do
-      Readiness.Scope.active?() ->
+      DSL.active?({Readiness.Scope, :readiness}) ->
         Readiness.Scope.add_check(Readiness.Scope.http_check(url, opts, source))
 
-      Scope.proxy_active?() ->
+      DSL.active?({Scope, :proxy}) ->
         raise ArgumentError, "proxy http listener expects keyword options, got two arguments"
 
       true ->

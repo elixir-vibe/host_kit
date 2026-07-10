@@ -34,7 +34,8 @@ defmodule HostKit.Apply do
       |> Keyword.put_new(:project, plan.project)
       |> maybe_put_package_manager(plan)
 
-    with :ok <- confirm(opts) do
+    with :ok <- confirm(opts),
+         :ok <- HostKit.Plan.ExecutionGraph.validate(plan) do
       opts = Keyword.put(opts, :plan, plan)
       with_reusable_runner(opts, fn opts -> apply_changes(plan.changes, opts) end)
     end
@@ -120,88 +121,22 @@ defmodule HostKit.Apply do
     graph = HostKit.Plan.ExecutionGraph.build(%Plan{changes: changes}, include: :all)
 
     if HostKit.Plan.ExecutionGraph.acyclic?(graph) do
-      stable_topological_order(changes, graph.edges)
+      changes_by_id = Map.new(changes, &{&1.resource_id, &1})
+
+      positions =
+        changes
+        |> Enum.with_index()
+        |> Map.new(fn {change, index} -> {change.resource_id, index} end)
+
+      Enum.flat_map(graph.layers, fn layer ->
+        layer
+        |> Enum.sort_by(&Map.fetch!(positions, &1))
+        |> Enum.map(&Map.fetch!(changes_by_id, &1))
+      end)
     else
       changes
     end
   end
-
-  defp stable_topological_order(changes, edges) do
-    ids = Enum.map(changes, & &1.resource_id)
-    positions = ids |> Enum.with_index() |> Map.new()
-
-    incoming = Map.new(ids, &{&1, MapSet.new()})
-    dependents = Map.new(ids, &{&1, MapSet.new()})
-
-    {incoming, dependents} =
-      Enum.reduce(edges, {incoming, dependents}, fn edge, {incoming, dependents} ->
-        if Map.has_key?(incoming, edge.from) and Map.has_key?(incoming, edge.to) do
-          {
-            Map.update!(incoming, edge.to, &MapSet.put(&1, edge.from)),
-            Map.update!(dependents, edge.from, &MapSet.put(&1, edge.to))
-          }
-        else
-          {incoming, dependents}
-        end
-      end)
-
-    ready = ready_ids(ids, incoming, positions)
-
-    do_stable_topological_order(
-      changes_by_id(changes),
-      incoming,
-      dependents,
-      positions,
-      ready,
-      []
-    )
-  end
-
-  defp do_stable_topological_order(changes_by_id, incoming, dependents, positions, ready, ordered) do
-    case ready do
-      [] ->
-        if map_size(incoming) == 0 do
-          Enum.reverse(ordered)
-        else
-          changes_by_id |> Map.values() |> Enum.sort_by(&positions[&1.resource_id])
-        end
-
-      [id | rest] ->
-        change = Map.fetch!(changes_by_id, id)
-        dependent_ids = Map.get(dependents, id, MapSet.new())
-
-        {incoming, newly_ready} =
-          Enum.reduce(dependent_ids, {Map.delete(incoming, id), []}, fn dependent_id,
-                                                                        {incoming, newly_ready} ->
-            incoming = Map.update!(incoming, dependent_id, &MapSet.delete(&1, id))
-
-            if incoming |> Map.fetch!(dependent_id) |> MapSet.size() == 0 do
-              {incoming, [dependent_id | newly_ready]}
-            else
-              {incoming, newly_ready}
-            end
-          end)
-
-        ready = (rest ++ newly_ready) |> Enum.uniq() |> Enum.sort_by(&positions[&1])
-
-        do_stable_topological_order(
-          Map.delete(changes_by_id, id),
-          incoming,
-          dependents,
-          positions,
-          ready,
-          [change | ordered]
-        )
-    end
-  end
-
-  defp ready_ids(ids, incoming, positions) do
-    ids
-    |> Enum.filter(&(incoming |> Map.fetch!(&1) |> MapSet.size() == 0))
-    |> Enum.sort_by(&positions[&1])
-  end
-
-  defp changes_by_id(changes), do: Map.new(changes, &{&1.resource_id, &1})
 
   defp chunk_package_changes(changes), do: chunk_package_changes(changes, []) |> Enum.reverse()
 
@@ -537,10 +472,8 @@ defmodule HostKit.Apply do
 
   defp apply_file(%File{path: path, content: content} = file, opts) do
     with {:ok, content} <- file_content(content, opts),
-         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
-         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
-         :ok <- Ops.chown(path, file.owner, file.group, opts) do
-      Ops.chmod(path, file.mode, opts)
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts) do
+      write_resource_file(path, content, file.owner, file.group, file.mode, opts)
     end
   end
 
@@ -637,38 +570,37 @@ defmodule HostKit.Apply do
   defp apply_config_file(%ConfigFile{path: path} = config_file, opts) do
     with {:ok, rendered} <- ConfigFile.render(config_file),
          {:ok, content} <- rendered_content(config_file, rendered, opts),
-         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
-         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
-         :ok <- Ops.chown(path, config_file.owner, config_file.group, opts) do
-      Ops.chmod(path, config_file.mode, opts)
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts) do
+      write_resource_file(
+        path,
+        content,
+        config_file.owner,
+        config_file.group,
+        config_file.mode,
+        opts
+      )
     end
   end
 
   defp apply_template(%Template{path: path} = template, opts) do
     with {:ok, rendered} <- Template.render(template),
          {:ok, content} <- rendered_content(template, rendered, opts),
-         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
-         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
-         :ok <- Ops.chown(path, template.owner, template.group, opts) do
-      Ops.chmod(path, template.mode, opts)
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts) do
+      write_resource_file(path, content, template.owner, template.group, template.mode, opts)
     end
   end
 
   defp apply_exs(%Exs{path: path} = exs, opts) do
     with {:ok, content} <- Exs.render(exs),
-         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
-         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
-         :ok <- Ops.chown(path, exs.owner, exs.group, opts) do
-      Ops.chmod(path, exs.mode, opts)
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts) do
+      write_resource_file(path, content, exs.owner, exs.group, exs.mode, opts)
     end
   end
 
   defp apply_env_file(%EnvFile{path: path} = env_file, opts) do
     with {:ok, content} <- env_file_content(env_file, opts),
-         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
-         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
-         :ok <- Ops.chown(path, env_file.owner, env_file.group, opts) do
-      Ops.chmod(path, env_file.mode, opts)
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts) do
+      write_resource_file(path, content, env_file.owner, env_file.group, env_file.mode, opts)
     end
   end
 
@@ -835,19 +767,22 @@ defmodule HostKit.Apply do
 
     with {:ok, content} <- rendered_content(egress, Firewall.Nftables.render_egress(egress), opts),
          :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
-         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
-         :ok <- Ops.chown(path, "root", "root", opts),
-         :ok <- Ops.chmod(path, 0o644, opts) do
+         :ok <- write_resource_file(path, content, "root", "root", 0o644, opts) do
       validate_firewall(path, opts)
     end
   end
 
   defp apply_proxy(%Proxy{path: path} = proxy, opts) do
     with {:ok, content} <- rendered_content(proxy, Proxy.render(proxy), opts),
-         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
-         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
-         :ok <- Ops.chown(path, proxy.meta[:owner], proxy.meta[:group], opts) do
-      Ops.chmod(path, Map.get(proxy.meta, :mode, 0o644), opts)
+         :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts) do
+      write_resource_file(
+        path,
+        content,
+        proxy.meta[:owner],
+        proxy.meta[:group],
+        Map.get(proxy.meta, :mode, 0o644),
+        opts
+      )
     end
   end
 
@@ -856,9 +791,7 @@ defmodule HostKit.Apply do
   defp apply_firewall(%Firewall{path: path} = firewall, opts) do
     with {:ok, content} <- rendered_content(firewall, Firewall.render(firewall), opts),
          :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
-         :ok <- HostKit.Runner.Files.write_file(path, content, opts),
-         :ok <- Ops.chown(path, "root", "root", opts),
-         :ok <- Ops.chmod(path, 0o644, opts),
+         :ok <- write_resource_file(path, content, "root", "root", 0o644, opts),
          :ok <- validate_firewall(path, opts) do
       reload_firewall(opts)
     end
@@ -885,10 +818,17 @@ defmodule HostKit.Apply do
     owner = Keyword.get(opts, :systemd_unit_owner, "root")
     group = Keyword.get(opts, :systemd_unit_group, "root")
 
-    with :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts),
-         :ok <- HostKit.Runner.Files.write_file(path, IO.iodata_to_binary(content), opts),
+    with :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), opts) do
+      write_resource_file(path, IO.iodata_to_binary(content), owner, group, 0o644, opts)
+    end
+  end
+
+  defp write_resource_file(path, content, owner, group, mode, opts) do
+    write_opts = Keyword.merge(opts, owner: owner, group: group, mode: mode)
+
+    with :ok <- HostKit.Runner.Files.write_file(path, content, write_opts),
          :ok <- Ops.chown(path, owner, group, opts) do
-      Ops.chmod(path, 0o644, opts)
+      Ops.chmod(path, mode, opts)
     end
   end
 
@@ -921,19 +861,17 @@ defmodule HostKit.Apply do
     end
   end
 
-  defp systemd_change?(%{status: status, change: %{after: %Systemd.Service{}}})
+  defp systemd_change?(%{
+         status: status,
+         change: %{action: :delete, before: %Systemd.Service{}}
+       })
        when status in [:applied, :dry_run],
        do: true
 
-  defp systemd_change?(%{status: status, change: %{before: %Systemd.Service{}}})
-       when status in [:applied, :dry_run],
-       do: true
-
-  defp systemd_change?(%{status: status, change: %{after: %Systemd.Timer{}}})
-       when status in [:applied, :dry_run],
-       do: true
-
-  defp systemd_change?(%{status: status, change: %{before: %Systemd.Timer{}}})
+  defp systemd_change?(%{
+         status: status,
+         change: %{action: :delete, before: %Systemd.Timer{}}
+       })
        when status in [:applied, :dry_run],
        do: true
 

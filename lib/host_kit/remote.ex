@@ -1,7 +1,6 @@
 defmodule HostKit.Remote do
   @moduledoc "Read-only inspection of resources through a HostKit runner."
 
-  alias HostKit.Caddy
   alias HostKit.{Firewall, Proxy, Reader.Helpers, Runner, Systemd}
 
   alias HostKit.Resources.{
@@ -95,34 +94,9 @@ defmodule HostKit.Remote do
     Helpers.read_exs(desired, &read(&1, context))
   end
 
-  def read(%Caddy.Site{} = desired, context) do
-    sites_dir =
-      get_in(context, [
-        :project,
-        Access.key(:provider_configs),
-        :caddy,
-        Access.key(:config),
-        :sites_dir
-      ])
-
-    case sites_dir do
-      nil ->
-        {:ok, nil}
-
-      dir ->
-        read_caddy_site(Path.join(dir, Helpers.caddy_site_filename(desired)), desired, context)
-    end
-  end
-
   def read(_resource, _context), do: {:ok, nil}
 
-  defp read_readiness(%Readiness{} = desired, opts) do
-    read_current_readiness(desired, opts)
-  end
-
-  defp read_current_readiness(desired, opts) do
-    if HostKit.Readiness.current?(desired, opts), do: {:ok, desired}, else: {:ok, nil}
-  end
+  defp read_readiness(%Readiness{} = desired, opts), do: HostKit.Readiness.read(desired, opts)
 
   defp read_systemd_unit(path, desired, context) do
     case read_file(path, context) do
@@ -140,14 +114,6 @@ defmodule HostKit.Remote do
 
   defp read_proxy(%Proxy{path: path} = desired, context) do
     Helpers.read_content_resource(desired, path, &read_file(&1, context))
-  end
-
-  defp read_caddy_site(path, desired, context) do
-    case read_file(path, context) do
-      {:ok, content} -> {:ok, %{desired | meta: Map.put(desired.meta, :content, content)}}
-      {:error, :enoent} -> {:ok, nil}
-      {:error, reason} -> {:error, reason}
-    end
   end
 
   defp read_file(path, %{opts: opts}) do

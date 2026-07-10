@@ -57,21 +57,29 @@ defmodule HostKit.Env do
     do: {:error, :redacted_secret_not_renderable}
 
   defp render_entry({:secret, key, %HostKit.Secret{} = secret}, _opts) do
-    {:ok, "#{key}=#{quote_value(HostKit.Secret.resolve!(secret))}"}
-  rescue
-    error in [System.EnvError] -> {:error, {:missing_secret_env, error.env}}
+    with {:ok, value} <- HostKit.Secret.resolve(secret) do
+      {:ok, "#{key}=#{quote_value(value)}"}
+    end
   end
 
   @spec parse(String.t()) :: {:ok, map()} | {:error, term()}
   def parse(content) do
-    path = Path.join(System.tmp_dir!(), "host-kit-env-#{System.unique_integer([:positive])}.env")
+    dir = temporary_dir()
+    path = Path.join(dir, "env")
 
     try do
+      File.mkdir!(dir)
+      File.chmod!(dir, 0o700)
       File.write!(path, content)
       Dotenvy.source(path, side_effect: fn _env -> :ok end)
     after
-      File.rm(path)
+      File.rm_rf(dir)
     end
+  end
+
+  defp temporary_dir do
+    suffix = :crypto.strong_rand_bytes(12) |> Base.url_encode64(padding: false)
+    Path.join(System.tmp_dir!(), "host-kit-env-#{suffix}")
   end
 
   defp validate_dotenv(content) do

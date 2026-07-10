@@ -8,7 +8,6 @@ defmodule HostKit.Agent.State do
     project: nil,
     target: nil,
     last_plan: nil,
-    last_apply: nil,
     last_monitor: nil,
     events: []
   }
@@ -104,7 +103,6 @@ defmodule HostKit.Agent.State do
       project: project_name(state.project),
       target: target_name(state.target),
       last_plan: state.last_plan,
-      last_apply: state.last_apply,
       last_monitor: state.last_monitor,
       events: state.events
     }

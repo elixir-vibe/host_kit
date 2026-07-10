@@ -108,6 +108,21 @@ defmodule HostKit.MonitorRunTest do
     assert result.observed.output == "boom\n"
   end
 
+  test "runs HTTP checks through Req" do
+    adapter = fn request -> {request, Req.Response.new(status: 204, body: "ignored")} end
+
+    project =
+      project_with_check(
+        HostKit.Monitor.check(:http, url: "https://example.test", expect: [status: 204])
+      )
+
+    assert {:ok, [result]} =
+             HostKit.Monitor.run(project, req_options: [adapter: adapter])
+
+    assert result.status == :ok
+    assert result.observed.status == 204
+  end
+
   test "runs filesystem checks" do
     path = Path.join(System.tmp_dir!(), "host-kit-monitor-#{System.unique_integer([:positive])}")
     File.write!(path, "ok")

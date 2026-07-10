@@ -1,8 +1,8 @@
 defmodule HostKit.SystemdRuntime do
   @moduledoc "Systemd runtime operations for HostKit apply and readiness."
 
-  alias HostKit.Runner.Ops
   alias HostKit.Readiness.Systemd, as: SystemdCheck
+  alias HostKit.Runner.Ops
 
   @spec reload(keyword()) :: :ok | {:error, term()}
   def reload(opts \\ []) do

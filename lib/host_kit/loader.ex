@@ -1,3 +1,5 @@
+# Config evaluation is intentionally normalized at this boundary.
+# reach:disable-for-this-file bare_rescue
 defmodule HostKit.Loader do
   @moduledoc "Loads HostKit `.exs` project declarations."
 
@@ -16,8 +18,7 @@ defmodule HostKit.Loader do
         other -> {:error, {:expected_project, other}}
       end
     rescue
-      exception in [ArgumentError, Code.LoadError, CompileError, RuntimeError, SyntaxError] ->
-        {:error, {exception, __STACKTRACE__}}
+      exception -> {:error, {exception, __STACKTRACE__}}
     end
   end
 

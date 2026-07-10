@@ -10,11 +10,18 @@ defmodule HostKit.Workspace.Agent.Server do
   @impl true
   def init(opts) do
     socket = Keyword.fetch!(opts, :socket)
+    max_request = Keyword.get(opts, :max_request, 1_000_000)
     File.rm(socket)
     File.mkdir_p!(Path.dirname(socket))
 
     {:ok, listen} =
-      :gen_tcp.listen(0, [:binary, active: false, packet: 4, ifaddr: {:local, socket}])
+      :gen_tcp.listen(0, [
+        :binary,
+        active: false,
+        packet: 4,
+        packet_size: max_request,
+        ifaddr: {:local, socket}
+      ])
 
     File.chmod!(socket, Keyword.get(opts, :socket_mode, 0o600))
 
@@ -23,7 +30,9 @@ defmodule HostKit.Workspace.Agent.Server do
       listen: listen,
       workspace: Keyword.get(opts, :workspace, File.cwd!()),
       timeout: Keyword.get(opts, :timeout, 30_000),
-      max_output: Keyword.get(opts, :max_output, 64_000)
+      max_output: Keyword.get(opts, :max_output, 64_000),
+      max_connections: max(Keyword.get(opts, :max_connections, 16), 1),
+      tasks: %{}
     }
 
     send(self(), :accept)
@@ -34,8 +43,10 @@ defmodule HostKit.Workspace.Agent.Server do
   def handle_info(:accept, state) do
     case :gen_tcp.accept(state.listen, 0) do
       {:ok, client} ->
-        Task.start(fn -> serve(client, state) end)
-        send(self(), :accept)
+        {:ok, pid} = Task.start(fn -> serve(client, state) end)
+        ref = Process.monitor(pid)
+        state = %{state | tasks: Map.put(state.tasks, ref, pid)}
+        if map_size(state.tasks) < state.max_connections, do: send(self(), :accept)
         {:noreply, state}
 
       {:error, :timeout} ->
@@ -47,9 +58,17 @@ defmodule HostKit.Workspace.Agent.Server do
     end
   end
 
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
+    was_full? = map_size(state.tasks) >= state.max_connections
+    state = %{state | tasks: Map.delete(state.tasks, ref)}
+    if was_full?, do: send(self(), :accept)
+    {:noreply, state}
+  end
+
   @impl true
   def terminate(_reason, state) do
     :gen_tcp.close(state.listen)
+    Enum.each(state.tasks, fn {_ref, pid} -> Process.exit(pid, :shutdown) end)
     File.rm(state.socket)
     :ok
   end
@@ -63,6 +82,7 @@ defmodule HostKit.Workspace.Agent.Server do
       end
 
     :gen_tcp.send(client, :erlang.term_to_binary(response))
+  after
     :gen_tcp.close(client)
   end
 
@@ -127,21 +147,56 @@ defmodule HostKit.Workspace.Agent.Server do
     do: HostKit.Monitor.Result.error(check, {:unsupported_inside_check, check.type})
 
   defp run_command([command | args], state) do
-    task =
-      Task.async(fn -> System.cmd(command, args, cd: state.workspace, stderr_to_stdout: true) end)
-
-    case Task.yield(task, state.timeout) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {output, status}} ->
-        {:ok, %{exit_status: status, stdout: truncate(output, state.max_output)}}
-
+    case System.find_executable(command) do
       nil ->
-        {:error, :timeout}
+        {:error, :enoent}
+
+      executable ->
+        port =
+          Port.open(
+            {:spawn_executable, executable},
+            [
+              :binary,
+              :exit_status,
+              :hide,
+              :stderr_to_stdout,
+              args: args,
+              cd: state.workspace
+            ]
+          )
+
+        deadline = System.monotonic_time(:millisecond) + state.timeout
+        collect_command(port, deadline, state.max_output, [], 0)
     end
   rescue
     error in [ErlangError, RuntimeError, ArgumentError] -> {:error, error}
   end
 
   defp run_command(_argv, _state), do: {:error, :invalid_command}
+
+  defp collect_command(port, deadline, max_output, output, size) do
+    timeout = max(deadline - System.monotonic_time(:millisecond), 0)
+
+    receive do
+      {^port, {:data, data}} ->
+        {output, size} = append_output(output, size, data, max_output)
+        collect_command(port, deadline, max_output, output, size)
+
+      {^port, {:exit_status, status}} ->
+        {:ok, %{exit_status: status, stdout: output |> Enum.reverse() |> IO.iodata_to_binary()}}
+    after
+      timeout ->
+        Port.close(port)
+        {:error, :timeout}
+    end
+  end
+
+  defp append_output(output, size, _data, max) when size >= max, do: {output, size}
+
+  defp append_output(output, size, data, max) do
+    keep = min(byte_size(data), max - size)
+    {[binary_part(data, 0, keep) | output], size + keep}
+  end
 
   defp listening?(port) when is_integer(port) do
     case :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false], 500) do
@@ -155,7 +210,4 @@ defmodule HostKit.Workspace.Agent.Server do
   end
 
   defp listening?(_port), do: false
-
-  defp truncate(output, max) when byte_size(output) <= max, do: output
-  defp truncate(output, max), do: binary_part(output, 0, max)
 end

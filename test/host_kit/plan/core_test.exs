@@ -24,7 +24,10 @@ defmodule HostKit.PlanTest do
   end
 
   test "plan triggers healthy readiness when an upstream dependency changes" do
-    service = %HostKit.Systemd.Service{name: "demo.service"}
+    service = %HostKit.Systemd.Service{
+      name: "demo.service",
+      service: [exec_start: "/usr/bin/true"]
+    }
 
     readiness = %HostKit.Resources.Readiness{
       name: :demo_ready,
@@ -56,7 +59,10 @@ defmodule HostKit.PlanTest do
   end
 
   test "plan leaves healthy readiness unchanged when dependencies do not change" do
-    service = %HostKit.Systemd.Service{name: "demo.service"}
+    service = %HostKit.Systemd.Service{
+      name: "demo.service",
+      service: [exec_start: "/usr/bin/true"]
+    }
 
     readiness = %HostKit.Resources.Readiness{
       name: :demo_ready,
@@ -81,6 +87,32 @@ defmodule HostKit.PlanTest do
              %Change{resource_id: {:systemd_service, "demo.service"}, action: :no_op},
              %Change{resource_id: {:readiness, :demo_ready}, action: :no_op}
            ] = plan.changes
+  end
+
+  test "plan rejects duplicate resource identities" do
+    file = %HostKit.Resources.File{path: "/etc/demo", content: "demo"}
+
+    project = %HostKit.Project{
+      name: :demo,
+      services: [%HostKit.Service{name: :demo, path: "demo", resources: [file, file]}]
+    }
+
+    assert {:error, %HostKit.Diagnostics{errors: [diagnostic]}} = HostKit.plan(project)
+    assert diagnostic.code == :duplicate_resource_id
+    assert diagnostic.resource_id == {:file, "/etc/demo"}
+  end
+
+  test "plan validates resources before reading host state" do
+    service = %HostKit.Systemd.Service{name: "invalid.service", service: [type: :invalid]}
+
+    project = %HostKit.Project{
+      name: :demo,
+      services: [%HostKit.Service{name: :demo, path: "demo", resources: [service]}]
+    }
+
+    assert {:error, %HostKit.Diagnostics{errors: [diagnostic]}} = HostKit.plan(project)
+    assert diagnostic.code == :invalid_resource
+    assert diagnostic.resource_id == {:systemd_service, "invalid.service"}
   end
 
   test "plan can be scoped to declared services" do

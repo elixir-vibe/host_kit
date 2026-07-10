@@ -10,7 +10,11 @@ defmodule HostKit.MixProject do
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
-      dialyzer: [plt_add_apps: [:eex, :mix, :ssh, :yaml_elixir, :yamerl]],
+      test_coverage: [summary: [threshold: 72]],
+      dialyzer: [
+        plt_add_apps: [:eex, :mix, :ssh, :yaml_elixir, :yamerl],
+        ignore_warnings: "dialyzer.ignore-warnings.exs"
+      ],
       package: package(),
       description: description(),
       docs: docs()
@@ -40,6 +44,7 @@ defmodule HostKit.MixProject do
       {:jason, "~> 1.4"},
       {:json_codec, "~> 0.1.4"},
       {:jsonpatch, "~> 2.3"},
+      {:libgraph, "~> 0.16"},
       {:yaml_elixir, "~> 2.11"},
       {:ymlr, "~> 5.1"},
       {:toml, "~> 0.7"},
@@ -66,7 +71,7 @@ defmodule HostKit.MixProject do
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/elixir-vibe/host_kit"},
       files:
-        ~w(lib guides examples notebooks scripts .formatter.exs mix.exs README.md CHANGELOG.md LICENSE*)
+        ~w(lib guides examples notebooks scripts .formatter.exs dialyzer.ignore-warnings.exs mix.exs README.md CHANGELOG.md LICENSE*)
     ]
   end
 
@@ -108,12 +113,12 @@ defmodule HostKit.MixProject do
   defp aliases do
     [
       ci: [
-        "format",
+        "hex.audit",
         "compile --warnings-as-errors",
         "format --check-formatted",
-        "test",
+        "test --cover",
         "credo --strict",
-        "dialyzer",
+        "dialyzer --list-unused-filters",
         "ex_dna --max-clones 0",
         "reach.check --arch --smells"
       ]

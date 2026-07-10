@@ -10,7 +10,7 @@ defmodule Mix.Tasks.HostKit.Apply do
   use Mix.Task
 
   alias HostKit.Package.{Manager, TargetRepo}
-  alias Mix.Tasks.HostKit.Options
+  alias Mix.Tasks.HostKit.{Options, Output}
 
   @shortdoc "Apply HostKit resources"
 
@@ -63,7 +63,7 @@ defmodule Mix.Tasks.HostKit.Apply do
         plan = load_plan(opts, project, positional, target_opts)
 
         case HostKit.apply(plan, Keyword.put(apply_opts(opts, target_opts), :reporter, reporter)) do
-          {:ok, results} -> print_results(results)
+          {:ok, results} -> Output.print_results(results)
           {:error, reason} -> Mix.raise("HostKit apply failed: #{inspect(reason)}")
         end
       after
@@ -139,35 +139,35 @@ defmodule Mix.Tasks.HostKit.Apply do
   defp maybe_prepare_release_kit!(%{artifacts: []}, _opts, _target_opts, _reporter), do: :ok
 
   defp maybe_prepare_release_kit!(context, opts, target_opts, reporter) do
-    if Keyword.get(opts, :dry_run, false) do
-      :ok
-    else
-      prepare_project =
-        HostKit.Recipes.OTPRelease.prepare_project(context.project, context.artifacts,
-          services: Options.selected_services(opts)
-        )
+    if Keyword.get(opts, :dry_run, false),
+      do: :ok,
+      else: prepare_release_kit!(context, opts, target_opts, reporter)
+  end
 
-      plan_opts = opts |> plan_opts(target_opts) |> Keyword.delete(:services)
+  defp prepare_release_kit!(context, opts, target_opts, reporter) do
+    prepare_project =
+      HostKit.Recipes.OTPRelease.prepare_project(context.project, context.artifacts,
+        services: Options.selected_services(opts)
+      )
 
-      case HostKit.plan(prepare_project, plan_opts) do
-        {:ok, plan} ->
-          case HostKit.apply(
-                 plan,
-                 Keyword.put(apply_opts(opts, target_opts), :reporter, reporter)
-               ) do
-            {:ok, _results} ->
-              :ok
+    plan_opts = opts |> plan_opts(target_opts) |> Keyword.delete(:services)
 
-            {:error, reason} ->
-              Mix.raise("HostKit ReleaseKit preparation failed: #{inspect(reason)}")
-          end
+    case HostKit.plan(prepare_project, plan_opts) do
+      {:ok, plan} ->
+        apply_release_kit_plan!(plan, opts, target_opts, reporter)
 
-        {:error, %HostKit.Diagnostics{} = diagnostics} ->
-          Mix.raise(HostKit.Diagnostics.Format.format(diagnostics))
+      {:error, %HostKit.Diagnostics{} = diagnostics} ->
+        Mix.raise(HostKit.Diagnostics.Format.format(diagnostics))
 
-        {:error, reason} ->
-          Mix.raise("HostKit ReleaseKit preparation plan failed: #{inspect(reason)}")
-      end
+      {:error, reason} ->
+        Mix.raise("HostKit ReleaseKit preparation plan failed: #{inspect(reason)}")
+    end
+  end
+
+  defp apply_release_kit_plan!(plan, opts, target_opts, reporter) do
+    case HostKit.apply(plan, Keyword.put(apply_opts(opts, target_opts), :reporter, reporter)) do
+      {:ok, _results} -> :ok
+      {:error, reason} -> Mix.raise("HostKit ReleaseKit preparation failed: #{inspect(reason)}")
     end
   end
 
@@ -256,14 +256,6 @@ defmodule Mix.Tasks.HostKit.Apply do
       ]
 
   defp print_event?(_event, _opts), do: true
-
-  defp print_results(results) do
-    results
-    |> Enum.map_join("\n", fn %{change: change, status: status} ->
-      "#{status} #{HostKit.Plan.Format.format_change(change)}"
-    end)
-    |> IO.puts()
-  end
 
   defp plan_opts(opts, target_opts) do
     target_opts

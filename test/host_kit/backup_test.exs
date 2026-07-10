@@ -153,6 +153,37 @@ defmodule HostKit.BackupTest do
     if root = Process.get(:backup_test_root), do: File.rm_rf!(root)
   end
 
+  test "runner keeps caller-provided stamps inside the backup destination" do
+    root =
+      Path.join(System.tmp_dir!(), "hostkit-backup-stamp-#{System.unique_integer([:positive])}")
+
+    destination = Path.join(root, "backups")
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    project = %HostKit.Project{
+      name: :demo,
+      resources: [
+        %HostKit.Systemd.Service{
+          name: "demo-backup.service",
+          meta: %{
+            backup: %HostKit.Backup.Job{
+              name: "demo-backup.service",
+              destination: destination,
+              config: "/tmp/demo.exs"
+            }
+          }
+        }
+      ]
+    }
+
+    assert {:ok, result} =
+             HostKit.Backup.Runner.run(project, "demo-backup", stamp: "../outside")
+
+    assert Path.dirname(result.manifest) == destination
+    assert Path.basename(result.manifest) == "backup-outside.manifest.json"
+    refute File.exists?(Path.join(root, "backup-outside.manifest.json"))
+  end
+
   test "runner archives included paths and writes checksum and manifest" do
     root = Path.join(System.tmp_dir!(), "hostkit-backup-#{System.unique_integer([:positive])}")
     Process.put(:backup_test_root, root)

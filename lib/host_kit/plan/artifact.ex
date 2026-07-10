@@ -6,7 +6,7 @@ defmodule HostKit.Plan.Artifact do
   alias HostKit.{Change, Plan, Resource}
 
   defmodule ChangeEntry do
-    @moduledoc false
+    @moduledoc "Serialized change entry stored in a portable plan artifact."
 
     use JSONCodec, fast_path: :json
 
@@ -145,7 +145,7 @@ defmodule HostKit.Plan.Artifact do
     content = plan |> from_plan(opts) |> dump() |> Jason.encode_to_iodata!(pretty: true)
 
     with :ok <- File.mkdir_p(Path.dirname(path)) do
-      File.write(path, [content, ?\n])
+      HostKit.Runner.Files.write_file(path, [content, ?\n], mode: 0o600)
     end
   end
 

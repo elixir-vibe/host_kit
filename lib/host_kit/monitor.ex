@@ -93,10 +93,10 @@ defmodule HostKit.Monitor do
     end
   end
 
-  defp run_check(%Check{type: :http} = check, _opts) do
+  defp run_check(%Check{type: :http} = check, opts) do
     expected_status = get_in(check.expect, [:status]) || 200
 
-    with {:ok, status} <- http_status(check.target),
+    with {:ok, status} <- http_status(check.target, opts),
          true <- status == expected_status do
       Result.ok(check, %{status: status})
     else
@@ -167,15 +167,23 @@ defmodule HostKit.Monitor do
     if Keyword.get(opts, :sudo, false), do: {"sudo", [command | args]}, else: {command, args}
   end
 
-  defp http_status(nil), do: {:error, :missing_url}
+  defp http_status(nil, _opts), do: {:error, :missing_url}
 
-  defp http_status(url) do
-    :inets.start()
-    :ssl.start()
+  defp http_status(url, opts) do
+    request_opts =
+      [
+        retry: false,
+        receive_timeout: Keyword.get(opts, :http_timeout, 5_000),
+        into: &discard_body/2
+      ]
+      |> Keyword.merge(Keyword.get(opts, :req_options, []))
 
-    case :httpc.request(:get, {String.to_charlist(url), []}, [], body_format: :binary) do
-      {:ok, {{_version, status, _reason}, _headers, _body}} -> {:ok, status}
+    case Req.get(url, request_opts) do
+      {:ok, %Req.Response{status: status}} -> {:ok, status}
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp discard_body({:data, _data}, request_and_response),
+    do: {:cont, request_and_response}
 end

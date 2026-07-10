@@ -65,9 +65,9 @@ defmodule HostKit.Package.Repology.Cache do
   end
 
   defp write(path, value) do
-    with :ok <- File.mkdir_p(Path.dirname(path)) do
-      File.write!(path, Jason.encode_to_iodata!(value, pretty: true))
-      :ok
+    with {:ok, content} <- Jason.encode_to_iodata(value, pretty: true),
+         :ok <- File.mkdir_p(Path.dirname(path)) do
+      HostKit.Runner.Files.write_file(path, content, mode: 0o600)
     end
   end
 

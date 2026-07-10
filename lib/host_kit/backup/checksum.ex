@@ -12,8 +12,13 @@ defmodule HostKit.Backup.Checksum do
       |> :crypto.hash_final()
       |> Base.encode16(case: :lower)
 
-    File.write!(checksum_path, "#{hash}  #{Path.basename(path)}\n")
-    File.chmod!(checksum_path, 0o600)
+    :ok =
+      HostKit.Runner.Local.write_file(
+        checksum_path,
+        "#{hash}  #{Path.basename(path)}\n",
+        mode: 0o600
+      )
+
     checksum_path
   end
 end

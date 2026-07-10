@@ -9,7 +9,6 @@ defmodule HostKit.Recipes.Gatehouse do
     release = __MODULE__.release_assigns(name, opts)
 
     service release.service_name do
-      packages([:git, :curl, :ca_certificates])
       package(:build_essential, as: "build-essential")
       package(:cmake, as: "cmake")
 

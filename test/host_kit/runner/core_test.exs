@@ -54,22 +54,60 @@ defmodule HostKit.RunnerTest do
     assert_received {:local_cmd, "sudo", ["mkdir", "-p", "/root/demo"]}
   end
 
-  test "local runner writes files through sudo install when requested" do
+  test "local runner writes files atomically with restrictive permissions" do
+    root = Path.join(System.tmp_dir!(), "hostkit-runner-#{System.unique_integer([:positive])}")
+    path = Path.join(root, "secret")
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    assert :ok = HostKit.Runner.Local.write_file(path, "secret", mode: 0o640)
+    assert File.read!(path) == "secret"
+    assert Bitwise.band(File.stat!(path).mode, 0o777) == 0o640
+    assert Path.wildcard(path <> ".hostkit-*") == []
+  end
+
+  test "local runner stages sudo writes with final metadata before rename" do
     cmd_fun = fn command, args, _opts ->
       send(self(), {:local_cmd, command, args})
 
       case {command, args} do
-        {"sudo", ["install", "-m", "0644", temp_path, "/root/demo"]} ->
-          send(self(), {:temp_content, File.read!(temp_path)})
-          {"", 0}
+        {"sudo", ["install", "-m", "0640", "-o", "root", "-g", "app", "--", source, _target]} ->
+          send(self(), {:temp_content, source, File.read!(source), File.stat!(source).mode})
+
+        _other ->
+          :ok
       end
+
+      {"", 0}
     end
 
     assert :ok =
-             HostKit.Runner.Local.write_file("/root/demo", "hello", sudo: true, cmd_fun: cmd_fun)
+             HostKit.Runner.Local.write_file("/root/demo", "hello",
+               sudo: true,
+               owner: "root",
+               group: "app",
+               mode: 0o640,
+               cmd_fun: cmd_fun
+             )
 
-    assert_received {:local_cmd, "sudo", ["install", "-m", "0644", temp_path, "/root/demo"]}
-    assert_received {:temp_content, "hello"}
-    refute File.exists?(temp_path)
+    assert_received {:local_cmd, "sudo",
+                     [
+                       "install",
+                       "-m",
+                       "0640",
+                       "-o",
+                       "root",
+                       "-g",
+                       "app",
+                       "--",
+                       source_path,
+                       target_path
+                     ]}
+
+    assert_received {:temp_content, ^source_path, "hello", source_mode}
+    assert Bitwise.band(source_mode, 0o777) == 0o600
+    assert_received {:local_cmd, "sudo", ["mv", "-f", "--", ^target_path, "/root/demo"]}
+    assert_received {:local_cmd, "sudo", ["rm", "-f", "--", ^target_path]}
+    refute File.exists?(source_path)
   end
 end

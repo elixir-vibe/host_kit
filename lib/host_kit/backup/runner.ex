@@ -13,7 +13,7 @@ defmodule HostKit.Backup.Runner do
   end
 
   defp do_run(project, %Job{} = job, opts) do
-    stamp = Keyword.get_lazy(opts, :stamp, &stamp/0)
+    stamp = opts |> Keyword.get_lazy(:stamp, &stamp/0) |> safe_archive_segment()
     File.mkdir_p!(job.destination)
     File.chmod!(job.destination, 0o700)
 
@@ -171,9 +171,10 @@ defmodule HostKit.Backup.Runner do
     paths =
       service.meta
       |> Map.get(:storage, %{})
-      |> Map.values()
-      |> Enum.filter(&Storage.backup?/1)
-      |> Enum.map(&relative_path!(&1.path))
+      |> Enum.reduce([], fn {_name, volume}, paths ->
+        if Storage.backup?(volume), do: [relative_path!(volume.path) | paths], else: paths
+      end)
+      |> Enum.reverse()
 
     if paths == [] do
       raise ArgumentError,
@@ -191,11 +192,23 @@ defmodule HostKit.Backup.Runner do
 
   defp add_archive(state, archive), do: %{state | archives: state.archives ++ [archive]}
 
-  defp archive_path(destination, name, stamp),
-    do: Path.join(destination, "#{name}-#{stamp}.tar.gz")
+  defp archive_path(destination, name, stamp) do
+    Path.join(destination, "#{safe_archive_segment(name)}-#{stamp}.tar.gz")
+  end
 
   defp archive_name(path) do
-    path |> String.trim_leading("/") |> String.replace(~r/[^A-Za-z0-9_.-]+/, "-")
+    path |> String.trim_leading("/") |> safe_archive_segment()
+  end
+
+  defp safe_archive_segment(value) do
+    value
+    |> to_string()
+    |> String.replace(~r/[^A-Za-z0-9_.-]+/, "-")
+    |> String.replace(~r/^[.-]+|[.-]+$/, "")
+    |> case do
+      "" -> raise ArgumentError, "backup archive name must contain a safe filename character"
+      segment -> segment
+    end
   end
 
   defp relative_path!("/" <> path), do: path

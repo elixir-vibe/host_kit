@@ -46,26 +46,63 @@ defmodule HostKit.Runner.Local do
     if Keyword.get(opts, :sudo, false) do
       sudo_write_file(path, content, opts)
     else
-      Elixir.File.write(path, content)
+      atomic_write_file(path, content, opts)
     end
   end
 
-  defp sudo_write_file(path, content, opts) do
-    temp_path = Path.join(System.tmp_dir!(), "host-kit-#{System.unique_integer([:positive])}")
+  defp atomic_write_file(path, content, opts) do
+    temp_path = HostKit.Runner.Files.temporary_path(path)
 
-    result =
-      with :ok <- Elixir.File.write(temp_path, content),
-           {_output, 0} <- cmd("sudo", ["install", "-m", "0644", temp_path, path], opts) do
+    try do
+      with {:ok, file} <- Elixir.File.open(temp_path, [:write, :binary, :exclusive]),
+           :ok <- write_open_file(file, temp_path, content, Keyword.get(opts, :mode) || 0o600) do
+        Elixir.File.rename(temp_path, path)
+      end
+    after
+      Elixir.File.rm(temp_path)
+    end
+  end
+
+  defp write_open_file(file, path, content, mode) do
+    with :ok <- Elixir.File.chmod(path, mode) do
+      IO.binwrite(file, content)
+    end
+  after
+    Elixir.File.close(file)
+  end
+
+  defp sudo_write_file(path, content, opts) do
+    source_path = HostKit.Runner.Files.temporary_path(Path.join(System.tmp_dir!(), "host-kit"))
+    target_path = HostKit.Runner.Files.temporary_path(path)
+    install_args = HostKit.Runner.Files.install_args(source_path, target_path, opts)
+
+    move_args = ["mv", "-f", "--", target_path, path]
+
+    try do
+      with :ok <- atomic_write_file(source_path, content, mode: 0o600),
+           {:install, {_output, 0}} <- {:install, cmd("sudo", install_args, opts)},
+           {:move, {_output, 0}} <- {:move, cmd("sudo", move_args, opts)} do
         :ok
       else
         {:error, reason} ->
           {:error, reason}
 
-        {output, status} ->
-          {:error, {:command_failed, "install", [temp_path, path], status, output}}
-      end
+        {:install, {output, status}} ->
+          HostKit.Runner.Files.command_error("install", install_args, status, output)
 
-    Elixir.File.rm(temp_path)
-    result
+        {:move, {output, status}} ->
+          HostKit.Runner.Files.command_error("mv", move_args, status, output)
+      end
+    after
+      Elixir.File.rm(source_path)
+      cleanup_sudo(target_path, opts)
+    end
+  end
+
+  defp cleanup_sudo(path, opts) do
+    cmd("sudo", ["rm", "-f", "--", path], opts)
+    :ok
+  rescue
+    _error in [ErlangError, ArgumentError] -> :ok
   end
 end

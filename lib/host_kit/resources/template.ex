@@ -107,11 +107,7 @@ defmodule HostKit.Resources.Template do
     end
   end
 
-  defp resolve_assign(%HostKit.Secret{} = secret) do
-    {:ok, HostKit.Secret.resolve!(secret)}
-  rescue
-    error in [System.EnvError] -> {:error, {:missing_secret_env, error.env}}
-  end
+  defp resolve_assign(%HostKit.Secret{} = secret), do: HostKit.Secret.resolve(secret)
 
   defp resolve_assign(:redacted), do: {:error, :redacted_secret_not_renderable}
   defp resolve_assign(value), do: {:ok, value}

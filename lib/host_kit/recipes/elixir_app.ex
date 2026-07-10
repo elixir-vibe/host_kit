@@ -72,7 +72,6 @@ defmodule HostKit.Recipes.ElixirApp do
     app = __MODULE__.assigns(name, opts)
 
     service app.service_name do
-      packages([:git, :curl, :ca_certificates])
       package(:caddy, as: "caddy")
       package(:build_essential, as: "build-essential")
 

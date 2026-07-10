@@ -46,6 +46,33 @@ defmodule HostKit.Secret do
 
   def secret?(_value), do: false
 
+  @spec resolve(term()) :: {:ok, term()} | {:error, term()}
+  def resolve(%__MODULE__{source: {:env, name}}) do
+    case System.fetch_env(name) do
+      {:ok, value} -> {:ok, value}
+      :error -> {:error, {:missing_secret_env, name}}
+    end
+  end
+
+  def resolve(%__MODULE__{source: {:file, path}}) do
+    case File.read(path) do
+      {:ok, value} -> {:ok, String.trim_trailing(value, "\n")}
+      {:error, reason} -> {:error, {:secret_file_failed, path, reason}}
+    end
+  end
+
+  def resolve(%__MODULE__{source: {:command, {command, args}}}) do
+    case System.cmd(command, args, stderr_to_stdout: true) do
+      {output, 0} -> {:ok, String.trim_trailing(output)}
+      {_output, status} -> {:error, {:secret_command_failed, status}}
+    end
+  rescue
+    error in [ErlangError, RuntimeError, ArgumentError] ->
+      {:error, {:secret_command_failed, error.__struct__, Exception.message(error)}}
+  end
+
+  def resolve(value), do: {:ok, value}
+
   @spec resolve!(term()) :: term()
   def resolve!(%__MODULE__{source: {:env, name}}), do: System.fetch_env!(name)
 
@@ -60,8 +87,8 @@ defmodule HostKit.Secret do
       {output, 0} ->
         String.trim_trailing(output)
 
-      {output, status} ->
-        raise "secret command #{inspect([command | args])} failed with status #{status}: #{output}"
+      {_output, status} ->
+        raise "secret command failed with status #{status}"
     end
   end
 

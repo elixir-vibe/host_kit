@@ -36,6 +36,14 @@ defmodule Mix.Tasks.HostKit.Output do
     end
   end
 
+  def print_results(results) do
+    results
+    |> Enum.map_join("\n", fn %{change: change, status: status} ->
+      "#{status} #{HostKit.Plan.Format.format_change(change)}"
+    end)
+    |> IO.puts()
+  end
+
   def format_counts(counts) when map_size(counts) == 0, do: "none"
 
   def format_counts(counts) do

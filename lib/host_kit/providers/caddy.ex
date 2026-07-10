@@ -19,6 +19,17 @@ defmodule HostKit.Providers.Caddy do
   def resource_types, do: [Site]
 
   @impl true
+  def read(%Site{} = site, context) do
+    case Map.get(provider_config(context), :sites_dir) do
+      nil ->
+        {:ok, nil}
+
+      sites_dir ->
+        read_site(Path.join(sites_dir, Helpers.caddy_site_filename(site)), site, context)
+    end
+  end
+
+  @impl true
   def apply(%Change{action: action, after: %Site{} = site}, context)
       when action in [:create, :update] do
     config = provider_config(context)
@@ -31,13 +42,20 @@ defmodule HostKit.Providers.Caddy do
 
     opts = Map.get(context, :opts, [])
 
-    file_opts = Keyword.put(opts, :runner, Ops.runner(opts))
+    owner = Map.get(config, :owner)
+    group = Map.get(config, :group)
+    mode = Map.get(config, :mode, 0o644)
+
+    file_opts =
+      opts
+      |> Keyword.put(:runner, Ops.runner(opts))
+      |> Keyword.merge(owner: owner, group: group, mode: mode)
 
     with {:ok, content} <- rendered_content(site, render_site(site), opts),
          :ok <- HostKit.Runner.Files.mkdir_p(Path.dirname(path), file_opts),
          :ok <- HostKit.Runner.Files.write_file(path, content, file_opts),
-         :ok <- Ops.chown(path, Map.get(config, :owner), Map.get(config, :group), opts),
-         :ok <- Ops.chmod(path, Map.get(config, :mode, 0o644), opts) do
+         :ok <- Ops.chown(path, owner, group, opts),
+         :ok <- Ops.chmod(path, mode, opts) do
       activate_site(site, config)
     end
   end
@@ -74,6 +92,21 @@ defmodule HostKit.Providers.Caddy do
     [site.host, " {\n", Enum.map(site.directives, &render_directive/1), "}\n"]
   end
 
+  defp read_site(path, site, context) do
+    case HostKit.Runner.Files.read_file(path, Map.get(context, :opts, [])) do
+      {:ok, content} -> {:ok, %{site | meta: Map.put(site.meta, :content, content)}}
+      {:error, :enoent} -> {:ok, nil}
+      {:error, {:command_failed, _command, _args, _status, output}} -> read_error(output)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp read_error(output) do
+    if String.contains?(output, ["No such file", "not found"]),
+      do: {:ok, nil},
+      else: {:error, {:caddy_site_read_failed, output}}
+  end
+
   defp rendered_content(%{meta: %{content: %HostKit.BackupRef{path: path}}}, _default, opts),
     do: HostKit.Runner.read_file(path, Keyword.put(opts, :runner, Ops.runner(opts)))
 
@@ -95,9 +128,8 @@ defmodule HostKit.Providers.Caddy do
       admin_url = Map.get(config, :admin_url, "http://127.0.0.1:2019")
       route = site |> HostKit.Caddy.JSON.route_for_site() |> HostKit.Caddy.JSON.to_map()
 
-      with {:ok, routes, etag} <- fetch_routes(admin_url),
-           :ok <- put_route(admin_url, routes, etag, site.host, route) do
-        :ok
+      with {:ok, routes, etag} <- fetch_routes(admin_url) do
+        put_route(admin_url, routes, etag, site.host, route)
       end
     else
       :ok

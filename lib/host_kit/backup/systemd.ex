@@ -3,10 +3,7 @@ defmodule HostKit.Backup.Systemd do
 
   @spec active?(String.t(), keyword()) :: boolean()
   def active?(unit, opts \\ []) do
-    case cmd("systemctl", ["is-active", "--quiet", unit], opts) do
-      {:ok, _output} -> true
-      {:error, _reason} -> false
-    end
+    match?({:ok, _output}, cmd("systemctl", ["is-active", "--quiet", unit], opts))
   end
 
   @spec stop(String.t(), keyword()) :: :ok | {:error, term()}

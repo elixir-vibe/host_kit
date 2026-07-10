@@ -35,9 +35,8 @@ defmodule HostKit.Instance.Backends.Libvirt do
          :ok <- ensure_disk(instance, opts),
          {:ok, seed_image} <- ensure_seed(instance, opts),
          :ok <- ensure_defined(instance, seed_image, opts),
-         :ok <- ensure_running(instance, opts),
-         :ok <- wait_ready(instance, opts) do
-      :ok
+         :ok <- ensure_running(instance, opts) do
+      wait_ready(instance, opts)
     end
   end
 
@@ -45,9 +44,8 @@ defmodule HostKit.Instance.Backends.Libvirt do
   def delete(%Instance{} = instance, opts) do
     opts = backend_opts(instance, opts)
 
-    with :ok <- destroy(instance, opts),
-         :ok <- undefine(instance, opts) do
-      :ok
+    with :ok <- destroy(instance, opts) do
+      undefine(instance, opts)
     end
   end
 
@@ -96,15 +94,19 @@ defmodule HostKit.Instance.Backends.Libvirt do
         {:error, :missing_libvirt_seed_image}
 
       {seed_image, user_data, meta_data} ->
-        with {:ok, user_data_path} <- write_temp("user-data", user_data || default_user_data()),
-             {:ok, meta_data_path} <-
-               write_temp("meta-data", meta_data || default_meta_data(config)),
-             :ok <-
-               cloud_localds([seed_image, user_data_path, meta_data_path], opts)
-               |> expect_ok(:libvirt_seed_create_failed) do
-          {:ok, seed_image}
-        end
+        with_temp("user-data", user_data || default_user_data(), fn user_data_path ->
+          create_seed(seed_image, user_data_path, meta_data || default_meta_data(config), opts)
+        end)
     end
+  end
+
+  defp create_seed(seed_image, user_data_path, meta_data, opts) do
+    with_temp("meta-data", meta_data, fn meta_data_path ->
+      case cloud_localds([seed_image, user_data_path, meta_data_path], opts) do
+        {_output, 0} -> {:ok, seed_image}
+        {output, status} -> {:error, {:libvirt_seed_create_failed, status, output}}
+      end
+    end)
   end
 
   defp ensure_defined(instance, seed_image, opts) do
@@ -123,12 +125,12 @@ defmodule HostKit.Instance.Backends.Libvirt do
   defp define(instance, seed_image, opts) do
     emit(opts, :instance_define_started, instance)
 
-    with {:ok, xml_path} <-
-           write_temp("#{instance_name(instance)}.xml", domain_xml(instance, seed_image)),
-         :ok <- virsh(["define", xml_path], opts) |> expect_ok(:libvirt_define_failed) do
-      emit(opts, :instance_define_finished, instance)
-      :ok
-    end
+    with_temp("#{instance_name(instance)}.xml", domain_xml(instance, seed_image), fn xml_path ->
+      with :ok <- virsh(["define", xml_path], opts) |> expect_ok(:libvirt_define_failed) do
+        emit(opts, :instance_define_finished, instance)
+        :ok
+      end
+    end)
   end
 
   defp ensure_running(instance, opts) do
@@ -285,12 +287,19 @@ defmodule HostKit.Instance.Backends.Libvirt do
     """
   end
 
-  defp write_temp(name, content) when is_binary(content) do
-    dir = Path.join(System.tmp_dir!(), "hostkit-libvirt")
-    path = Path.join(dir, "#{System.unique_integer([:positive])}-#{name}")
+  defp with_temp(name, content, fun) when is_binary(content) and is_function(fun, 1) do
+    suffix = :crypto.strong_rand_bytes(12) |> Base.url_encode64(padding: false)
+    dir = Path.join(System.tmp_dir!(), "hostkit-libvirt-#{suffix}")
+    path = Path.join(dir, Path.basename(name))
 
-    with :ok <- File.mkdir_p(dir), :ok <- File.write(path, content) do
-      {:ok, path}
+    try do
+      with :ok <- File.mkdir(dir),
+           :ok <- File.chmod(dir, 0o700),
+           :ok <- HostKit.Runner.Local.write_file(path, content, mode: 0o600) do
+        fun.(path)
+      end
+    after
+      File.rm_rf(dir)
     end
   end
 

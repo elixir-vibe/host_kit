@@ -7,6 +7,7 @@ defmodule HostKit.Runner.SSH.Connection do
 
   @default_port 22
   @timeout 30_000
+  @max_output 1_000_000
   @default_preferred_algorithms [
     kex: [
       :"curve25519-sha256",
@@ -71,43 +72,63 @@ defmodule HostKit.Runner.SSH.Connection do
   end
 
   defp sudo_write_file(path, content, opts) do
-    temp_path = "/tmp/host-kit-#{System.unique_integer([:positive])}"
+    source_path = HostKit.Runner.Files.temporary_path("/tmp/host-kit")
+    target_path = HostKit.Runner.Files.temporary_path(path)
+    install_args = HostKit.Runner.Files.install_args(source_path, target_path, opts)
+    user_opts = Keyword.put(opts, :sudo, false)
 
-    result =
-      with :ok <- direct_write_file(temp_path, content, Keyword.put(opts, :sudo, false)),
-           {_output, 0} <- cmd("sudo", ["install", "-m", "0644", temp_path, path], opts) do
+    move_args = ["mv", "-f", "--", target_path, path]
+
+    try do
+      with :ok <- direct_write_file(source_path, content, Keyword.put(user_opts, :mode, 0o600)),
+           {:install, {_output, 0}} <- {:install, cmd("sudo", install_args, opts)},
+           {:move, {_output, 0}} <- {:move, cmd("sudo", move_args, opts)} do
         :ok
       else
         {:error, reason} ->
           {:error, reason}
 
-        {output, status} ->
-          {:error, {:command_failed, "install", [temp_path, path], status, output}}
+        {:install, {output, status}} ->
+          HostKit.Runner.Files.command_error("install", install_args, status, output)
+
+        {:move, {output, status}} ->
+          HostKit.Runner.Files.command_error("mv", move_args, status, output)
       end
-
-    remove_temp_file(temp_path, opts)
-    result
-  end
-
-  defp direct_write_file(path, content, opts) do
-    encoded = content |> IO.iodata_to_binary() |> Base.encode64()
-
-    case cmd(
-           "sh",
-           [
-             "-c",
-             "printf %s #{HostKit.Shell.escape(encoded)} | base64 -d > #{HostKit.Shell.escape(path)}"
-           ],
-           opts
-         ) do
-      {_output, 0} -> :ok
-      {output, status} -> {:error, {:command_failed, "write_file", [path], status, output}}
+    after
+      cleanup("rm", ["-f", "--", source_path], user_opts)
+      cleanup("sudo", ["rm", "-f", "--", target_path], opts)
     end
   end
 
-  defp remove_temp_file(path, opts) do
-    cmd("rm", ["-f", path], Keyword.put(opts, :sudo, false))
+  defp direct_write_file(path, content, opts) do
+    temp_path = HostKit.Runner.Files.temporary_path(path)
+    encoded = content |> IO.iodata_to_binary() |> Base.encode64()
+    mode = format_mode(Keyword.get(opts, :mode) || 0o600)
+    encoded = HostKit.Shell.escape(encoded)
+    escaped_temp_path = HostKit.Shell.escape(temp_path)
+    escaped_path = HostKit.Shell.escape(path)
+
+    script =
+      "umask 077; set -C; " <>
+        "printf %s #{encoded} | base64 -d > #{escaped_temp_path} && " <>
+        "chmod #{mode} #{escaped_temp_path} && " <>
+        "mv -f -- #{escaped_temp_path} #{escaped_path}"
+
+    try do
+      case cmd("sh", ["-c", script], opts) do
+        {_output, 0} -> :ok
+        {output, status} -> {:error, {:command_failed, "write_file", [path], status, output}}
+      end
+    after
+      cleanup("rm", ["-f", "--", temp_path], Keyword.put(opts, :sudo, false))
+    end
+  end
+
+  defp cleanup(command, args, opts) do
+    cmd(command, args, opts)
     :ok
+  rescue
+    _error in [ErlangError, ArgumentError] -> :ok
   end
 
   defp exec(conn, command, opts) do
@@ -115,32 +136,44 @@ defmodule HostKit.Runner.SSH.Connection do
 
     with {:ok, channel} <- :ssh_connection.session_channel(conn, timeout),
          :success <- :ssh_connection.exec(conn, channel, to_charlist(command), timeout) do
-      collect_exec(conn, channel, "", nil, timeout)
+      max_output = Keyword.get(opts, :max_output) || @max_output
+      collect_exec(conn, channel, [], 0, nil, timeout, max_output)
     else
       {:error, reason} -> {inspect(reason), 255}
       other -> {inspect(other), 255}
     end
   end
 
-  defp collect_exec(conn, channel, output, status, timeout) do
+  defp collect_exec(conn, channel, output, size, status, timeout, max_output) do
     receive do
       {:ssh_cm, ^conn, {:data, ^channel, _type, data}} ->
-        collect_exec(conn, channel, output <> to_string(data), status, timeout)
+        {output, size} = append_output(output, size, data, max_output)
+        collect_exec(conn, channel, output, size, status, timeout, max_output)
 
       {:ssh_cm, ^conn, {:eof, ^channel}} ->
-        collect_exec(conn, channel, output, status, timeout)
+        collect_exec(conn, channel, output, size, status, timeout, max_output)
 
       {:ssh_cm, ^conn, {:exit_status, ^channel, exit_status}} ->
-        collect_exec(conn, channel, output, exit_status, timeout)
+        collect_exec(conn, channel, output, size, exit_status, timeout, max_output)
 
       {:ssh_cm, ^conn, {:closed, ^channel}} ->
-        {output, status || 0}
+        {output |> Enum.reverse() |> IO.iodata_to_binary(), status || 0}
     after
       timeout ->
         :ssh_connection.close(conn, channel)
-        {output, 255}
+        {output |> Enum.reverse() |> IO.iodata_to_binary(), 255}
     end
   end
+
+  defp append_output(output, size, _data, max) when size >= max, do: {output, size}
+
+  defp append_output(output, size, data, max) do
+    data = IO.iodata_to_binary(data)
+    keep = min(byte_size(data), max - size)
+    {[binary_part(data, 0, keep) | output], size + keep}
+  end
+
+  defp format_mode(mode), do: mode |> Integer.to_string(8) |> String.pad_leading(4, "0")
 
   defp retry_open(connect_fun, host, port, ssh_opts, timeout, retry, opts, attempt \\ 1) do
     case connect_fun.(host, port, ssh_opts, timeout) do

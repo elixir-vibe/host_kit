@@ -127,7 +127,7 @@ defmodule HostKit.FirewallTest do
         HostKit.Firewall.allow(tcp: 22, from: :any),
         HostKit.Firewall.allow(tcp: [80, 443], from: :any),
         HostKit.Firewall.allow(tcp: 9100, from: {10, 44, 0, 0, 24}),
-        HostKit.Firewall.allow(udp: 60000..61000, from: :any),
+        HostKit.Firewall.allow(udp: 60_000..61_000, from: :any),
         HostKit.Firewall.deny(:all)
       ]
     }

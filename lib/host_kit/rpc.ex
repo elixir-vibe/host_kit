@@ -79,8 +79,9 @@ defmodule HostKit.RPC do
     selected = opts |> Keyword.get(:services) |> selected_service_set()
 
     project.services
-    |> Enum.filter(&(selected == nil or MapSet.member?(selected, &1.name)))
-    |> Enum.filter(&(rpc(&1).bindings != []))
+    |> Enum.filter(fn service ->
+      (selected == nil or MapSet.member?(selected, service.name)) and rpc(service).bindings != []
+    end)
     |> Enum.map(&binding_file(project, &1, service_index))
   end
 

@@ -68,6 +68,27 @@ defmodule HostKit.Plan.ExecutionGraphTest do
     assert edge?(graph, {:package, :caddy}, {:file, "/etc/app.conf"}, :explicit_dependency)
   end
 
+  test "rejects missing declared dependencies" do
+    file = %File{path: "/etc/app.conf", depends_on: [{:package, :missing}]}
+    plan = %HostKit.Plan{changes: [create({:file, file.path}, file)]}
+
+    assert {:error, %HostKit.Diagnostics{errors: [diagnostic]}} = ExecutionGraph.validate(plan)
+    assert diagnostic.code == :missing_dependency
+    assert diagnostic.resource_id == {:file, "/etc/app.conf"}
+    assert diagnostic.details.dependency == {:package, :missing}
+  end
+
+  test "rejects duplicate resource ids" do
+    id = {:file, "/etc/app.conf"}
+    file = %File{path: "/etc/app.conf"}
+    plan = %HostKit.Plan{changes: [create(id, file), create(id, file)]}
+
+    assert {:error, %HostKit.Diagnostics{errors: [diagnostic]}} = ExecutionGraph.validate(plan)
+    assert diagnostic.code == :duplicate_resource_id
+    assert diagnostic.resource_id == id
+    assert diagnostic.details.count == 2
+  end
+
   test "matches declared Addr.Resource dependencies against tuple resource ids" do
     file = %File{path: "/etc/app.conf", depends_on: [Resource.new(:package, :caddy)]}
     package = %HostKit.Resources.Package{name: :caddy}
@@ -190,6 +211,26 @@ defmodule HostKit.Plan.ExecutionGraphTest do
                symlink./tmp/two -> file./tmp/one [explicit_dependency: symlink./tmp/two]
              """
              |> String.trim_trailing()
+  end
+
+  test "reports only strongly connected resources as a cycle" do
+    one = %File{path: "/tmp/one", depends_on: [{:symlink, "/tmp/two"}]}
+    two = %Symlink{path: "/tmp/two", to: "/tmp/one", depends_on: [{:file, "/tmp/one"}]}
+    downstream = %File{path: "/tmp/downstream", depends_on: [{:file, "/tmp/one"}]}
+
+    graph =
+      graph_for([
+        create({:file, "/tmp/one"}, one),
+        create({:symlink, "/tmp/two"}, two),
+        create({:file, "/tmp/downstream"}, downstream)
+      ])
+
+    assert graph.cycles == [[{:file, "/tmp/one"}, {:symlink, "/tmp/two"}]]
+
+    assert {:error, %HostKit.Diagnostics{errors: [diagnostic]}} =
+             ExecutionGraph.validate(%HostKit.Plan{changes: Enum.map(graph.nodes, & &1.change)})
+
+    assert diagnostic.code == :dependency_cycle
   end
 
   test "formats a concise graph summary" do

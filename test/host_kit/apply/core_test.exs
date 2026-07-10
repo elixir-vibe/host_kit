@@ -15,6 +15,23 @@ defmodule HostKit.ApplyTest do
     assert Apply.run(plan) == {:error, :confirmation_required}
   end
 
+  test "rejects invalid execution graphs before applying changes" do
+    id = {:file, "/tmp/duplicate"}
+    file = %File{path: "/tmp/duplicate", content: "duplicate"}
+
+    plan = %Plan{
+      changes: [
+        %Change{action: :create, resource_id: id, after: file},
+        %Change{action: :create, resource_id: id, after: file}
+      ]
+    }
+
+    assert {:error, %HostKit.Diagnostics{errors: [diagnostic]}} =
+             Apply.run(plan, dry_run: true)
+
+    assert diagnostic.code == :duplicate_resource_id
+  end
+
   test "reports apply lifecycle messages" do
     path =
       Path.join(System.tmp_dir!(), "host-kit-apply-events-#{System.unique_integer([:positive])}")

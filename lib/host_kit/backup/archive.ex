@@ -4,7 +4,7 @@ defmodule HostKit.Backup.Archive do
   @spec create(Path.t(), [Path.t()], keyword()) :: :ok | {:error, term()}
   def create(archive, members, opts \\ []) do
     runner = Keyword.get(opts, :runner, &System.cmd/3)
-    args = ["-C", "/", "-czf", archive | members]
+    args = ["-C", "/", "-czf", archive, "--" | members]
 
     case runner.("tar", args, stderr_to_stdout: true) do
       {_output, 0} -> :ok

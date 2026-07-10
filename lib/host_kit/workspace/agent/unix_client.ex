@@ -26,11 +26,15 @@ defmodule HostKit.Workspace.Agent.UnixClient do
     timeout = Keyword.get(opts, :timeout, 5_000)
 
     with {:ok, port} <-
-           :gen_tcp.connect({:local, socket}, 0, [:binary, active: false, packet: 4], timeout),
-         :ok <- :gen_tcp.send(port, :erlang.term_to_binary(payload)),
-         {:ok, response} <- :gen_tcp.recv(port, 0, timeout),
-         :ok <- :gen_tcp.close(port) do
-      {:ok, :erlang.binary_to_term(response, [:safe])}
+           :gen_tcp.connect({:local, socket}, 0, [:binary, active: false, packet: 4], timeout) do
+      try do
+        with :ok <- :gen_tcp.send(port, :erlang.term_to_binary(payload)),
+             {:ok, response} <- :gen_tcp.recv(port, 0, timeout) do
+          {:ok, :erlang.binary_to_term(response, [:safe])}
+        end
+      after
+        :gen_tcp.close(port)
+      end
     end
   end
 

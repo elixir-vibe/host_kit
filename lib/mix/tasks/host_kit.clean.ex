@@ -9,7 +9,7 @@ defmodule Mix.Tasks.HostKit.Clean do
 
   use Mix.Task
 
-  alias Mix.Tasks.HostKit.Options
+  alias Mix.Tasks.HostKit.{Options, Output}
 
   @shortdoc "Clean stale HostKit-managed release artifacts"
 
@@ -59,7 +59,7 @@ defmodule Mix.Tasks.HostKit.Clean do
 
       Keyword.get(opts, :confirm, false) ->
         case HostKit.apply(plan, apply_opts(opts, target_opts)) do
-          {:ok, results} -> print_results(results)
+          {:ok, results} -> Output.print_results(results)
           {:error, reason} -> Mix.raise("HostKit clean apply failed: #{inspect(reason)}")
         end
 
@@ -81,14 +81,6 @@ defmodule Mix.Tasks.HostKit.Clean do
     |> Options.expand_target_opts()
     |> Keyword.merge(confirm: true, dry_run: false, track: false)
     |> put_present(:keep, Keyword.get(opts, :keep))
-  end
-
-  defp print_results(results) do
-    results
-    |> Enum.map_join("\n", fn %{change: change, status: status} ->
-      "#{status} #{HostKit.Plan.Format.format_change(change)}"
-    end)
-    |> IO.puts()
   end
 
   defp put_present(opts, _key, nil), do: opts

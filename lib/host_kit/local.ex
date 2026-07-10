@@ -1,7 +1,7 @@
 defmodule HostKit.Local do
   @moduledoc "Read-only inspection of resources on the local host."
 
-  alias HostKit.{Caddy, Firewall, Proxy}
+  alias HostKit.{Firewall, Proxy}
   alias HostKit.Reader.Helpers
 
   alias HostKit.Resources.{
@@ -119,22 +119,6 @@ defmodule HostKit.Local do
   def read(_resource), do: {:ok, nil}
 
   @spec read(struct(), map()) :: {:ok, struct() | nil} | {:error, term()}
-  def read(%Caddy.Site{} = desired, context) do
-    sites_dir =
-      get_in(context, [
-        :project,
-        Access.key(:provider_configs),
-        :caddy,
-        Access.key(:config),
-        :sites_dir
-      ])
-
-    case sites_dir do
-      nil -> {:ok, nil}
-      dir -> read_caddy_site(Path.join(dir, Helpers.caddy_site_filename(desired)), desired)
-    end
-  end
-
   def read(%Directory{path: path} = desired, context) do
     case stat_metadata(path, context) do
       {:ok, %{type: :directory} = metadata} ->
@@ -225,13 +209,7 @@ defmodule HostKit.Local do
 
   def read(resource, _context), do: read(resource)
 
-  defp read_readiness(%Readiness{} = desired, opts) do
-    read_current_readiness(desired, opts)
-  end
-
-  defp read_current_readiness(desired, opts) do
-    if HostKit.Readiness.current?(desired, opts), do: {:ok, desired}, else: {:ok, nil}
-  end
+  defp read_readiness(%Readiness{} = desired, opts), do: HostKit.Readiness.read(desired, opts)
 
   defp read_file(path, context) do
     case Elixir.File.read(path) do
@@ -275,14 +253,6 @@ defmodule HostKit.Local do
 
   defp read_proxy(%Proxy{path: path} = desired, context) do
     Helpers.read_content_resource(desired, path, &read_file(&1, context))
-  end
-
-  defp read_caddy_site(path, desired) do
-    case Elixir.File.read(path) do
-      {:ok, content} -> {:ok, %{desired | meta: Map.put(desired.meta, :content, content)}}
-      {:error, :enoent} -> {:ok, nil}
-      {:error, reason} -> {:error, reason}
-    end
   end
 
   defp stat_metadata(path), do: stat_metadata(path, %{})

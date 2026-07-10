@@ -1,8 +1,6 @@
 defmodule HostKit.Resource do
   @moduledoc "Helpers for resource identity, dependency metadata, and JSON-safe terms."
 
-  @callback id(struct()) :: term()
-
   @artifact_modules MapSet.new([
                       HostKit.Addr.AbsResource,
                       HostKit.Addr.Resource,

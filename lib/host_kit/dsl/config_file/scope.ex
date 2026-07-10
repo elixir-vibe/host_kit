@@ -37,19 +37,14 @@ defmodule HostKit.DSL.ConfigFile.Scope do
   end
 
   defp put_value(_kind, key, value) do
-    update_config_file(fn config ->
-      content =
-        if section_active?() do
-          section = current_section!()
+    update_config_file(&%{&1 | content: put_content(&1.content, key, value)})
+  end
 
-          Map.update(config.content, section, %{key => value}, fn values ->
-            Map.put(values, key, value)
-          end)
-        else
-          Map.put(config.content, key, value)
-        end
-
-      %{config | content: content}
-    end)
+  defp put_content(content, key, value) do
+    if section_active?() do
+      Map.update(content, current_section!(), %{key => value}, &Map.put(&1, key, value))
+    else
+      Map.put(content, key, value)
+    end
   end
 end

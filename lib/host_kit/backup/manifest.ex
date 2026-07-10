@@ -5,8 +5,7 @@ defmodule HostKit.Backup.Manifest do
   def write!(destination, data) do
     path = Path.join(destination, "backup-#{Map.fetch!(data, :stamp)}.manifest.json")
     json = Jason.encode!(stringify_keys(data), pretty: true)
-    File.write!(path, json <> "\n")
-    File.chmod!(path, 0o600)
+    :ok = HostKit.Runner.Local.write_file(path, json <> "\n", mode: 0o600)
     path
   end
 

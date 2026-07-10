@@ -23,7 +23,7 @@ defmodule HostKit.State do
       |> encode!()
 
     with :ok <- File.mkdir_p(Path.dirname(path)) do
-      File.write(path, content)
+      HostKit.Runner.Files.write_file(path, content, mode: 0o600)
     end
   end
 
@@ -32,10 +32,28 @@ defmodule HostKit.State do
     path
     |> File.read()
     |> then(fn
-      {:ok, content} -> Jason.decode(content, keys: :atoms)
-      error -> error
+      {:ok, content} ->
+        with {:ok, value} <- Jason.decode(content), do: {:ok, normalize_keys(value)}
+
+      error ->
+        error
     end)
   end
+
+  defp normalize_keys(%{} = map) do
+    Map.new(map, fn {key, value} -> {existing_atom(key), normalize_keys(value)} end)
+  end
+
+  defp normalize_keys(values) when is_list(values), do: Enum.map(values, &normalize_keys/1)
+  defp normalize_keys(value), do: value
+
+  defp existing_atom(key) when is_binary(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> key
+  end
+
+  defp existing_atom(key), do: key
 
   defp encode!(snapshot) do
     Jason.encode!(snapshot, pretty: true)

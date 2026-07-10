@@ -36,6 +36,10 @@ defmodule HostKit.Instance.LibvirtBackendTest do
         {:virsh, ["domstate", "demo"]} ->
           {"running\n", 0}
 
+        {:virsh, ["define", xml_path]} ->
+          send(parent, {:xml_content, File.read!(xml_path)})
+          {"", 0}
+
         {_kind, _args} ->
           {"", 0}
       end
@@ -75,13 +79,14 @@ defmodule HostKit.Instance.LibvirtBackendTest do
                      ]}
 
     assert_received {:virsh, "virsh", ["define", xml_path]}
-    xml = File.read!(xml_path)
+    assert_received {:xml_content, xml}
     assert xml =~ "<name>demo</name>"
     assert xml =~ "<memory unit='MiB'>4096</memory>"
     assert xml =~ "<vcpu>2</vcpu>"
     assert xml =~ "<source file='/var/lib/libvirt/images/demo.qcow2'/>"
     assert xml =~ "<source network='default'/>"
     assert xml =~ "<mac address='52:54:00:12:34:56'/>"
+    refute File.exists?(xml_path)
 
     assert_received {:virsh, "virsh", ["start", "demo"]}
     assert_received {:virsh, "virsh", ["domstate", "demo"]}
@@ -94,9 +99,22 @@ defmodule HostKit.Instance.LibvirtBackendTest do
       send(parent, {kind, command, args})
 
       case {kind, args} do
-        {:virsh, ["dominfo", "demo"]} -> {"missing", 1}
-        {:virsh, ["domstate", "demo"]} -> {"running\n", 0}
-        {_kind, _args} -> {"", 0}
+        {:virsh, ["dominfo", "demo"]} ->
+          {"missing", 1}
+
+        {:virsh, ["domstate", "demo"]} ->
+          {"running\n", 0}
+
+        {:cloud_localds, [_seed, user_data_path, meta_data_path]} ->
+          send(parent, {:seed_content, File.read!(user_data_path), File.read!(meta_data_path)})
+          {"", 0}
+
+        {:virsh, ["define", xml_path]} ->
+          send(parent, {:xml_content, File.read!(xml_path)})
+          {"", 0}
+
+        {_kind, _args} ->
+          {"", 0}
       end
     end
 
@@ -116,11 +134,16 @@ defmodule HostKit.Instance.LibvirtBackendTest do
     assert_received {:cloud_localds, "cloud-localds",
                      ["/var/lib/libvirt/images/demo-seed.iso", user_data_path, meta_data_path]}
 
-    assert File.read!(user_data_path) =~ "#cloud-config"
-    assert File.read!(meta_data_path) =~ "instance-id: demo"
+    assert_received {:seed_content, user_data, meta_data}
+    assert user_data =~ "#cloud-config"
+    assert meta_data =~ "instance-id: demo"
+    refute File.exists?(user_data_path)
+    refute File.exists?(meta_data_path)
 
     assert_received {:virsh, "virsh", ["define", xml_path]}
-    assert File.read!(xml_path) =~ "<source file='/var/lib/libvirt/images/demo-seed.iso'/>"
+    assert_received {:xml_content, xml}
+    assert xml =~ "<source file='/var/lib/libvirt/images/demo-seed.iso'/>"
+    refute File.exists?(xml_path)
   end
 
   test "apply rejects non-VM instance kinds" do

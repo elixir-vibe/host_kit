@@ -2,18 +2,16 @@ defmodule HostKit.Provider do
   @moduledoc """
   Provider behaviour for HostKit integrations.
 
-  Providers own resource types, schemas, planning, applying, and optional DSL
-  modules. This follows Terraform's provider/resource split while staying
-  Elixir-native.
+  Providers contribute resource types, validation, rendering, apply behavior,
+  and optional DSL modules. Provider DSLs should prefer compiling to ordinary
+  HostKit resources whenever core planning and apply behavior is sufficient.
   """
 
   @callback provider_name() :: atom()
   @callback dsl_modules() :: [module()]
-  @callback resource_types() :: [atom()]
+  @callback resource_types() :: [module()]
   @callback read(resource :: struct(), context :: map()) ::
               {:ok, struct() | nil} | :ignore | {:error, term()}
-  @callback plan(resource :: struct(), actual :: struct() | nil, context :: map()) ::
-              {:ok, [HostKit.Change.t()]} | :ignore | {:error, term()}
   @callback apply(change :: HostKit.Change.t(), context :: map()) ::
               :ok | :ignore | {:error, term()}
   @callback render(resource :: struct(), context :: map()) ::
@@ -23,7 +21,6 @@ defmodule HostKit.Provider do
   @optional_callbacks dsl_modules: 0,
                       resource_types: 0,
                       read: 2,
-                      plan: 3,
                       apply: 2,
                       render: 2,
                       validate: 2
@@ -51,6 +48,12 @@ defmodule HostKit.Provider do
     |> Enum.uniq()
   end
 
+  @spec read([module()], struct(), map()) ::
+          {:ok, struct() | nil} | :ignore | {:error, term()}
+  def read(providers, resource, context \\ %{}) do
+    Enum.find_value(providers, :ignore, &read_with(&1, resource, context))
+  end
+
   @spec apply([module()], HostKit.Change.t(), map()) :: :ok | {:error, term()}
   def apply(providers, change, context \\ %{}) do
     Enum.find_value(providers, {:error, :no_applier}, &apply_with(&1, change, context))
@@ -68,8 +71,19 @@ defmodule HostKit.Provider do
     if errors == [], do: :ok, else: {:error, errors}
   end
 
+  defp read_with(provider, resource, context) do
+    if supports?(provider, resource) and exports?(provider, :read, 2) do
+      case provider.read(resource, context) do
+        :ignore -> nil
+        result -> result
+      end
+    end
+  end
+
   defp apply_with(provider, change, context) do
-    if exports?(provider, :apply, 2) do
+    resource = change.after || change.before
+
+    if supports?(provider, resource) and exports?(provider, :apply, 2) do
       case provider.apply(change, context) do
         :ignore -> nil
         result -> result
@@ -78,7 +92,7 @@ defmodule HostKit.Provider do
   end
 
   defp render_with(provider, resource, context) do
-    if exports?(provider, :render, 2) do
+    if supports?(provider, resource) and exports?(provider, :render, 2) do
       case provider.render(resource, context) do
         :ignore -> nil
         result -> result
@@ -87,7 +101,7 @@ defmodule HostKit.Provider do
   end
 
   defp validate_with(provider, resource, context) do
-    if exports?(provider, :validate, 2) do
+    if supports?(provider, resource) and exports?(provider, :validate, 2) do
       case provider.validate(resource, context) do
         :ok -> []
         :ignore -> []
@@ -97,6 +111,12 @@ defmodule HostKit.Provider do
       []
     end
   end
+
+  defp supports?(provider, %module{}) do
+    not exports?(provider, :resource_types, 0) or module in provider.resource_types()
+  end
+
+  defp supports?(_provider, _resource), do: false
 
   defp exports?(provider, function, arity) do
     Code.ensure_loaded?(provider) and function_exported?(provider, function, arity)

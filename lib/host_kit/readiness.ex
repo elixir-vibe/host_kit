@@ -10,6 +10,12 @@ defmodule HostKit.Readiness do
     check_all(readiness, opts) == :ok
   end
 
+  @doc false
+  @spec read(Readiness.t(), keyword()) :: {:ok, Readiness.t() | nil}
+  def read(%Readiness{} = readiness, opts) do
+    if current?(readiness, opts), do: {:ok, readiness}, else: {:ok, nil}
+  end
+
   @spec wait(Readiness.t(), keyword()) :: :ok | {:error, term()}
   def wait(%Readiness{} = readiness, opts) do
     emit_apply(opts, :readiness_started, readiness)
@@ -138,9 +144,10 @@ defmodule HostKit.Readiness do
   defp body_text(body) when is_binary(body), do: body
 
   defp body_text(body) do
-    Jason.encode!(body)
-  rescue
-    _exception -> inspect(body)
+    case Jason.encode(body) do
+      {:ok, text} -> text
+      {:error, _reason} -> inspect(body)
+    end
   end
 
   defp effective_interval(%Readiness{interval: 500}, opts) do

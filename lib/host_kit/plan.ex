@@ -20,7 +20,7 @@ defmodule HostKit.Plan do
   }
 
   @type t :: %__MODULE__{
-          project: Project.t(),
+          project: Project.t() | nil,
           resources: [struct()],
           changes: [Change.t()],
           summary: map(),
@@ -82,25 +82,57 @@ defmodule HostKit.Plan do
          {:ok, resources} <- HostKit.Endpoint.Resolver.resolve(resources, project.services),
          {:ok, resources} <- expand_ingress(resources, project),
          :ok <- HostKit.CommandAnalysis.validate(resources),
+         :ok <- validate_resources(project, resources),
          :ok <- maybe_write_package_lock(resources, opts) do
       opts = Keyword.put(opts, :resources, resources)
-      changes = resources |> Enum.map(&change_for(&1, project, opts)) |> trigger_readiness()
-      diagnostics = HostKit.Source.Diagnostics.for_plan(resources, changes)
+      changes = Enum.map(resources, &change_for(&1, project, opts))
+
+      %__MODULE__{project: project, resources: resources, changes: changes, opts: opts}
+      |> finalize_plan()
+    end
+  end
+
+  defp finalize_plan(%__MODULE__{} = plan) do
+    with :ok <- HostKit.Plan.ExecutionGraph.validate(plan) do
+      changes = trigger_readiness(plan.changes)
+      diagnostics = HostKit.Source.Diagnostics.for_plan(plan.resources, changes)
 
       if HostKit.Diagnostics.ok?(diagnostics) do
         {:ok,
          %__MODULE__{
-           project: project,
-           resources: resources,
-           changes: changes,
-           summary: summarize(changes),
-           opts: opts,
-           diagnostics: diagnostics
+           plan
+           | changes: changes,
+             summary: summarize(changes),
+             diagnostics: diagnostics
          }}
       else
         {:error, diagnostics}
       end
     end
+  end
+
+  defp validate_resources(project, resources) do
+    diagnostics =
+      resources
+      |> Enum.flat_map(fn resource ->
+        case HostKit.Validate.validate(project, resource, %{project: project}) do
+          :ok ->
+            []
+
+          {:error, reason} ->
+            [
+              %Diagnostic{
+                code: :invalid_resource,
+                message: "invalid resource #{inspect(Resource.id(resource))}",
+                resource_id: Resource.id(resource),
+                details: %{reason: reason}
+              }
+            ]
+        end
+      end)
+      |> Diagnostics.new()
+
+    if Diagnostics.ok?(diagnostics), do: :ok, else: {:error, diagnostics}
   end
 
   @doc "Builds a down/rollback plan from an existing plan."
@@ -291,31 +323,39 @@ defmodule HostKit.Plan do
 
   defp active_dependencies(resource_id, active, incoming) do
     resource_id
-    |> collect_active_dependencies(active, incoming, MapSet.new())
+    |> collect_active_dependencies(active, incoming, %{})
     |> MapSet.to_list()
     |> Enum.sort_by(&inspect/1)
   end
 
+  @spec collect_active_dependencies(term(), MapSet.t(), map(), map()) :: MapSet.t()
   defp collect_active_dependencies(resource_id, active, incoming, visited) do
-    if MapSet.member?(visited, resource_id) do
+    if Map.has_key?(visited, resource_id) do
       MapSet.new()
     else
-      visited = MapSet.put(visited, resource_id)
-
-      incoming
-      |> Map.get(resource_id, [])
-      |> Enum.reduce(MapSet.new(), fn dependency, dependencies ->
-        dependencies =
-          if MapSet.member?(active, dependency),
-            do: MapSet.put(dependencies, dependency),
-            else: dependencies
-
-        MapSet.union(
-          dependencies,
-          collect_active_dependencies(dependency, active, incoming, visited)
-        )
-      end)
+      collect_unvisited_dependencies(
+        resource_id,
+        active,
+        incoming,
+        Map.put(visited, resource_id, true)
+      )
     end
+  end
+
+  defp collect_unvisited_dependencies(resource_id, active, incoming, visited) do
+    incoming
+    |> Map.get(resource_id, [])
+    |> Enum.reduce(MapSet.new(), fn dependency, dependencies ->
+      dependencies
+      |> maybe_add_active_dependency(dependency, active)
+      |> MapSet.union(collect_active_dependencies(dependency, active, incoming, visited))
+    end)
+  end
+
+  defp maybe_add_active_dependency(dependencies, dependency, active) do
+    if MapSet.member?(active, dependency),
+      do: MapSet.put(dependencies, dependency),
+      else: dependencies
   end
 
   defp maybe_put_package_manager(resources, opts) do
@@ -509,7 +549,14 @@ defmodule HostKit.Plan do
     end
   end
 
-  defp read_actual(reader, resource, context) do
+  defp read_actual(reader, resource, %{project: project} = context) do
+    case HostKit.Provider.read(project.providers, resource, context) do
+      :ignore -> read_from_reader(reader, resource, context)
+      result -> result
+    end
+  end
+
+  defp read_from_reader(reader, resource, context) do
     Code.ensure_loaded?(reader)
 
     cond do

@@ -360,8 +360,10 @@ defmodule HostKit.Recipes.OTPRelease do
     cwd = Path.expand(cwd)
 
     resources
-    |> Enum.filter(&match?(%HostKit.Resources.Source{}, &1))
-    |> Enum.filter(fn source -> release_kit_cwd_inside_source?(cwd, source) end)
+    |> Enum.filter(fn
+      %HostKit.Resources.Source{} = source -> release_kit_cwd_inside_source?(cwd, source)
+      _resource -> false
+    end)
     |> Enum.map(& &1.name)
   end
 
@@ -615,11 +617,14 @@ defmodule HostKit.Recipes.OTPRelease do
             "ReleaseKit OTP artifact manifests require adding {:release_kit, \"~> 0.2.1\"}"
     end
 
-    ReleaseKit.Manifest
-    |> apply(:read!, [path])
+    path
+    |> ReleaseKit.Manifest.read!()
     |> validate_manifest!(path)
   end
 
+  # ReleaseKit's manifest type fixes these fields to the current values, while this
+  # boundary intentionally validates artifacts produced by other package versions.
+  @dialyzer {:nowarn_function, validate_manifest!: 2}
   defp validate_manifest!(%{__struct__: module} = manifest, path)
        when module == ReleaseKit.Manifest do
     unless manifest.format == @format do

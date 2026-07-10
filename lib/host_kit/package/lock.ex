@@ -36,7 +36,7 @@ defmodule HostKit.Package.Lock do
     content = lock |> dump() |> Jason.encode_to_iodata!(pretty: true)
 
     with :ok <- File.mkdir_p(Path.dirname(path)) do
-      File.write(path, [content, ?\n])
+      HostKit.Runner.Files.write_file(path, [content, ?\n], mode: 0o644)
     end
   end
 

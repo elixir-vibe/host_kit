@@ -1,7 +1,7 @@
 defmodule HostKit.Plan.ExecutionGraph.Build do
   @moduledoc false
 
-  alias HostKit.{Change, Plan, Resource}
+  alias HostKit.{Change, Plan}
   alias HostKit.Plan.ExecutionGraph
   alias HostKit.Plan.ExecutionGraph.{Edge, Node}
   alias HostKit.Readiness.Systemd, as: SystemdReadiness
@@ -31,8 +31,9 @@ defmodule HostKit.Plan.ExecutionGraph.Build do
         &{format_id(&1.from), format_id(&1.to), to_string(&1.reason), inspect(&1.detail)}
       )
 
-    layers = layers(nodes, edges)
-    cycles = cycles(nodes, layers)
+    graph = libgraph(nodes, edges)
+    layers = layers(graph)
+    cycles = cycles(graph, edges)
 
     %ExecutionGraph{nodes: nodes, edges: edges, layers: layers, cycles: cycles}
   end
@@ -46,7 +47,11 @@ defmodule HostKit.Plan.ExecutionGraph.Build do
 
   defp resource_index(nodes) do
     Map.new(nodes, fn node -> {node.resource_id, node.id} end)
-    |> Map.merge(Map.new(nodes, fn node -> {normalize_dependency(node.resource_id), node.id} end))
+    |> Map.merge(
+      Map.new(nodes, fn node ->
+        {ExecutionGraph.normalize_dependency(node.resource_id), node.id}
+      end)
+    )
   end
 
   defp path_index(nodes) do
@@ -104,7 +109,7 @@ defmodule HostKit.Plan.ExecutionGraph.Build do
     |> Map.get(:depends_on, [])
     |> List.wrap()
     |> Enum.reduce(edges, fn dependency, acc ->
-      dependency = normalize_dependency(dependency)
+      dependency = ExecutionGraph.normalize_dependency(dependency)
 
       case Map.fetch(resource_to_node, dependency) do
         {:ok, dependency_node} ->
@@ -406,54 +411,43 @@ defmodule HostKit.Plan.ExecutionGraph.Build do
     %Edge{from: dependency, to: dependent, reason: reason, detail: detail, source: source}
   end
 
-  defp normalize_dependency(%HostKit.Addr.Resource{type: type, name: name}), do: {type, name}
-  defp normalize_dependency(%_{} = resource), do: Resource.id(resource)
-  defp normalize_dependency(dependency), do: dependency
-
-  defp layers(nodes, edges) do
-    node_ids = Enum.map(nodes, & &1.id)
-    incoming = Map.new(node_ids, &{&1, MapSet.new()})
-
-    incoming =
-      Enum.reduce(edges, incoming, fn edge, incoming ->
-        Map.update!(incoming, edge.to, &MapSet.put(&1, edge.from))
-      end)
-
-    build_layers(incoming, [])
+  defp libgraph(nodes, edges) do
+    Graph.new(vertex_identifier: & &1)
+    |> Graph.add_vertices(Enum.map(nodes, & &1.id))
+    |> Graph.add_edges(Enum.map(edges, &{&1.from, &1.to}))
   end
 
-  defp build_layers(incoming, acc) when map_size(incoming) == 0, do: Enum.reverse(acc)
+  defp layers(graph), do: build_layers(graph, [])
 
-  defp build_layers(incoming, acc) do
-    ready =
-      incoming
-      |> Enum.filter(fn {_id, deps} -> MapSet.size(deps) == 0 end)
-      |> Enum.map(fn {id, _deps} -> id end)
-      |> Enum.sort_by(&format_id/1)
+  defp build_layers(graph, acc) do
+    case Graph.vertices(graph) do
+      [] ->
+        Enum.reverse(acc)
 
-    if ready == [] do
-      Enum.reverse(acc)
-    else
-      ready_set = MapSet.new(ready)
+      vertices ->
+        ready =
+          vertices
+          |> Enum.filter(&(Graph.in_degree(graph, &1) == 0))
+          |> Enum.sort_by(&format_id/1)
 
-      incoming =
-        incoming
-        |> Map.drop(ready)
-        |> Map.new(fn {id, deps} -> {id, MapSet.difference(deps, ready_set)} end)
-
-      build_layers(incoming, [ready | acc])
+        if ready == [] do
+          Enum.reverse(acc)
+        else
+          graph |> Graph.delete_vertices(ready) |> build_layers([ready | acc])
+        end
     end
   end
 
-  defp cycles(nodes, layers) do
-    layered = layers |> List.flatten() |> MapSet.new()
-
-    nodes
-    |> Enum.map(& &1.id)
-    |> Enum.reject(&MapSet.member?(layered, &1))
-    |> case do
-      [] -> []
-      remaining -> [Enum.sort_by(remaining, &format_id/1)]
-    end
+  defp cycles(graph, edges) do
+    graph
+    |> Graph.strong_components()
+    |> Enum.filter(&cyclic_component?(&1, edges))
+    |> Enum.map(&Enum.sort_by(&1, fn id -> format_id(id) end))
+    |> Enum.sort_by(fn [id | _rest] -> format_id(id) end)
   end
+
+  defp cyclic_component?([id], edges),
+    do: Enum.any?(edges, &(&1.from == id and &1.to == id))
+
+  defp cyclic_component?([_first, _second | _rest], _edges), do: true
 end

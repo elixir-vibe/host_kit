@@ -25,6 +25,7 @@ defmodule HostKit.RunRecordTest do
     assert record["project"] == "tracked"
     assert record["direction"] == "up"
     assert [%{"action" => "create", "status" => "applied"}] = record["changes"]
+    assert Bitwise.band(File.stat!(record_path).mode, 0o777) == 0o600
 
     assert {:ok, [listed]} = HostKit.RunRecord.list(hostkit_runs_root: runs_root)
     assert listed.id == record["id"]
@@ -32,6 +33,38 @@ defmodule HostKit.RunRecordTest do
     assert latest.id == record["id"]
     assert {:ok, loaded} = HostKit.RunRecord.load(record["id"], hostkit_runs_root: runs_root)
     assert loaded.id == record["id"]
+  end
+
+  test "tracked applies use collision-resistant run ids" do
+    root = Path.join(System.tmp_dir!(), "hostkit-run-ids-#{System.unique_integer([:positive])}")
+    runs_root = Path.join(root, "runs")
+    File.mkdir_p!(root)
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    plan = %Plan{project: %HostKit.Project{name: :tracked}, changes: []}
+
+    assert {:ok, []} =
+             HostKit.apply(plan, confirm: true, track: true, hostkit_runs_root: runs_root)
+
+    assert {:ok, []} =
+             HostKit.apply(plan, confirm: true, track: true, hostkit_runs_root: runs_root)
+
+    assert {:ok, [first, second]} = HostKit.RunRecord.list(hostkit_runs_root: runs_root)
+    refute first.id == second.id
+  end
+
+  test "run listing reports corrupt records" do
+    root =
+      Path.join(System.tmp_dir!(), "hostkit-corrupt-run-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+    File.write!(Path.join(root, "corrupt.json"), "not json")
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    assert {:error, {:invalid_run_record, path, _reason}} =
+             HostKit.RunRecord.list(hostkit_runs_root: root)
+
+    assert path == Path.join(root, "corrupt.json")
   end
 
   test "tracked apply stores backup payloads for previous file-like state" do
@@ -72,6 +105,7 @@ defmodule HostKit.RunRecordTest do
     assert [{resource_id, backup_path}] = Map.to_list(record.backups)
     assert resource_id =~ ":file"
     assert File.read!(backup_path) == "old"
+    assert Bitwise.band(File.stat!(backup_path).mode, 0o777) == 0o600
 
     restored_plan = HostKit.RunRecord.apply_backups(plan, record)
 
@@ -248,11 +282,50 @@ defmodule HostKit.RunRecordTest do
     File.write!(Path.join(runs_root, old.id <> ".json"), Jason.encode!(JSONCodec.dump(old)))
     File.write!(Path.join(runs_root, new.id <> ".json"), Jason.encode!(JSONCodec.dump(new)))
 
-    assert {:ok, [^old]} = HostKit.RunRecord.prune([hostkit_runs_root: runs_root], keep: 1)
+    assert {:ok, [^old]} =
+             HostKit.RunRecord.prune(
+               [hostkit_runs_root: runs_root, hostkit_backups_root: Path.join(root, "backups")],
+               keep: 1
+             )
+
     refute File.exists?(Path.join(runs_root, old.id <> ".json"))
     refute File.exists?(old_artifact_dir)
     refute File.exists?(old_backup_dir)
     assert File.exists?(Path.join(runs_root, new.id <> ".json"))
+  end
+
+  test "prune rejects payload paths outside tracking roots" do
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "hostkit-runs-safe-prune-#{System.unique_integer([:positive])}"
+      )
+
+    runs_root = Path.join(root, "runs")
+    backups_root = Path.join(root, "backups")
+    outside = Path.join(root, "outside")
+    File.mkdir_p!(runs_root)
+    File.mkdir_p!(outside)
+    File.write!(Path.join(outside, "secret"), "keep")
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    record = %HostKit.RunRecord{
+      id: "20200101-000000-demo-up",
+      project: "demo",
+      direction: "up",
+      applied_at: "2020-01-01T00:00:00Z",
+      backups: %{"file" => Path.join(outside, "secret")}
+    }
+
+    File.write!(Path.join(runs_root, record.id <> ".json"), Jason.encode!(JSONCodec.dump(record)))
+
+    assert {:error, {:unsafe_run_record_path, ^outside}} =
+             HostKit.RunRecord.prune(
+               [hostkit_runs_root: runs_root, hostkit_backups_root: backups_root],
+               keep: 0
+             )
+
+    assert File.read!(Path.join(outside, "secret")) == "keep"
   end
 
   test "tracked apply records plan artifact references" do
