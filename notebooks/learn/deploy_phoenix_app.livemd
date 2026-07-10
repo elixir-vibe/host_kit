@@ -154,8 +154,6 @@ project =
     end
 
     service :phoenix_caddy do
-      package :curl, as: "curl"
-
       directory caddy_config_dir, owner: "root", group: "root", mode: 0o755
       directory caddy_sites_dir, owner: "root", group: "root", mode: 0o755
 

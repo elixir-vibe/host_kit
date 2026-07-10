@@ -237,7 +237,10 @@ defmodule HostKit.Reader.Helpers do
     end
   end
 
-  def caddy_site_filename(%Caddy.Site{meta: %{path: path}}), do: path
+  def caddy_site_filename(%Caddy.Site{meta: %{path: path}})
+      when is_binary(path) and path != "",
+      do: path
+
   def caddy_site_filename(%Caddy.Site{name: name}), do: "#{name}.caddy"
 
   def mark_render(%Systemd.Service{} = actual),

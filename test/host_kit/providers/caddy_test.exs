@@ -68,6 +68,12 @@ defmodule HostKit.CaddyProviderTest do
     assert [%ReverseProxy{upstreams: ["127.0.0.1:4000"]}] = site.directives
   end
 
+  test "caddy site filename falls back to its name when metadata path is nil" do
+    site = %Site{name: "example", meta: %{path: nil}}
+
+    assert HostKit.Reader.Helpers.caddy_site_filename(site) == "example.caddy"
+  end
+
   test "caddy provider applies site files" do
     tmp =
       Path.join(System.tmp_dir!(), "host-kit-caddy-apply-#{System.unique_integer([:positive])}")
