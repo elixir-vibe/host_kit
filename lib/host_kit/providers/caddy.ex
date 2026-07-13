@@ -13,7 +13,7 @@ defmodule HostKit.Providers.Caddy do
   def provider_name, do: :caddy
 
   @impl true
-  def dsl_modules, do: [HostKit.Providers.Caddy.DSL]
+  def dsl_modules, do: [HostKit.Provider.conventional_dsl_module(__MODULE__)]
 
   @impl true
   def resource_types, do: [Site]

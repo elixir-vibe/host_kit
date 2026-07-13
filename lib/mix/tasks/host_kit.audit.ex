@@ -114,7 +114,7 @@ defmodule Mix.Tasks.HostKit.Audit do
     [
       "\nRedacted config: ",
       Enum.map_join(entries, "; ", fn entry ->
-        "#{format_resource_id(HostKit.Resource.load(entry.resource_id))}: #{Enum.join(entry.paths, ", ")}"
+        "#{format_resource_id(HostKit.Plan.Artifact.load_term(entry.resource_id))}: #{Enum.join(entry.paths, ", ")}"
       end)
     ]
   end

@@ -63,7 +63,12 @@ defmodule HostKit.Plan.Summary do
         if paths == [] do
           []
         else
-          [%{resource_id: Resource.dump(HostKit.Resources.ConfigFile.id(config)), paths: paths}]
+          [
+            %{
+              resource_id: Resource.dump(HostKit.Resources.ConfigFile.id(config)),
+              paths: paths
+            }
+          ]
         end
 
       _resource ->

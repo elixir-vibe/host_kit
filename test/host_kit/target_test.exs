@@ -27,6 +27,12 @@ defmodule HostKit.TargetTest do
     assert opts[:dry_run] == true
   end
 
+  test "rejects targets without an initialized runner" do
+    assert_raise ArgumentError, ~r/target runner is not initialized/, fn ->
+      HostKit.Target.opts(%HostKit.Target{name: :invalid})
+    end
+  end
+
   test "host DSL keeps ssh retry options with the target" do
     source = """
     use HostKit.DSL

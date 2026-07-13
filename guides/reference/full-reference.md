@@ -301,7 +301,7 @@ end
 
 ## Providers
 
-Providers can contribute DSL modules, resource types, observed-state readers, validators, renderers, and apply behavior. Provider DSLs should compile to ordinary HostKit resources when core planning and apply behavior is sufficient. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.
+Providers can contribute DSL modules, resource types, observed-state readers, validators, renderers, and apply behavior. When a provider does not implement `dsl_modules/0`, HostKit uses an available `ProviderModule.DSL` module by convention; providers with DSL modules elsewhere can return them explicitly. Provider DSLs should compile to ordinary HostKit resources when core planning and apply behavior is sufficient. Systemd and Unitctl are core primitives, not providers; integrations such as Caddy should be providers.
 
 ```elixir
 use HostKit.DSL, providers: [HostKit.Providers.Caddy]
@@ -525,7 +525,7 @@ mix host_kit.apply --host prod \
 
 `ssh retry: ...` is an SSH transport policy. It retries connection establishment for transient SSH startup/network failures; it does not blindly rerun arbitrary deployment commands after a command has been sent to the remote host. Use `retry: 3` as shorthand for three attempts, `retry: false` to disable, or keyword options with `:attempts`, `:base_delay`/`:base_delay_ms`, and `:max_delay`/`:max_delay_ms`. Retry progress is emitted as apply events and mirrored to Logger for collection.
 
-Plan artifacts are JSON and intended to be inspectable. They include an artifact version, target metadata, dumped project/resources/changes, source identities, diagnostics, aggregate resource/action statistics, source-location metadata on changes where available, and structured diffs for resources that support semantic review. Structured diffs are generated through HostKit's diff wrapper around JSON Patch concepts; HostKit stores its own stable diff structs rather than exposing the dependency as the artifact contract. Dotenv/INI/YAML/TOML resources diff public keys or paths. Templates diff public assign metadata and redacted assign names, not arbitrary rendered text. Secret references are stored as references, not values, for example:
+Plan artifacts are JSON and intended to be inspectable. They include an artifact version, target metadata, dumped project/resources/changes, source identities, diagnostics, aggregate resource/action statistics, source-location metadata on changes where available, and structured diffs for resources that support semantic review. `HostKit.Resource.dump/1` produces JSON-safe term data, while `HostKit.Plan.Artifact.load_term/1` owns the explicit struct allowlist used when reconstructing trusted HostKit artifact types; unknown struct modules are rejected. Structured diffs are generated through HostKit's diff wrapper around JSON Patch concepts; HostKit stores its own stable diff structs rather than exposing the dependency as the artifact contract. Dotenv/INI/YAML/TOML resources diff public keys or paths. Templates diff public assign metadata and redacted assign names, not arbitrary rendered text. Secret references are stored as references, not values, for example:
 
 ```json
 {

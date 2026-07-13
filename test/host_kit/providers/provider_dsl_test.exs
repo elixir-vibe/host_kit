@@ -1,6 +1,27 @@
 defmodule HostKit.ProviderTest do
   use HostKit.Case, async: true
 
+  defmodule ConventionalProvider do
+    defmodule DSL do
+    end
+  end
+
+  defmodule ProviderWithoutDSL do
+  end
+
+  test "providers use colocated DSL modules by convention" do
+    assert HostKit.Provider.dsl_modules([
+             HostKit.Providers.Caddy,
+             HostKit.Providers.Gatus,
+             ConventionalProvider,
+             ProviderWithoutDSL
+           ]) == [
+             HostKit.Providers.Caddy.DSL,
+             HostKit.Providers.Gatus.DSL,
+             ConventionalProvider.DSL
+           ]
+  end
+
   test "providers can contribute DSL and renderers" do
     project = HostKit.load!(fixture_path("plugin_project.hostkit"))
 

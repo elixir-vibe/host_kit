@@ -288,7 +288,7 @@ defmodule HostKit.Plan.ArtifactTest do
   end
 
   test "loads user atoms as strings instead of creating atoms" do
-    assert HostKit.Resource.load(%{
+    assert HostKit.Plan.Artifact.load_term(%{
              "$type" => "atom",
              "value" => "hostkit_user_atom_not_existing"
            }) ==

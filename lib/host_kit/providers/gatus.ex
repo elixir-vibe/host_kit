@@ -5,7 +5,7 @@ defmodule HostKit.Providers.Gatus do
 
   def provider_name, do: :gatus
 
-  def dsl_modules, do: [HostKit.Providers.Gatus.DSL]
+  def dsl_modules, do: [HostKit.Provider.conventional_dsl_module(__MODULE__)]
 
   @spec endpoints_from_monitors(HostKit.Project.t() | [HostKit.Monitor.Check.t()], keyword()) :: [
           keyword()

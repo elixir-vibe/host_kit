@@ -24,6 +24,7 @@ HostKit models Linux host desired state in Elixir and produces inspectable plans
 - Plan before apply unless the user explicitly asks for emergency action.
 - Change HostKit source, not generated live files.
 - Use existing DSL and existing project patterns; do not invent new DSL while operating an end-user project.
+- Provider DSL modules conventionally live at `ProviderModule.DSL`; implement `dsl_modules/0` only when the DSL lives elsewhere.
 - Before proposing deployment wrappers or new HostKit entities, reread the relevant HostKit source and prefer existing resources such as `source`, `ready`, `command`/`bash`, `monitor`, services, and recipes.
 - For `otp_release ... release_kit:`, HostKit prepares ReleaseKit artifacts through a normal preparation plan, so selected `source` resources and generated artifact build commands are ordered and reported through plan/apply.
 - Avoid raw systemd/YAML/shell escape hatches when an existing HostKit DSL form already exists.

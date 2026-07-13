@@ -5,6 +5,139 @@ defmodule HostKit.Plan.Artifact do
 
   alias HostKit.{Change, Plan, Resource}
 
+  @artifact_modules MapSet.new([
+                      HostKit.Addr.AbsResource,
+                      HostKit.Addr.Resource,
+                      HostKit.Caddy.Directive.Encode,
+                      HostKit.Caddy.Directive.FileServer,
+                      HostKit.Caddy.Directive.ReverseProxy,
+                      HostKit.Caddy.Directive.Root,
+                      HostKit.Caddy.Site,
+                      HostKit.Change,
+                      HostKit.Apply.Event,
+                      HostKit.Backup.Job,
+                      HostKit.Backup.Service,
+                      HostKit.BackupRef,
+                      HostKit.CommandLine,
+                      HostKit.Conventions,
+                      HostKit.Diagnostic,
+                      HostKit.Diagnostics,
+                      HostKit.Diff,
+                      HostKit.Diff.Entry,
+                      HostKit.Endpoint,
+                      HostKit.Firewall,
+                      HostKit.Firewall.Rule,
+                      HostKit.Host,
+                      HostKit.Ingress,
+                      HostKit.Ingress.Proxy,
+                      HostKit.Ingress.Route,
+                      HostKit.Ingress.Server,
+                      HostKit.Ingress.TLS,
+                      HostKit.Instance,
+                      HostKit.Listener,
+                      HostKit.Monitor,
+                      HostKit.Monitor.Check,
+                      HostKit.Monitor.Endpoint,
+                      HostKit.Monitor.Result,
+                      HostKit.Package.Resolution,
+                      HostKit.Project,
+                      HostKit.ProviderConfig,
+                      HostKit.Proxy,
+                      HostKit.RPC,
+                      HostKit.RPC.Binding,
+                      HostKit.RPC.Exposure,
+                      HostKit.Account.Ref,
+                      HostKit.Resources.Account,
+                      HostKit.Resources.Capability,
+                      HostKit.Resources.Command,
+                      HostKit.Resources.ConfigFile,
+                      HostKit.Resources.Directory,
+                      HostKit.Resources.EnvFile,
+                      HostKit.Resources.Exs,
+                      HostKit.Resources.File,
+                      HostKit.Resources.Mise,
+                      HostKit.Resources.Package,
+                      HostKit.Resources.Readiness,
+                      HostKit.Resources.Shell,
+                      HostKit.Resources.Source,
+                      HostKit.Resources.Symlink,
+                      HostKit.Resources.Template,
+                      HostKit.Secret,
+                      HostKit.Readiness.HTTP,
+                      HostKit.Readiness.Systemd,
+                      HostKit.Source.Identity,
+                      HostKit.Service,
+                      HostKit.Storage.Volume,
+                      HostKit.ShellScript,
+                      HostKit.Systemd.Service,
+                      HostKit.Systemd.Timer,
+                      HostKit.Tenant,
+                      HostKit.Workspace.Egress,
+                      Range
+                    ])
+  @artifact_module_names @artifact_modules |> Enum.map(&Atom.to_string/1) |> MapSet.new()
+
+  @doc "Decodes a JSON-safe artifact term."
+  @spec load_term(term()) :: term()
+  def load_term(%{"$type" => "struct", "module" => module, "fields" => fields}) do
+    module = allowed_artifact_module!(module)
+    struct(module, load_struct_fields(fields, module))
+  end
+
+  def load_term(%{"$type" => "tuple", "items" => items}),
+    do: items |> load_term() |> List.to_tuple()
+
+  def load_term(%{"$type" => "map", "entries" => entries}) do
+    Map.new(entries, fn [key, value] -> {load_term(key), load_term(value)} end)
+  end
+
+  def load_term(%{"$type" => "atom", "value" => value}), do: load_atom(value)
+
+  def load_term(%{"$type" => "binary", "encoding" => "base64", "value" => value}) do
+    Base.decode64!(value)
+  end
+
+  def load_term(values) when is_list(values), do: Enum.map(values, &load_term/1)
+  def load_term(value), do: value
+
+  defp load_struct_fields(fields, module) when is_map(fields) do
+    known_fields = struct_field_names(module)
+
+    Map.new(fields, fn {key, value} ->
+      {Map.fetch!(known_fields, key), load_term(value)}
+    end)
+  end
+
+  defp struct_field_names(module) do
+    module
+    |> struct()
+    |> Map.from_struct()
+    |> Map.keys()
+    |> Map.new(&{Atom.to_string(&1), &1})
+  end
+
+  defp load_atom(value) do
+    String.to_existing_atom(value)
+  rescue
+    ArgumentError -> value
+  end
+
+  defp allowed_artifact_module!(module) when is_atom(module) do
+    if MapSet.member?(@artifact_modules, module) do
+      module
+    else
+      raise ArgumentError, "unsupported HostKit artifact module #{inspect(module)}"
+    end
+  end
+
+  defp allowed_artifact_module!(module) when is_binary(module) do
+    if MapSet.member?(@artifact_module_names, module) do
+      String.to_existing_atom(module)
+    else
+      raise ArgumentError, "unsupported HostKit artifact module #{inspect(module)}"
+    end
+  end
+
   defmodule ChangeEntry do
     @moduledoc "Serialized change entry stored in a portable plan artifact."
 
@@ -28,20 +161,20 @@ defmodule HostKit.Plan.Artifact do
             source: map() | nil
           }
 
-    codec(:resource_id, transform: &Resource.load/1)
-    codec(:before, transform: &Resource.load/1)
-    codec(:after, transform: &Resource.load/1)
-    codec(:reason, transform: &Resource.load/1)
-    codec(:diff, transform: &Resource.load/1)
+    codec(:resource_id, transform: &HostKit.Plan.Artifact.load_term/1)
+    codec(:before, transform: &HostKit.Plan.Artifact.load_term/1)
+    codec(:after, transform: &HostKit.Plan.Artifact.load_term/1)
+    codec(:reason, transform: &HostKit.Plan.Artifact.load_term/1)
+    codec(:diff, transform: &HostKit.Plan.Artifact.load_term/1)
 
     def from_change(%Change{} = change) do
       %__MODULE__{
         action: change.action,
-        resource_id: Resource.dump(change.resource_id),
-        before: Resource.dump(change.before),
-        after: Resource.dump(change.after),
-        reason: Resource.dump(change.reason),
-        diff: Resource.dump(change.diff),
+        resource_id: HostKit.Resource.dump(change.resource_id),
+        before: HostKit.Resource.dump(change.before),
+        after: HostKit.Resource.dump(change.after),
+        reason: HostKit.Resource.dump(change.reason),
+        diff: HostKit.Resource.dump(change.diff),
         source: change_source(change)
       }
     end
@@ -76,7 +209,11 @@ defmodule HostKit.Plan.Artifact do
             changes: [],
             summary: %{},
             stats: %{},
-            diagnostics: Resource.dump(%HostKit.Diagnostics{})
+            diagnostics: %{
+              "$type" => "struct",
+              "module" => "Elixir.HostKit.Diagnostics",
+              "fields" => %{"errors" => [], "warnings" => []}
+            }
 
   @type t :: %__MODULE__{
           version: pos_integer(),
@@ -113,12 +250,12 @@ defmodule HostKit.Plan.Artifact do
   def to_plan(%__MODULE__{} = artifact) do
     {:ok,
      %Plan{
-       project: Resource.load(artifact.project),
-       resources: Resource.load(artifact.resources),
+       project: HostKit.Plan.Artifact.load_term(artifact.project),
+       resources: HostKit.Plan.Artifact.load_term(artifact.resources),
        changes: Enum.map(artifact.changes, &ChangeEntry.to_change/1),
-       summary: Resource.load(artifact.summary),
+       summary: HostKit.Plan.Artifact.load_term(artifact.summary),
        opts: [],
-       diagnostics: Resource.load(artifact.diagnostics)
+       diagnostics: HostKit.Plan.Artifact.load_term(artifact.diagnostics)
      }}
   rescue
     error in [ArgumentError] -> {:error, error}

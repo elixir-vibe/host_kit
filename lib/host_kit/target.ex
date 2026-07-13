@@ -3,12 +3,12 @@ defmodule HostKit.Target do
 
   @type t :: %__MODULE__{
           name: atom(),
-          runner: module() | {module(), keyword()},
+          runner: module() | {module(), keyword()} | nil,
           opts: keyword()
         }
 
   defstruct name: nil,
-            runner: HostKit.Runner.Local,
+            runner: nil,
             opts: []
 
   @spec local(atom(), keyword()) :: t()
@@ -28,6 +28,10 @@ defmodule HostKit.Target do
     target.opts
     |> Keyword.put(:runner, runner(target))
     |> Keyword.merge(extra)
+  end
+
+  defp runner(%__MODULE__{runner: nil}) do
+    raise ArgumentError, "target runner is not initialized; use local/2 or ssh/2"
   end
 
   defp runner(%__MODULE__{runner: {module, runner_opts}, opts: opts}) do

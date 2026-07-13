@@ -130,7 +130,7 @@ Resources describe desired state or an operational step. Examples:
 - `%HostKit.Proxy{}`
 - `%HostKit.Ingress{}`
 
-Resources are intentionally ordinary structs. `HostKit.Resource.id/1` gives each resource a stable resource id.
+Resources are intentionally ordinary structs. `HostKit.Resource.id/1` gives each resource a stable resource id. `HostKit.Resource.dump/1` only converts terms to JSON-safe data; the plan-artifact boundary owns the explicit module allowlist used by `HostKit.Plan.Artifact.load_term/1` when reconstructing structs.
 
 ### `HostKit.Instance`
 

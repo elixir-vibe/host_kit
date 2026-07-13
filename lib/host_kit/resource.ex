@@ -1,77 +1,6 @@
 defmodule HostKit.Resource do
   @moduledoc "Helpers for resource identity, dependency metadata, and JSON-safe terms."
 
-  @artifact_modules MapSet.new([
-                      HostKit.Addr.AbsResource,
-                      HostKit.Addr.Resource,
-                      HostKit.Caddy.Directive.Encode,
-                      HostKit.Caddy.Directive.FileServer,
-                      HostKit.Caddy.Directive.ReverseProxy,
-                      HostKit.Caddy.Directive.Root,
-                      HostKit.Caddy.Site,
-                      HostKit.Change,
-                      HostKit.Apply.Event,
-                      HostKit.Backup.Job,
-                      HostKit.Backup.Service,
-                      HostKit.BackupRef,
-                      HostKit.CommandLine,
-                      HostKit.Conventions,
-                      HostKit.Diagnostic,
-                      HostKit.Diagnostics,
-                      HostKit.Diff,
-                      HostKit.Diff.Entry,
-                      HostKit.Endpoint,
-                      HostKit.Firewall,
-                      HostKit.Firewall.Rule,
-                      HostKit.Host,
-                      HostKit.Ingress,
-                      HostKit.Ingress.Proxy,
-                      HostKit.Ingress.Route,
-                      HostKit.Ingress.Server,
-                      HostKit.Ingress.TLS,
-                      HostKit.Instance,
-                      HostKit.Listener,
-                      HostKit.Monitor,
-                      HostKit.Monitor.Check,
-                      HostKit.Monitor.Endpoint,
-                      HostKit.Monitor.Result,
-                      HostKit.Package.Resolution,
-                      HostKit.Project,
-                      HostKit.ProviderConfig,
-                      HostKit.Proxy,
-                      HostKit.RPC,
-                      HostKit.RPC.Binding,
-                      HostKit.RPC.Exposure,
-                      HostKit.Account.Ref,
-                      HostKit.Resources.Account,
-                      HostKit.Resources.Capability,
-                      HostKit.Resources.Command,
-                      HostKit.Resources.ConfigFile,
-                      HostKit.Resources.Directory,
-                      HostKit.Resources.EnvFile,
-                      HostKit.Resources.Exs,
-                      HostKit.Resources.File,
-                      HostKit.Resources.Mise,
-                      HostKit.Resources.Package,
-                      HostKit.Resources.Readiness,
-                      HostKit.Resources.Shell,
-                      HostKit.Resources.Source,
-                      HostKit.Resources.Symlink,
-                      HostKit.Resources.Template,
-                      HostKit.Secret,
-                      HostKit.Readiness.HTTP,
-                      HostKit.Readiness.Systemd,
-                      HostKit.Source.Identity,
-                      HostKit.Service,
-                      HostKit.Storage.Volume,
-                      HostKit.ShellScript,
-                      HostKit.Systemd.Service,
-                      HostKit.Systemd.Timer,
-                      HostKit.Tenant,
-                      HostKit.Workspace.Egress,
-                      Range
-                    ])
-  @artifact_module_names @artifact_modules |> Enum.map(&Atom.to_string/1) |> MapSet.new()
   @spec id(struct()) :: term()
   def id(resource) do
     Code.ensure_loaded?(resource.__struct__)
@@ -85,8 +14,6 @@ defmodule HostKit.Resource do
 
   @spec dump(term()) :: term()
   def dump(%module{} = struct) do
-    module = allowed_artifact_module!(module)
-
     %{
       "$type" => "struct",
       "module" => Atom.to_string(module),
@@ -119,68 +46,9 @@ defmodule HostKit.Resource do
 
   def dump(value), do: value
 
-  @spec load(term()) :: term()
-  def load(%{"$type" => "struct", "module" => module, "fields" => fields}) do
-    module = allowed_artifact_module!(module)
-    struct(module, load_struct_fields(fields, module))
-  end
-
-  def load(%{"$type" => "tuple", "items" => items}), do: items |> load() |> List.to_tuple()
-
-  def load(%{"$type" => "map", "entries" => entries}) do
-    Map.new(entries, fn [key, value] -> {load(key), load(value)} end)
-  end
-
-  def load(%{"$type" => "atom", "value" => value}), do: load_atom(value)
-
-  def load(%{"$type" => "binary", "encoding" => "base64", "value" => value}) do
-    Base.decode64!(value)
-  end
-
-  def load(values) when is_list(values), do: Enum.map(values, &load/1)
-  def load(value), do: value
-
   defp dump_struct_fields(struct) do
     struct
     |> Map.from_struct()
     |> Map.new(fn {key, value} -> {Atom.to_string(key), dump(value)} end)
-  end
-
-  defp load_struct_fields(fields, module) when is_map(fields) do
-    known_fields = struct_field_names(module)
-
-    Map.new(fields, fn {key, value} ->
-      {Map.fetch!(known_fields, key), load(value)}
-    end)
-  end
-
-  defp struct_field_names(module) do
-    module
-    |> struct()
-    |> Map.from_struct()
-    |> Map.keys()
-    |> Map.new(&{Atom.to_string(&1), &1})
-  end
-
-  defp load_atom(value) do
-    String.to_existing_atom(value)
-  rescue
-    ArgumentError -> value
-  end
-
-  defp allowed_artifact_module!(module) when is_atom(module) do
-    if MapSet.member?(@artifact_modules, module) do
-      module
-    else
-      raise ArgumentError, "unsupported HostKit artifact module #{inspect(module)}"
-    end
-  end
-
-  defp allowed_artifact_module!(module) when is_binary(module) do
-    if MapSet.member?(@artifact_module_names, module) do
-      String.to_existing_atom(module)
-    else
-      raise ArgumentError, "unsupported HostKit artifact module #{inspect(module)}"
-    end
   end
 end

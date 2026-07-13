@@ -3,8 +3,10 @@ defmodule HostKit.Provider do
   Provider behaviour for HostKit integrations.
 
   Providers contribute resource types, validation, rendering, apply behavior,
-  and optional DSL modules. Provider DSLs should prefer compiling to ordinary
-  HostKit resources whenever core planning and apply behavior is sufficient.
+  and optional DSL modules. By convention, `MyProvider.DSL` is used when a
+  provider does not implement `dsl_modules/0`. Provider DSLs should prefer
+  compiling to ordinary HostKit resources whenever core planning and apply
+  behavior is sufficient.
   """
 
   @callback provider_name() :: atom()
@@ -42,10 +44,25 @@ defmodule HostKit.Provider do
   @spec dsl_modules([module()]) :: [module()]
   def dsl_modules(providers) do
     providers
-    |> Enum.flat_map(fn provider ->
-      if exports?(provider, :dsl_modules, 0), do: provider.dsl_modules(), else: []
-    end)
+    |> Enum.flat_map(&dsl_modules_for/1)
     |> Enum.uniq()
+  end
+
+  @doc "Returns the conventional colocated DSL module for a provider."
+  @spec conventional_dsl_module(module()) :: module()
+  def conventional_dsl_module(provider), do: Module.concat(provider, "DSL")
+
+  defp dsl_modules_for(provider) do
+    if exports?(provider, :dsl_modules, 0) do
+      provider.dsl_modules()
+    else
+      conventional_dsl_modules(provider)
+    end
+  end
+
+  defp conventional_dsl_modules(provider) do
+    module = conventional_dsl_module(provider)
+    if Code.ensure_loaded?(module), do: [module], else: []
   end
 
   @spec read([module()], struct(), map()) ::

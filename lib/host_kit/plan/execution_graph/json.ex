@@ -3,8 +3,6 @@ defmodule HostKit.Plan.ExecutionGraph.JSON do
 
   alias HostKit.Plan.ExecutionGraph
   alias HostKit.Plan.ExecutionGraph.{Edge, Node}
-  alias HostKit.Resource
-
   import HostKit.Plan.ExecutionGraph.Helpers, only: [cycle_edges: 2, format_id: 1]
 
   @spec to_json(ExecutionGraph.t()) :: map()
@@ -49,7 +47,8 @@ defmodule HostKit.Plan.ExecutionGraph.JSON do
     Enum.map(cycles, fn cycle -> Enum.map(cycle_edges(cycle, edges), &edge_json/1) end)
   end
 
-  defp id_json(id), do: %{"display" => format_id(id), "term" => Resource.dump(id)}
+  defp id_json(id),
+    do: %{"display" => format_id(id), "term" => HostKit.Resource.dump(id)}
 
   defp detail_json(nil), do: nil
 
@@ -57,7 +56,7 @@ defmodule HostKit.Plan.ExecutionGraph.JSON do
     do: detail
 
   defp detail_json(detail) when is_atom(detail), do: Atom.to_string(detail)
-  defp detail_json(detail), do: Resource.dump(detail)
+  defp detail_json(detail), do: HostKit.Resource.dump(detail)
 
   defp module_json(nil), do: nil
   defp module_json(module) when is_atom(module), do: Atom.to_string(module)

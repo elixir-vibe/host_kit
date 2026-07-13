@@ -7,6 +7,7 @@
 - Route provider-owned observed-state reads through the provider contract, including Caddy site reads.
 - Bound workspace-agent requests, concurrency, command output, and SSH output; normalize secret failures without exposing command output or creating atoms from state-file keys.
 - Enforce security advisories, coverage, Credo, Dialyzer filters, clone checks, architecture policy, and smell checks through `mix ci`.
+- Keep artifact deserialization policy at the plan-artifact boundary and discover conventional `ProviderModule.DSL` modules without compile-time provider cycles.
 
 ## v0.1.0-beta.7 - 2026-06-28
 
