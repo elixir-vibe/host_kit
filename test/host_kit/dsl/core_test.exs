@@ -222,11 +222,11 @@ defmodule HostKit.DSL.CoreTest do
 
     assert :erlang.binary_to_term(content, [:safe]) == %{
              "catalog" => %{
-               listener: "rpc",
-               socket: "/run/apps/catalog/rpc.sock",
-               upstream: "unix:/run/apps/catalog/rpc.sock",
-               modules: ["Elixir.Catalog.API", "Elixir.Catalog.Admin"],
-               unit: "app-catalog.service"
+               "listener" => "rpc",
+               "socket" => "/run/apps/catalog/rpc.sock",
+               "upstream" => "unix:/run/apps/catalog/rpc.sock",
+               "modules" => ["Elixir.Catalog.API", "Elixir.Catalog.Admin"],
+               "unit" => "app-catalog.service"
              }
            }
 
