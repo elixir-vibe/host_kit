@@ -139,12 +139,12 @@ defmodule HostKit.RPC do
       modules = bound_modules(provider, binding)
       listener = provider.meta.listeners[binding.listener]
 
-      {binding.service,
+      {binding_name(binding.service),
        %{
-         listener: binding.listener,
+         listener: binding_name(binding.listener),
          socket: listener.socket,
          upstream: Listener.upstream(listener),
-         modules: modules,
+         modules: Enum.map(modules, &binding_name/1),
          unit: unit_name(project, provider)
        }}
     end)
@@ -249,6 +249,9 @@ defmodule HostKit.RPC do
   defp append_environment(_existing, env), do: [env]
 
   defp service_index(project), do: Map.new(project.services, &{&1.name, &1})
+
+  defp binding_name(value) when is_atom(value), do: Atom.to_string(value)
+  defp binding_name(value) when is_binary(value), do: value
 
   defp rpc(%Service{} = service), do: Map.get(service.meta, :rpc, new())
 
