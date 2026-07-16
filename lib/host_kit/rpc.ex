@@ -141,11 +141,11 @@ defmodule HostKit.RPC do
 
       {binding_name(binding.service),
        %{
-         listener: binding_name(binding.listener),
-         socket: listener.socket,
-         upstream: Listener.upstream(listener),
-         modules: Enum.map(modules, &binding_name/1),
-         unit: unit_name(project, provider)
+         "listener" => binding_name(binding.listener),
+         "socket" => listener.socket,
+         "upstream" => Listener.upstream(listener),
+         "modules" => Enum.map(modules, &binding_name/1),
+         "unit" => unit_name(project, provider)
        }}
     end)
   end
