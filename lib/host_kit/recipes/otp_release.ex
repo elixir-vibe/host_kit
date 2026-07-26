@@ -115,7 +115,7 @@ defmodule HostKit.Recipes.OTPRelease do
       )
 
       command(HostKit.Recipes.OTPRelease.unpack_mkdir_command(artifact),
-        exec: {"mkdir", ["-p", release_dir]},
+        exec: {"install", ["-d", "-m", "0755", release_dir]},
         creates: release_dir,
         timeout: artifact.timeout,
         down: :irreversible,

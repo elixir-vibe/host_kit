@@ -78,7 +78,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
     assert Enum.any?(resources, fn
              %HostKit.Resources.Command{
                name: "demo_app_unpack_mkdir",
-               exec: {"mkdir", ["-p", "/opt/example/demo_app/releases/abc123"]},
+               exec: {"install", ["-d", "-m", "0755", "/opt/example/demo_app/releases/abc123"]},
                creates: "/opt/example/demo_app/releases/abc123",
                down: :irreversible,
                depends_on: [{:command, "demo_app_unpack_clean"}],
