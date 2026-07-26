@@ -715,26 +715,50 @@ defmodule HostKit.Apply do
   end
 
   defp command_opts(%Command{} = command, opts) do
-    with {:ok, env} <- command_env_vars(command, opts) do
+    with {:ok, env, secret_keys} <- command_env_vars(command, opts) do
       {:ok,
        []
        |> maybe_put(:cd, command.cwd)
        |> maybe_put(:env, env)
+       |> maybe_put(:redact_env, Map.take(env, secret_keys))
        |> maybe_put(:timeout, command.timeout)
        |> maybe_put(:success_codes, command.success_codes)}
     end
   end
 
   defp command_env_vars(%Command{env_files: env_files, env: env}, opts) do
-    Enum.reduce_while(env_files, {:ok, %{}}, fn path, {:ok, acc} ->
+    Enum.reduce_while(env_files, {:ok, %{}, MapSet.new()}, fn path, {:ok, acc, secret_keys} ->
       case read_env_file_vars(path, opts) do
-        {:ok, vars} -> {:cont, {:ok, Map.merge(acc, vars)}}
-        {:error, reason} -> {:halt, {:error, {:env_file_load_failed, path, reason}}}
+        {:ok, vars} ->
+          keys = env_file_secret_keys(path, vars, opts)
+          {:cont, {:ok, Map.merge(acc, vars), MapSet.union(secret_keys, keys)}}
+
+        {:error, reason} ->
+          {:halt, {:error, {:env_file_load_failed, path, reason}}}
       end
     end)
     |> case do
-      {:ok, vars} -> {:ok, Map.merge(vars, env)}
-      error -> error
+      {:ok, vars, secret_keys} ->
+        {:ok, Map.merge(vars, env), MapSet.to_list(secret_keys)}
+
+      error ->
+        error
+    end
+  end
+
+  defp env_file_secret_keys(path, vars, opts) do
+    case Keyword.get(opts, :project) do
+      %HostKit.Project{} = project ->
+        project
+        |> HostKit.Project.resources()
+        |> Enum.find(&match?(%EnvFile{path: ^path}, &1))
+        |> case do
+          %EnvFile{} = env_file -> env_file |> HostKit.Env.secret_paths() |> MapSet.new()
+          nil -> vars |> Map.keys() |> MapSet.new()
+        end
+
+      _other ->
+        vars |> Map.keys() |> MapSet.new()
     end
   end
 

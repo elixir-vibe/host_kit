@@ -73,6 +73,18 @@ defmodule HostKit.Secret do
 
   def resolve(value), do: {:ok, value}
 
+  @spec redact(term(), [term()]) :: term()
+  def redact(value, secrets) when is_binary(value) and is_list(secrets) do
+    secrets
+    |> Enum.map(&to_string/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+    |> Enum.sort_by(&byte_size/1, :desc)
+    |> Enum.reduce(value, &String.replace(&2, &1, "<redacted>"))
+  end
+
+  def redact(value, _secrets), do: value
+
   @spec resolve!(term()) :: term()
   def resolve!(%__MODULE__{source: {:env, name}}), do: System.fetch_env!(name)
 

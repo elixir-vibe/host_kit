@@ -1093,6 +1093,8 @@ Resources store normalized integer modes, so plan/apply remains simple.
 
 HostKit has a Dotenvy-validated `dotenv` resource for explicit env files. Secret values are resolved at apply time. Drift detection compares metadata and non-secret `set` entries with structured key-level diffs; secret entry values are not read into plan artifacts for comparison. Use `secret KEY, env: :redacted` for existing/generated env-file secrets that should be modeled but never rendered by HostKit. Secret sources support `env: "NAME"`, `file: "/run/secrets/name"`, and `command: ["pass", "show", "name"]`.
 
+Commands that load a modeled dotenv resource through `env_files:` pass resolved values to the executing process, but project secret paths remain authoritative for observability: secret assignments and resolved secret values are redacted from command failure tuples, formatted errors, runner traces, and runner telemetry. If an `env_files:` path is not represented by a dotenv resource in the project, HostKit conservatively treats every loaded key as sensitive at those output boundaries.
+
 ```elixir
 service :web do
   env :runtime do

@@ -27,8 +27,11 @@ defmodule HostKit.Runner.Ops do
   @spec cmd(keyword(), String.t(), [String.t()], keyword()) :: :ok | {:error, term()}
   def cmd(opts, command, args, command_opts \\ []) do
     {success_codes, command_opts} = Keyword.pop(command_opts, :success_codes, [0])
+    {redact_env, command_opts} = Keyword.pop(command_opts, :redact_env, %{})
     success_codes = MapSet.new(success_codes)
     {command, args} = maybe_sudo(command, args, opts)
+    redacted_args = HostKit.Runner.Command.redact_env_args(args, redact_env)
+    command_opts = Keyword.put(command_opts, :redacted_args, redacted_args)
 
     {output, status} =
       Runner.cmd(
@@ -41,7 +44,8 @@ defmodule HostKit.Runner.Ops do
     if MapSet.member?(success_codes, status) do
       :ok
     else
-      {:error, {:command_failed, command, args, status, output}}
+      redacted_output = HostKit.Secret.redact(output, Map.values(redact_env))
+      {:error, {:command_failed, command, redacted_args, status, redacted_output}}
     end
   end
 

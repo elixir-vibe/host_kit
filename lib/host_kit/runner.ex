@@ -24,7 +24,8 @@ defmodule HostKit.Runner do
   end
 
   defp traced_cmd(runner, command, args, opts) do
-    metadata = %{runner: runner_module(runner), command: command, args: args}
+    redacted_args = Keyword.get(opts, :redacted_args, args)
+    metadata = %{runner: runner_module(runner), command: command, args: redacted_args}
     native_started = System.monotonic_time()
     ms_started = System.monotonic_time(:millisecond)
 
@@ -34,10 +35,10 @@ defmodule HostKit.Runner do
       metadata
     )
 
-    result = runner_module(runner).cmd(command, args, opts)
+    result = runner_module(runner).cmd(command, args, Keyword.delete(opts, :redacted_args))
     native_duration = System.monotonic_time() - native_started
     ms_duration = System.monotonic_time(:millisecond) - ms_started
-    maybe_trace_command(opts, command, args, result, ms_duration)
+    maybe_trace_command(opts, command, redacted_args, result, ms_duration)
 
     HostKit.Telemetry.execute(
       [:runner, :cmd, :stop],

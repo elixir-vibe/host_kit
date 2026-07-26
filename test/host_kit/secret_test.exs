@@ -57,6 +57,13 @@ defmodule HostKit.SecretTest do
     end
   end
 
+  test "redacts resolved secret values longest-first" do
+    assert HostKit.Secret.redact(
+             "TOKEN=secret-token short=secret public=visible",
+             ["secret", "secret-token", ""]
+           ) == "TOKEN=<redacted> short=<redacted> public=visible"
+  end
+
   test "leaves non-secret values unchanged" do
     assert HostKit.Secret.resolve!("plain") == "plain"
     assert HostKit.Secret.resolve!(nil) == nil

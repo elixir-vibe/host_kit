@@ -10,6 +10,7 @@
 - Keep artifact deserialization policy at the plan-artifact boundary and discover conventional `ProviderModule.DSL` modules without compile-time provider cycles.
 - Create OTP release directories with an explicit managed `0755` mode so deploy behavior does not depend on the invoking process's umask.
 - Clean generated Mix release staging before each ReleaseKit artifact build so stale files and modes cannot leak into immutable artifacts.
+- Redact modeled env-file secrets from command failure tuples, formatted errors, runner traces, and runner telemetry while still passing real values to the executing process.
 
 ## v0.1.0-beta.7 - 2026-06-28
 
