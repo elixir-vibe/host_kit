@@ -377,7 +377,9 @@ defmodule HostKit.OTPReleaseRecipeTest do
     assert Enum.any?(resources, &match?(%HostKit.Resources.Source{name: :demo_app}, &1))
 
     deps_stamp = Path.join(app, "_build/hostkit/demo_app_release_kit_deps.json")
+    clean_stamp = Path.join(app, "_build/hostkit/demo_app_release_kit_clean.json")
     artifact_stamp = Path.join(app, "_build/hostkit/demo_app_release_kit_artifact.json")
+    release_build_dir = Path.join(app, "_build/prod/rel/demo_app")
     mix = System.find_executable("mix") || "mix"
 
     assert %HostKit.Resources.Command{
@@ -397,6 +399,21 @@ defmodule HostKit.OTPReleaseRecipeTest do
              )
 
     assert %HostKit.Resources.Command{
+             name: "demo_app_release_kit_clean",
+             exec: {"rm", ["-rf", ^release_build_dir]},
+             user: "deploy",
+             cwd: ^app,
+             inputs: [:demo_app, "mix.exs", "mix.lock", "lib"],
+             stamp: ^clean_stamp,
+             depends_on: [{:command, "demo_app_release_kit_deps"}],
+             meta: %{release_kit_artifact: ^manifest}
+           } =
+             Enum.find(
+               resources,
+               &match?(%HostKit.Resources.Command{name: "demo_app_release_kit_clean"}, &1)
+             )
+
+    assert %HostKit.Resources.Command{
              name: "demo_app_release_kit_artifact",
              exec: {^mix, ["release_kit.artifact", "--out-dir", "_build/prod/artifacts"]},
              user: "deploy",
@@ -405,7 +422,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
              inputs: [:demo_app, "mix.exs", "mix.lock", "lib"],
              outputs: ["_build/prod/artifacts/demo_app.etf"],
              stamp: ^artifact_stamp,
-             depends_on: [{:command, "demo_app_release_kit_deps"}],
+             depends_on: [{:command, "demo_app_release_kit_clean"}],
              meta: %{release_kit_artifact: ^manifest}
            } =
              Enum.find(

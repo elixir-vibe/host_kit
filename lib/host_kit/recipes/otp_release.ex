@@ -324,9 +324,10 @@ defmodule HostKit.Recipes.OTPRelease do
   defp prepare_commands(artifact, resources) do
     source_inputs = release_kit_source_inputs(artifact, resources)
     deps = release_kit_deps_command(artifact, source_inputs)
-    artifact_command = release_kit_artifact_command(artifact, source_inputs, deps)
+    clean = release_kit_clean_command(artifact, source_inputs, deps)
+    artifact_command = release_kit_artifact_command(artifact, source_inputs, clean)
 
-    [deps, artifact_command]
+    [deps, clean, artifact_command]
   end
 
   defp release_kit_deps_command(artifact, source_inputs) do
@@ -344,7 +345,20 @@ defmodule HostKit.Recipes.OTPRelease do
     )
   end
 
-  defp release_kit_artifact_command(artifact, source_inputs, deps) do
+  defp release_kit_clean_command(artifact, source_inputs, deps) do
+    HostKit.Resources.Command.new(release_kit_command_name(artifact, :clean),
+      exec: {"rm", ["-rf", release_kit_build_dir(artifact)]},
+      cwd: artifact.cwd,
+      user: artifact.user,
+      inputs: source_inputs ++ release_kit_path_inputs(artifact),
+      stamp: release_kit_command_stamp(artifact, :clean),
+      timeout: artifact.timeout,
+      depends_on: [HostKit.Resource.id(deps)],
+      meta: release_kit_command_meta(artifact)
+    )
+  end
+
+  defp release_kit_artifact_command(artifact, source_inputs, clean) do
     HostKit.Resources.Command.new(release_kit_command_name(artifact, :artifact),
       exec: release_kit_exec(artifact, release_kit_command(artifact)),
       cwd: artifact.cwd,
@@ -354,9 +368,13 @@ defmodule HostKit.Recipes.OTPRelease do
       outputs: [release_kit_manifest_output(artifact)],
       stamp: release_kit_command_stamp(artifact, :artifact),
       timeout: artifact.timeout,
-      depends_on: [HostKit.Resource.id(deps)],
+      depends_on: [HostKit.Resource.id(clean)],
       meta: release_kit_command_meta(artifact)
     )
+  end
+
+  defp release_kit_build_dir(artifact) do
+    Path.join([artifact.cwd, "_build", artifact.mix_env, "rel", to_string(artifact.name)])
   end
 
   defp release_kit_command_name(%{name: name}, step),
