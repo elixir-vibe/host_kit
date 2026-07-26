@@ -91,6 +91,21 @@ defmodule HostKit.OTPReleaseRecipeTest do
            end)
 
     assert Enum.any?(resources, fn
+             %HostKit.Resources.Directory{
+               path: "/opt/example/demo_app/releases/abc123",
+               owner: "root",
+               group: "root",
+               mode: 0o755,
+               depends_on: [{:command, "demo_app_unpack_mkdir"}],
+               meta: %{otp_release_artifact: ^manifest_path}
+             } ->
+               true
+
+             _resource ->
+               false
+           end)
+
+    assert Enum.any?(resources, fn
              %HostKit.Resources.Command{
                name: "demo_app_unpack",
                exec:
@@ -103,7 +118,9 @@ defmodule HostKit.OTPReleaseRecipeTest do
                   ]},
                creates: "/opt/example/demo_app/releases/abc123/bin/demo_app",
                down: :irreversible,
-               depends_on: [{:command, "demo_app_unpack_mkdir"}],
+               depends_on: [
+                 {:directory, "/opt/example/demo_app/releases/abc123"}
+               ],
                meta: %{otp_release_artifact: ^manifest_path}
              } ->
                true

@@ -123,12 +123,22 @@ defmodule HostKit.Recipes.OTPRelease do
         meta: %{otp_release_artifact: artifact.manifest_path}
       )
 
+      directory(release_dir,
+        owner: "root",
+        group: "root",
+        mode: 0o755,
+        depends_on: [
+          {:command, HostKit.Recipes.OTPRelease.unpack_mkdir_command(artifact)}
+        ],
+        meta: %{otp_release_artifact: artifact.manifest_path}
+      )
+
       command(artifact.commands.unpack,
         exec: {"tar", ["-xzf", artifact.tarball, "-C", release_dir]},
         creates: release_bin,
         timeout: artifact.timeout,
         down: :irreversible,
-        depends_on: [{:command, HostKit.Recipes.OTPRelease.unpack_mkdir_command(artifact)}],
+        depends_on: [{:directory, release_dir}],
         meta: %{otp_release_artifact: artifact.manifest_path}
       )
 
