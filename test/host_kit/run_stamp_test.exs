@@ -1,6 +1,18 @@
 defmodule HostKit.RunStampTest do
   use ExUnit.Case, async: false
 
+  defmodule SudoReadRunner do
+    def cmd("sh", ["-c", script], opts) do
+      send(opts[:test_pid], {:read_script, script})
+
+      if String.starts_with?(script, "sudo base64 ") do
+        {Base.encode64(opts[:content]), 0}
+      else
+        {"permission denied", 1}
+      end
+    end
+  end
+
   test "run stamps include source identities" do
     source = %HostKit.Resources.Source{
       name: :app,
@@ -23,6 +35,18 @@ defmodule HostKit.RunStampTest do
     assert stamp["inputs"] == []
     assert stamp["source_inputs"]["app"]["revision"] == "abc123"
     assert stamp["source_inputs"]["app"]["tree"] == "def456"
+  end
+
+  test "reads restrictive stamps through the sudo-aware runner boundary" do
+    command =
+      HostKit.Resources.Command.new(:build, exec: ["true"], stamp: "/restricted/build.json")
+
+    content = Jason.encode!(HostKit.RunStamp.desired(command, []))
+    runner = {SudoReadRunner, test_pid: self(), content: content}
+
+    assert {:ok, stamp} = HostKit.RunStamp.read(command, runner: runner, sudo: true)
+    assert stamp["resource_id"] == "{:command, :build}"
+    assert_receive {:read_script, "sudo base64 '/restricted/build.json'"}
   end
 
   test "run resources can be current via input/output stamp" do

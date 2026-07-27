@@ -65,22 +65,12 @@ defmodule HostKit.RunStamp do
   end
 
   def read(resource, opts) do
-    path = stamp_path(resource)
-
-    case Runner.cmd(runner(opts), "sh", ["-c", "base64 #{HostKit.Shell.escape(path)}"],
-           stderr_to_stdout: true
-         ) do
-      {content, 0} ->
-        content
-        |> String.replace(~r/\s+/, "")
-        |> Base.decode64()
-        |> case do
-          {:ok, json} -> Jason.decode(json)
-          :error -> {:error, :invalid_base64_stamp}
-        end
-
-      {_output, _status} ->
-        {:error, :missing_stamp}
+    resource
+    |> stamp_path()
+    |> Runner.read_file(opts)
+    |> case do
+      {:ok, content} -> Jason.decode(content)
+      {:error, _reason} -> {:error, :missing_stamp}
     end
   end
 
