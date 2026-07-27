@@ -32,6 +32,7 @@ defmodule HostKit.Recipes.OTPRelease do
     service artifact.service_name, service_opts do
       base_dir = Keyword.get(recipe_opts, :base_dir, path(:opt, service_path()))
       config_dir = Keyword.get(recipe_opts, :config_dir, path(:config))
+      manage_config_dir = Keyword.get(recipe_opts, :manage_config_dir, true)
       release_dir = Path.join([base_dir, "releases", artifact.version])
       current_dir = Path.join(base_dir, "current")
       env_path = Keyword.get(recipe_opts, :env_path, Path.join(config_dir, "env"))
@@ -77,7 +78,9 @@ defmodule HostKit.Recipes.OTPRelease do
         mode: 0o755
       )
 
-      directory(config_dir, owner: "root", group: service_user(), mode: 0o750)
+      if manage_config_dir do
+        directory(config_dir, owner: "root", group: service_user(), mode: 0o750)
+      end
 
       HostKit.DSL.Scope.put_release_metadata(artifact.name, %{
         name: artifact.name,

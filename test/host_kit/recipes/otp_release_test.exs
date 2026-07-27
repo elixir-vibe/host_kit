@@ -212,6 +212,47 @@ defmodule HostKit.OTPReleaseRecipeTest do
            end)
   end
 
+  test "otp_release can defer config directory management to storage" do
+    manifest_path = write_manifest!("external_config_app", "abc123")
+
+    defmodule OTPReleaseExternalConfigProject do
+      use HostKit.DSL, recipes: [HostKit.Recipes.OTPRelease]
+
+      def project(manifest_path) do
+        project :demo do
+          roots(opt: "/opt/example", config: "/etc/example")
+
+          otp_release(:external_config_app,
+            manifest: manifest_path,
+            config_dir: "/etc/example/external_config_app",
+            manage_config_dir: false
+          ) do
+            storage(:config,
+              path: "/etc/example/external_config_app",
+              owner: "root",
+              group: service_user(),
+              mode: 0o750,
+              backup: true
+            )
+          end
+        end
+      end
+    end
+
+    resources =
+      manifest_path
+      |> OTPReleaseExternalConfigProject.project()
+      |> HostKit.Project.resources()
+
+    assert [config_directory] =
+             Enum.filter(
+               resources,
+               &(HostKit.Resource.id(&1) == {:directory, "/etc/example/external_config_app"})
+             )
+
+    assert %HostKit.Resources.Directory{owner: "root", mode: 0o750} = config_directory
+  end
+
   test "otp_release service selectors match release name aliases" do
     manifest_path = write_manifest!("incant", "abc123")
 

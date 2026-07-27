@@ -12,6 +12,7 @@
 - Clean generated Mix release staging before each ReleaseKit artifact build so stale files and modes cannot leak into immutable artifacts.
 - Redact modeled env-file secrets from command failure tuples, formatted errors, runner traces, and runner telemetry while still passing real values to the executing process.
 - Order release retention by directory modification time instead of lexical hash order, with repeatable protected versions for operator-verified rollbacks.
+- Allow OTP release services to defer config-directory management to an explicit storage declaration, avoiding duplicate resource identities while retaining backup metadata.
 
 ## v0.1.0-beta.7 - 2026-06-28
 
