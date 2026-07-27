@@ -33,6 +33,7 @@ defmodule Mix.Tasks.HostKit.Clean do
           require: :keep,
           service: :keep,
           keep: :integer,
+          protect_version: :keep,
           dry_run: :boolean,
           confirm: :boolean,
           quiet: :boolean,
@@ -74,6 +75,7 @@ defmodule Mix.Tasks.HostKit.Clean do
     |> Options.expand_target_opts()
     |> put_present(:services, Options.selected_services(opts))
     |> put_present(:keep, Keyword.get(opts, :keep))
+    |> put_present(:protect_versions, protect_versions(opts))
   end
 
   defp apply_opts(opts, target_opts) do
@@ -81,6 +83,13 @@ defmodule Mix.Tasks.HostKit.Clean do
     |> Options.expand_target_opts()
     |> Keyword.merge(confirm: true, dry_run: false, track: false)
     |> put_present(:keep, Keyword.get(opts, :keep))
+  end
+
+  defp protect_versions(opts) do
+    case Keyword.get_values(opts, :protect_version) do
+      [] -> nil
+      versions -> versions
+    end
   end
 
   defp put_present(opts, _key, nil), do: opts

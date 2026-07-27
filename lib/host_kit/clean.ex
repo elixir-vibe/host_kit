@@ -68,13 +68,20 @@ defmodule HostKit.Clean do
          {:ok, release_entries} <- list_release_dirs(release, opts),
          {:ok, artifact_entries} <- list_artifacts(release, opts) do
       active_version = Path.basename(active_path)
+      protected_versions = protected_versions(opts)
 
       release_versions = release_versions(release_entries)
-      stale_versions = stale_versions(release_entries, active_version, keep)
+      stale_versions = stale_versions(release_entries, active_version, keep, protected_versions)
       stale_release_paths = paths_for_versions(release_entries, stale_versions)
 
       stale_artifact_paths =
-        artifact_paths_for_cleanup(artifact_entries, release, stale_versions, release_versions)
+        artifact_paths_for_cleanup(
+          artifact_entries,
+          release,
+          stale_versions,
+          release_versions,
+          protected_versions
+        )
 
       commands =
         stale_release_paths
@@ -118,10 +125,10 @@ defmodule HostKit.Clean do
 
   defp list_release_dirs(%{releases_dir: releases_dir}, opts) do
     script =
-      "if [ -d \"$1\" ]; then find \"$1\" -mindepth 1 -maxdepth 1 -type d -printf '%f\\t%p\\n' | sort; fi"
+      "if [ -d \"$1\" ]; then find \"$1\" -mindepth 1 -maxdepth 1 -type d -printf '%T@\\t%f\\t%p\\n'; fi"
 
     with {:ok, output} <- cmd_output(opts, "sh", ["-c", script, "sh", releases_dir]) do
-      {:ok, parse_tabbed_paths(output)}
+      {:ok, parse_release_entries(output)}
     end
   end
 
@@ -137,6 +144,19 @@ defmodule HostKit.Clean do
 
   defp list_artifacts(_release, _opts), do: {:ok, []}
 
+  defp parse_release_entries(output) do
+    output
+    |> String.split("\n", trim: true)
+    |> Enum.flat_map(fn line ->
+      with [modified_at, version, path] <- String.split(line, "\t", parts: 3),
+           {modified_at, ""} <- Float.parse(modified_at) do
+        [{version, path, modified_at}]
+      else
+        _other -> []
+      end
+    end)
+  end
+
   defp parse_tabbed_paths(output) do
     output
     |> String.split("\n", trim: true)
@@ -149,29 +169,52 @@ defmodule HostKit.Clean do
   end
 
   defp release_versions(entries),
-    do: entries |> Enum.map(fn {version, _path} -> version end) |> MapSet.new()
+    do: entries |> Enum.map(fn {version, _path, _modified_at} -> version end) |> MapSet.new()
 
-  defp stale_versions(entries, active_version, keep) do
+  defp protected_versions(opts) do
+    opts
+    |> Keyword.get(:protect_versions, [])
+    |> List.wrap()
+    |> Enum.map(&to_string/1)
+    |> MapSet.new()
+  end
+
+  defp stale_versions(entries, active_version, keep, protected_versions) do
+    automatically_retained =
+      entries
+      |> Enum.reject(fn {version, _path, _modified_at} -> version == active_version end)
+      |> Enum.sort_by(fn {version, _path, modified_at} -> {modified_at, version} end, :desc)
+      |> Enum.take(max(keep - 1, 0))
+      |> Enum.map(fn {version, _path, _modified_at} -> version end)
+      |> MapSet.new()
+
+    retained_versions = MapSet.union(automatically_retained, protected_versions)
+
     entries
-    |> Enum.map(fn {version, _path} -> version end)
-    |> Enum.reject(&(&1 == active_version))
-    |> Enum.sort(:desc)
-    |> Enum.drop(max(keep - 1, 0))
+    |> Enum.map(fn {version, _path, _modified_at} -> version end)
+    |> Enum.reject(&(&1 == active_version or MapSet.member?(retained_versions, &1)))
     |> MapSet.new()
   end
 
   defp paths_for_versions(entries, versions) do
     entries
-    |> Enum.filter(fn {version, _path} -> MapSet.member?(versions, version) end)
-    |> Enum.map(fn {_version, path} -> path end)
+    |> Enum.filter(fn {version, _path, _modified_at} -> MapSet.member?(versions, version) end)
+    |> Enum.map(fn {_version, path, _modified_at} -> path end)
   end
 
-  defp artifact_paths_for_cleanup(entries, release, stale_versions, release_versions) do
+  defp artifact_paths_for_cleanup(
+         entries,
+         release,
+         stale_versions,
+         release_versions,
+         protected_versions
+       ) do
     prefix = Map.fetch!(release, :artifact_prefix)
 
     entries
     |> Enum.flat_map(fn {name, path} ->
       with {:ok, version} <- artifact_version(name, prefix),
+           false <- MapSet.member?(protected_versions, version),
            true <-
              MapSet.member?(stale_versions, version) or
                not MapSet.member?(release_versions, version) do

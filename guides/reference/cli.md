@@ -137,7 +137,8 @@ Useful options:
 
 - target flags shared with `plan`
 - `--service NAME` — restrict cleanup to one declared service; repeat for multiple services
-- `--keep N` — keep the active release plus newest inactive releases up to `N` total
+- `--keep N` — keep the active release plus the most recently modified inactive release directories up to `N` total
+- `--protect-version VERSION` — preserve an additional known-good version; repeat for multiple versions
 - `--dry-run` — inspect cleanup commands without deleting anything
 - `--confirm` — apply cleanup commands
 
@@ -146,9 +147,11 @@ Examples:
 ```sh
 mix host_kit.clean --host prod --service app --keep 2 --dry-run infra/config.exs
 mix host_kit.clean --host prod --service app --keep 2 --confirm infra/config.exs
+mix host_kit.clean --host prod --service app --keep 1 \
+  --protect-version 20260726-b603078 --dry-run infra/config.exs
 ```
 
-For OTP releases, cleanup never deletes the active `current` target, deletes only inactive version directories under the known releases directory, and only removes matching release tarball/checksum artifacts for pruned versions. Manifests and package caches are left in place.
+For OTP releases, cleanup never deletes the active `current` target, deletes only inactive version directories under the known releases directory, and only removes matching release tarball/checksum artifacts for pruned versions. Automatic retention uses immutable release-directory modification time rather than lexical version ordering, so date-plus-hash names retain deployment order. After failed deployments leave newer unusable directories, combine `--keep 1` with `--protect-version` to preserve the operator-verified rollback. Manifests and package caches are left in place.
 
 ## `mix host_kit.read`
 
