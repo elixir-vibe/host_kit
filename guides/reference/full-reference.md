@@ -195,13 +195,37 @@ project :example do
 end
 ```
 
-Use the `:account_home` option when an existing service account should keep a home directory outside the release base. By default the recipe manages `:config_dir`; set `manage_config_dir: false` when the enclosing service declares the same path through `storage/2` for backup or storage metadata. Use the `:env` option to add deployment-specific clear environment variables to the generated service env file without rebuilding the artifact manifest:
+Use the `:account_home` option when an existing service account should keep a home directory outside the release base. By default the recipe manages `:config_dir`; set `manage_config_dir: false` when the enclosing service declares the same path through `storage/2` for backup or storage metadata. Set `timeout_stop_sec` to bound supervisor and storage shutdown after active work has already drained; the default is 30 seconds. Use the `:env` option to add deployment-specific clear environment variables to the generated service env file without rebuilding the artifact manifest:
 
 ```elixir
 otp_release :demo_app,
   manifest: "_build/prod/demo_app.etf",
   account_home: "/var/lib/demo_app/home",
   env: %{"APP_DATA_DIR" => "/srv/demo"}
+```
+
+Lifecycle blocks are ordered around release activation and readiness:
+
+1. `before_stop` runs from the unpacked new release while the old current symlink and service remain active.
+2. The current symlink changes, then HostKit stops the old service.
+3. `after_stop` and `before_start` run through the new current release.
+4. HostKit starts the service and passes readiness checks.
+5. `after_start` runs only after readiness succeeds.
+
+This makes `before_stop` suitable for an application-defined drain command. If that command fails, HostKit does not switch the current symlink or stop the running service. Multiple commands in one phase execute in declaration order.
+
+```elixir
+otp_release :demo_app,
+  manifest: "_build/prod/demo_app.etf",
+  timeout_stop_sec: 60 do
+  before_stop :drain, timeout: 1_801_000 do
+    eval(DemoApp.ReleaseTasks.drain_for_deploy(1_800_000))
+  end
+
+  before_start :migrate do
+    eval(DemoApp.ReleaseTasks.migrate())
+  end
+end
 ```
 
 The manifest is decoded with:

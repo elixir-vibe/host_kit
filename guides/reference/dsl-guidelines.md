@@ -390,10 +390,10 @@ Legend:
 | `mix` | Reference | Mix task command builder using the `:bin` convention root by default. |
 | `elixir` | Reference | Elixir CLI command builder using the `:bin` convention root by default. |
 | `eval` | Reference | `elixir -e` command builder using the `:bin` convention root by default; inside lifecycle blocks it supplies that block's command. |
-| `before_start` | Reference | Declare a command lifecycle step that runs before service readiness/start checks. |
-| `after_start` | Reference | Declare a command lifecycle step for post-start operations. |
-| `before_stop` | Reference | Declare a command lifecycle step for pre-stop operations. |
-| `after_stop` | Reference | Declare a command lifecycle step for post-stop operations. |
+| `before_start` | Reference | Declare an ordered command after service stop and before restart/readiness. |
+| `after_start` | Reference | Declare an ordered command that runs only after readiness passes. |
+| `before_stop` | Reference | Declare an ordered command from the unpacked release before symlink activation and service stop. |
+| `after_stop` | Reference | Declare an ordered command after service stop and before `before_start`. |
 
 ### Service conventions, storage, env
 

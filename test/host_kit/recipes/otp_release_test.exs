@@ -212,6 +212,98 @@ defmodule HostKit.OTPReleaseRecipeTest do
            end)
   end
 
+  test "otp_release orders lifecycle phases around symlink, stop, and readiness" do
+    manifest_path = write_manifest!("ordered_app", "def456")
+
+    defmodule OTPReleaseLifecycleOrderingProject do
+      use HostKit.DSL, recipes: [HostKit.Recipes.OTPRelease]
+
+      def project(manifest_path) do
+        project :ordered do
+          roots(opt: "/opt/example", config: "/etc/example")
+
+          otp_release(:ordered_app,
+            manifest: manifest_path,
+            base_dir: "/opt/example/ordered_app",
+            config_dir: "/etc/example/ordered_app",
+            timeout_stop_sec: 60
+          ) do
+            before_stop :drain do
+              eval(OrderedApp.ReleaseTasks.drain_for_deploy(1_800_000))
+            end
+
+            after_stop :checkpoint do
+              eval(OrderedApp.ReleaseTasks.checkpoint())
+            end
+
+            before_start :migrate do
+              eval(OrderedApp.ReleaseTasks.migrate())
+            end
+
+            after_start :verify do
+              eval(OrderedApp.ReleaseTasks.verify())
+            end
+          end
+        end
+      end
+    end
+
+    resources =
+      manifest_path
+      |> OTPReleaseLifecycleOrderingProject.project()
+      |> HostKit.Project.resources()
+
+    resource = fn type, name ->
+      Enum.find(resources, &(HostKit.Resource.id(&1) == {type, name}))
+    end
+
+    unpack = {:command, "ordered_app_unpack"}
+    drain = {:command, "ordered_app_drain"}
+    symlink = {:symlink, "/opt/example/ordered_app/current"}
+    stop = {:command, "ordered_app_stop_for_lifecycle"}
+    checkpoint = {:command, "ordered_app_checkpoint"}
+    migrate = {:command, "ordered_app_migrate"}
+    ready = {:readiness, "ordered_app_ready"}
+
+    assert %HostKit.Resources.Command{
+             phase: :before_stop,
+             exec:
+               {"/opt/example/ordered_app/releases/def456/bin/ordered_app",
+                ["eval", "OrderedApp.ReleaseTasks.drain_for_deploy(1_800_000)"]},
+             depends_on: [^unpack]
+           } = resource.(:command, "ordered_app_drain")
+
+    assert %HostKit.Resources.Symlink{depends_on: [^unpack, ^drain]} =
+             resource.(:symlink, "/opt/example/ordered_app/current")
+
+    assert %HostKit.Resources.Command{depends_on: [^unpack, ^symlink, ^drain]} =
+             resource.(:command, "ordered_app_stop_for_lifecycle")
+
+    assert %HostKit.Resources.Command{
+             phase: :after_stop,
+             exec:
+               {"/opt/example/ordered_app/current/bin/ordered_app",
+                ["eval", "OrderedApp.ReleaseTasks.checkpoint()"]},
+             depends_on: [^stop, ^unpack, ^symlink]
+           } = resource.(:command, "ordered_app_checkpoint")
+
+    assert %HostKit.Resources.Command{
+             phase: :before_start,
+             depends_on: [^checkpoint, ^unpack, ^symlink]
+           } = resource.(:command, "ordered_app_migrate")
+
+    assert %HostKit.Resources.Readiness{depends_on: [^migrate]} =
+             resource.(:readiness, "ordered_app_ready")
+
+    assert %HostKit.Resources.Command{phase: :after_start, depends_on: [^ready]} =
+             resource.(:command, "ordered_app_verify")
+
+    assert %HostKit.Systemd.Service{service: service} =
+             resource.(:systemd_service, "ordered-app.service")
+
+    assert service[:timeout_stop_sec] == 60
+  end
+
   test "otp_release can defer config directory management to storage" do
     manifest_path = write_manifest!("external_config_app", "abc123")
 

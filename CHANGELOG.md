@@ -14,6 +14,7 @@
 - Order release retention by directory modification time instead of lexical hash order, with repeatable protected versions for operator-verified rollbacks.
 - Allow OTP release services to defer config-directory management to an explicit storage declaration, avoiding duplicate resource identities while retaining backup metadata.
 - Read restrictive command stamps through the sudo-aware runner boundary so tracked lifecycle commands remain converged for non-root operators.
+- Order OTP release lifecycle phases around activation, service stop, and readiness; `before_stop` commands run from the unpacked release before the current symlink changes, and `timeout_stop_sec` is configurable.
 
 ## v0.1.0-beta.7 - 2026-06-28
 

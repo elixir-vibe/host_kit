@@ -46,26 +46,32 @@ defmodule HostKit.Recipes.OTPRelease do
         HostKit.DSL.Lifecycle.Scope.start_context(%{
           collect?: true,
           name: &HostKit.Recipes.OTPRelease.lifecycle_command_name(artifact.name, &1),
-          eval: &HostKit.Recipes.OTPRelease.release_eval_exec(current_bin, env_path, &1, &2),
+          eval:
+            &HostKit.Recipes.OTPRelease.lifecycle_release_eval_exec(
+              release_bin,
+              current_bin,
+              env_path,
+              &1,
+              &2
+            ),
           user: service_user(),
           env_files: [env_path],
           timeout: artifact.timeout,
           down: :irreversible,
-          inputs: [release_dir],
-          depends_on: [
-            {:command, artifact.commands.unpack},
-            {:symlink, current_dir}
-          ]
+          inputs: [release_dir]
         })
 
       yield()
 
       lifecycle_commands = HostKit.DSL.Lifecycle.Scope.finish_context(lifecycle_context)
 
-      lifecycle_commands =
-        HostKit.Recipes.OTPRelease.with_stop_dependency(
+      lifecycle =
+        HostKit.Recipes.OTPRelease.order_lifecycle(
           lifecycle_commands,
-          artifact.commands.stop
+          unpack: {:command, artifact.commands.unpack},
+          symlink: {:symlink, current_dir},
+          stop: {:command, artifact.commands.stop},
+          ready: {:readiness, artifact.commands.ready}
         )
 
       package(:tar, as: "tar")
@@ -145,9 +151,13 @@ defmodule HostKit.Recipes.OTPRelease do
         meta: %{otp_release_artifact: artifact.manifest_path}
       )
 
+      for lifecycle_command <- lifecycle.before_stop do
+        HostKit.DSL.Scope.add_resource(lifecycle_command)
+      end
+
       symlink(current_dir,
         to: release_dir,
-        depends_on: [{:command, artifact.commands.unpack}]
+        depends_on: lifecycle.symlink_dependencies
       )
 
       if lifecycle_commands != [] do
@@ -157,15 +167,12 @@ defmodule HostKit.Recipes.OTPRelease do
           timeout: artifact.timeout,
           down: :irreversible,
           inputs: [release_dir],
-          depends_on: [
-            {:command, artifact.commands.unpack},
-            {:symlink, current_dir}
-          ],
+          depends_on: lifecycle.stop_dependencies,
           meta: %{otp_release_artifact: artifact.manifest_path}
         )
       end
 
-      for lifecycle_command <- lifecycle_commands do
+      for lifecycle_command <- lifecycle.after_stop ++ lifecycle.before_start do
         HostKit.DSL.Scope.add_resource(lifecycle_command)
       end
 
@@ -180,16 +187,25 @@ defmodule HostKit.Recipes.OTPRelease do
         environment_file(env_path)
         working_directory(current_dir)
         exec_start([current_bin, "start"])
-        service(kill_mode: :mixed, timeout_stop_sec: 10)
+
+        service(
+          kill_mode: :mixed,
+          timeout_stop_sec: Keyword.get(recipe_opts, :timeout_stop_sec, 30)
+        )
+
         restart(:on_failure)
         wanted_by(:multi_user)
       end
 
       ready artifact.commands.ready,
         timeout: artifact.health.timeout * 1000,
-        depends_on: Enum.map(lifecycle_commands, &HostKit.Resource.id/1) do
+        depends_on: lifecycle.ready_dependencies do
         systemd(unit, restart: true, kill: true)
         http(artifact.health.url)
+      end
+
+      for lifecycle_command <- lifecycle.after_start do
+        HostKit.DSL.Scope.add_resource(lifecycle_command)
       end
     end
   end
@@ -445,13 +461,80 @@ defmodule HostKit.Recipes.OTPRelease do
     end
   end
 
-  def with_stop_dependency([], _stop_command), do: []
+  @doc false
+  def order_lifecycle(commands, opts) when is_list(commands) and is_list(opts) do
+    unpack = Keyword.fetch!(opts, :unpack)
+    symlink = Keyword.fetch!(opts, :symlink)
+    stop = Keyword.fetch!(opts, :stop)
+    ready = Keyword.fetch!(opts, :ready)
 
-  def with_stop_dependency(commands, stop_command) do
-    Enum.map(commands, fn command ->
-      depends_on = [{:command, stop_command} | command.depends_on]
-      %{command | depends_on: Enum.uniq(depends_on)}
-    end)
+    validate_lifecycle_phases!(commands)
+
+    before_stop = chain_lifecycle_phase(commands, :before_stop, [unpack])
+    before_stop_ids = Enum.map(before_stop, &HostKit.Resource.id/1)
+
+    after_stop =
+      chain_lifecycle_phase(commands, :after_stop, [stop, unpack, symlink])
+
+    before_start_base =
+      [last_resource_id(after_stop) || stop, unpack, symlink]
+
+    before_start = chain_lifecycle_phase(commands, :before_start, before_start_base)
+
+    ready_dependencies =
+      if commands == [] do
+        []
+      else
+        [last_resource_id(before_start) || last_resource_id(after_stop) || stop]
+      end
+
+    after_start = chain_lifecycle_phase(commands, :after_start, [ready])
+
+    %{
+      before_stop: before_stop,
+      after_stop: after_stop,
+      before_start: before_start,
+      after_start: after_start,
+      symlink_dependencies: Enum.uniq([unpack | before_stop_ids]),
+      stop_dependencies: Enum.uniq([unpack, symlink | before_stop_ids]),
+      ready_dependencies: ready_dependencies
+    }
+  end
+
+  defp chain_lifecycle_phase(commands, phase, base_dependencies) do
+    {ordered, _previous_id} =
+      commands
+      |> Enum.filter(&(&1.phase == phase))
+      |> Enum.map_reduce(nil, fn command, previous_id ->
+        dependencies =
+          base_dependencies
+          |> maybe_append_dependency(previous_id)
+          |> Kernel.++(command.depends_on)
+          |> Enum.uniq()
+
+        command = %{command | depends_on: dependencies}
+        {command, HostKit.Resource.id(command)}
+      end)
+
+    ordered
+  end
+
+  defp maybe_append_dependency(dependencies, nil), do: dependencies
+  defp maybe_append_dependency(dependencies, dependency), do: dependencies ++ [dependency]
+
+  defp last_resource_id([]), do: nil
+  defp last_resource_id(resources), do: resources |> List.last() |> HostKit.Resource.id()
+
+  defp validate_lifecycle_phases!(commands) do
+    allowed = [:before_stop, :after_stop, :before_start, :after_start]
+
+    case Enum.find(commands, &(&1.phase not in allowed)) do
+      nil ->
+        :ok
+
+      command ->
+        raise ArgumentError, "unsupported OTP release lifecycle phase #{inspect(command.phase)}"
+    end
   end
 
   def build_release_kit_artifact!(artifact, opts \\ []) do
@@ -492,6 +575,15 @@ defmodule HostKit.Recipes.OTPRelease do
   def release_kit_label(%{name: name}), do: "release_kit.#{name}"
 
   def lifecycle_command_name(app_name, step), do: Naming.resource([app_name, step])
+
+  def lifecycle_release_eval_exec(release_bin, current_bin, env_path, expression, opts \\ []) do
+    eval_bin =
+      if Keyword.get(opts, :lifecycle_phase) == :before_stop,
+        do: release_bin,
+        else: current_bin
+
+    release_eval_exec(eval_bin, env_path, expression, opts)
+  end
 
   def release_eval_exec(release_bin, _env_path, expression, _opts \\ []) do
     {release_bin, ["eval", expression]}

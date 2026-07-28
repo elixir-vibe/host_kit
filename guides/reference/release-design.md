@@ -54,7 +54,7 @@ Keep these concerns separate:
 
 ## Future shape
 
-A fuller release declaration may grow into artifact preparation and activation, but it should still compile to plain resources and commands. For OTP release manifests, HostKit provides a narrow built-in ReleaseKit path on `otp_release` instead of a separate producer entity:
+A fuller release declaration may grow into artifact preparation and activation, but it should still compile to plain resources and commands. OTP release activation orders lifecycle resources explicitly: pre-stop commands run from the unpacked version before the active symlink changes, stop-dependent commands run after service shutdown, readiness starts the new service, and post-start commands depend on readiness. For OTP release manifests, HostKit provides a narrow built-in ReleaseKit path on `otp_release` instead of a separate producer entity:
 
 ```elixir
 otp_release :my_app,

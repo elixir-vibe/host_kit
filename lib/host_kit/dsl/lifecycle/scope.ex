@@ -108,8 +108,11 @@ defmodule HostKit.DSL.Lifecycle.Scope do
 
   def eval_exec(expression, opts) do
     case current_context() do
-      %{eval: eval} when is_function(eval, 2) -> eval.(expression, opts)
-      _context -> HostKit.CommandLine.eval(expression, opts)
+      %{eval: eval} when is_function(eval, 2) ->
+        eval.(expression, Keyword.put(opts, :lifecycle_phase, current_lifecycle_command!().phase))
+
+      _context ->
+        HostKit.CommandLine.eval(expression, opts)
     end
   end
 
