@@ -160,7 +160,8 @@ defmodule HostKit.ApplyTest do
       path: path,
       entries: [
         {:set, "PORT", "4101"},
-        {:secret, "SECRET", :redacted}
+        {:secret, "SECRET", :redacted},
+        {:secret, "OPTIONAL_SECRET", :redacted}
       ],
       mode: 0o600
     }
@@ -177,8 +178,9 @@ defmodule HostKit.ApplyTest do
 
     assert {:ok, [%{status: :applied}]} = Apply.run(plan, confirm: true)
 
-    assert {:ok, %{"PORT" => "4101", "SECRET" => "keep me"}} =
-             HostKit.Env.parse(path |> Elixir.File.read!())
+    assert {:ok, values} = HostKit.Env.parse(path |> Elixir.File.read!())
+    assert values == %{"PORT" => "4101", "SECRET" => "keep me"}
+    refute Map.has_key?(values, "OPTIONAL_SECRET")
 
     Elixir.File.rm_rf!(root)
   end

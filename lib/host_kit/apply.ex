@@ -615,7 +615,12 @@ defmodule HostKit.Apply do
       [_ | _] ->
         with {:ok, content} <- Runner.read_file(env_file.path, opts),
              {:ok, existing} <- HostKit.Env.parse(content) do
-          HostKit.Env.render(env_file, Keyword.put(opts, :existing, existing))
+          HostKit.Env.render(
+            env_file,
+            opts
+            |> Keyword.put(:existing, existing)
+            |> Keyword.put(:allow_missing_redacted, true)
+          )
         else
           _error -> {:error, :redacted_secret_not_renderable}
         end

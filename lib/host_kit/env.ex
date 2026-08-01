@@ -51,6 +51,7 @@ defmodule HostKit.Env do
   defp render_entries(entries, opts) do
     Enum.reduce_while(entries, {:ok, []}, fn entry, {:ok, lines} ->
       case render_entry(entry, opts) do
+        {:ok, :omit} -> {:cont, {:ok, lines}}
         {:ok, line} -> {:cont, {:ok, [line | lines]}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
@@ -68,8 +69,13 @@ defmodule HostKit.Env do
     |> Keyword.get(:existing, %{})
     |> Map.fetch(key)
     |> case do
-      {:ok, value} -> {:ok, "#{key}=#{quote_value(value)}"}
-      :error -> {:error, :redacted_secret_not_renderable}
+      {:ok, value} ->
+        {:ok, "#{key}=#{quote_value(value)}"}
+
+      :error ->
+        if Keyword.get(opts, :allow_missing_redacted, false),
+          do: {:ok, :omit},
+          else: {:error, :redacted_secret_not_renderable}
     end
   end
 

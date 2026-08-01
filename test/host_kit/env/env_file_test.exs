@@ -90,13 +90,20 @@ defmodule HostKit.EnvFileTest do
       path: "/etc/app/env",
       entries: [
         {:set, "PORT", "4101"},
-        {:secret, "SECRET", :redacted}
+        {:secret, "SECRET", :redacted},
+        {:secret, "OPTIONAL_SECRET", :redacted}
       ]
     }
 
-    assert {:ok, content} = HostKit.Env.render(env_file, existing: %{"SECRET" => "preserved"})
+    assert {:ok, content} =
+             HostKit.Env.render(env_file,
+               existing: %{"SECRET" => "preserved"},
+               allow_missing_redacted: true
+             )
+
     assert content =~ ~s(PORT="4101")
     assert content =~ ~s(SECRET="preserved")
+    refute content =~ "OPTIONAL_SECRET"
   end
 
   test "missing secret envs fail rendering" do
