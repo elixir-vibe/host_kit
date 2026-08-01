@@ -23,6 +23,16 @@ defmodule HostKit.Env do
     |> Enum.sort()
   end
 
+  @spec redacted_secret_paths(EnvFile.t()) :: [String.t()]
+  def redacted_secret_paths(%EnvFile{entries: entries}) do
+    entries
+    |> Enum.flat_map(fn
+      {:secret, key, :redacted} -> [key]
+      _entry -> []
+    end)
+    |> Enum.sort()
+  end
+
   @spec public_entries_from_content(String.t(), [String.t()]) :: {:ok, map()} | {:error, term()}
   def public_entries_from_content(content, keys) do
     with {:ok, entries} <- parse(content) do
@@ -53,8 +63,15 @@ defmodule HostKit.Env do
 
   defp render_entry({:set, key, value}, _opts), do: {:ok, "#{key}=#{quote_value(value)}"}
 
-  defp render_entry({:secret, _key, :redacted}, _opts),
-    do: {:error, :redacted_secret_not_renderable}
+  defp render_entry({:secret, key, :redacted}, opts) do
+    opts
+    |> Keyword.get(:existing, %{})
+    |> Map.fetch(key)
+    |> case do
+      {:ok, value} -> {:ok, "#{key}=#{quote_value(value)}"}
+      :error -> {:error, :redacted_secret_not_renderable}
+    end
+  end
 
   defp render_entry({:secret, key, %HostKit.Secret{} = secret}, _opts) do
     with {:ok, value} <- HostKit.Secret.resolve(secret) do

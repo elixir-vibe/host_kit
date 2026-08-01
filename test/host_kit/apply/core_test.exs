@@ -6,7 +6,7 @@ defmodule HostKit.ApplyTest do
   alias HostKit.Apply
   alias HostKit.Change
   alias HostKit.Plan
-  alias HostKit.Resources.{Account, Command, Directory, File, Readiness}
+  alias HostKit.Resources.{Account, Command, Directory, EnvFile, File, Readiness}
   alias HostKit.Systemd
 
   test "requires confirmation outside dry-run" do
@@ -143,6 +143,42 @@ defmodule HostKit.ApplyTest do
     assert {:ok, %{mode: file_mode}} = Elixir.File.stat(file)
     assert Bitwise.band(dir_mode, 0o777) == 0o755
     assert Bitwise.band(file_mode, 0o777) == 0o600
+
+    Elixir.File.rm_rf!(root)
+  end
+
+  test "updates public env entries while preserving redacted live secrets" do
+    root =
+      Path.join(System.tmp_dir!(), "host-kit-env-update-#{System.unique_integer([:positive])}")
+
+    path = Path.join(root, "env")
+
+    Elixir.File.mkdir_p!(root)
+    Elixir.File.write!(path, ~s(PORT="4000"\nSECRET="keep me"\n))
+
+    env_file = %EnvFile{
+      path: path,
+      entries: [
+        {:set, "PORT", "4101"},
+        {:secret, "SECRET", :redacted}
+      ],
+      mode: 0o600
+    }
+
+    plan = %Plan{
+      changes: [
+        %Change{
+          action: :update,
+          resource_id: {:env_file, path},
+          after: env_file
+        }
+      ]
+    }
+
+    assert {:ok, [%{status: :applied}]} = Apply.run(plan, confirm: true)
+
+    assert {:ok, %{"PORT" => "4101", "SECRET" => "keep me"}} =
+             HostKit.Env.parse(path |> Elixir.File.read!())
 
     Elixir.File.rm_rf!(root)
   end

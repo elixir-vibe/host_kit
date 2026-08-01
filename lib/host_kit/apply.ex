@@ -607,7 +607,20 @@ defmodule HostKit.Apply do
   defp env_file_content(%{meta: %{content: %HostKit.BackupRef{}}} = env_file, opts),
     do: rendered_content(env_file, "", opts)
 
-  defp env_file_content(%EnvFile{} = env_file, opts), do: HostKit.Env.render(env_file, opts)
+  defp env_file_content(%EnvFile{} = env_file, opts) do
+    case HostKit.Env.redacted_secret_paths(env_file) do
+      [] ->
+        HostKit.Env.render(env_file, opts)
+
+      [_ | _] ->
+        with {:ok, content} <- Runner.read_file(env_file.path, opts),
+             {:ok, existing} <- HostKit.Env.parse(content) do
+          HostKit.Env.render(env_file, Keyword.put(opts, :existing, existing))
+        else
+          _error -> {:error, :redacted_secret_not_renderable}
+        end
+    end
+  end
 
   defp apply_command(%Command{} = command, opts) do
     with :ok <- command_current(command, opts),

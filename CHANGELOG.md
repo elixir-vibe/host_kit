@@ -15,6 +15,7 @@
 - Allow OTP release services to defer config-directory management to an explicit storage declaration, avoiding duplicate resource identities while retaining backup metadata.
 - Read restrictive command stamps through the sudo-aware runner boundary so tracked lifecycle commands remain converged for non-root operators.
 - Order OTP release lifecycle phases around activation, service stop, and readiness; `before_stop` commands run from the unpacked release before the current symlink changes, and `timeout_stop_sec` is configurable.
+- Preserve modeled redacted values from an existing dotenv file when public entries change, without exposing secret values to plans, diffs, errors, or telemetry.
 
 ## v0.1.0-beta.7 - 2026-06-28
 

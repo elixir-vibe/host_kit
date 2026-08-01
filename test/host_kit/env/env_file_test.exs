@@ -85,6 +85,20 @@ defmodule HostKit.EnvFileTest do
     assert HostKit.Env.render(env_file) == {:error, :redacted_secret_not_renderable}
   end
 
+  test "redacted env file secrets render from explicit existing values" do
+    env_file = %HostKit.Resources.EnvFile{
+      path: "/etc/app/env",
+      entries: [
+        {:set, "PORT", "4101"},
+        {:secret, "SECRET", :redacted}
+      ]
+    }
+
+    assert {:ok, content} = HostKit.Env.render(env_file, existing: %{"SECRET" => "preserved"})
+    assert content =~ ~s(PORT="4101")
+    assert content =~ ~s(SECRET="preserved")
+  end
+
   test "missing secret envs fail rendering" do
     env_file = %HostKit.Resources.EnvFile{
       path: "/etc/app/env",
