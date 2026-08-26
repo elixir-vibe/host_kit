@@ -2,7 +2,7 @@ defmodule HostKit.OTPReleaseRecipeTest do
   use HostKit.Case, async: true
 
   test "otp_release recipe expands artifact manifest to ordinary resources" do
-    manifest_path = write_manifest!("demo_app", "abc123")
+    manifest_path = write_manifest!("demo_app", "abc123", 4000)
 
     defmodule OTPReleaseRecipeProject do
       use HostKit.DSL, recipes: [HostKit.Recipes.OTPRelease]
@@ -629,21 +629,21 @@ defmodule HostKit.OTPReleaseRecipeTest do
     end
   end
 
-  defp write_manifest!(release_name, version) do
+  defp write_manifest!(release_name, version, port \\ 4100) do
     path = Path.join(System.tmp_dir!(), "hostkit-otp-#{System.unique_integer([:positive])}.etf")
 
-    File.write!(path, :erlang.term_to_binary(valid_manifest(release_name, version)))
+    File.write!(path, :erlang.term_to_binary(valid_manifest(release_name, version, port)))
     path
   end
 
-  defp valid_manifest(release_name, version) do
+  defp valid_manifest(release_name, version, port \\ 4100) do
     ReleaseKit.Manifest.new(
       app: release_name,
       version: version,
       release: release_name,
       mix_env: "prod",
       tarball: "/tmp/#{release_name}-#{version}.tar.gz",
-      port: 4100,
+      port: port,
       health_path: "/health",
       env_clear: %{"PHX_HOST" => "app.example.com"},
       env_secret: ["SECRET_KEY_BASE"]

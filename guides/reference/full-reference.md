@@ -195,7 +195,7 @@ project :example do
 end
 ```
 
-Use the `:account_home` option when an existing service account should keep a home directory outside the release base. By default the recipe manages `:config_dir`; set `manage_config_dir: false` when the enclosing service declares the same path through `storage/2` for backup or storage metadata. Set `timeout_stop_sec` to bound supervisor and storage shutdown after active work has already drained; the default is 30 seconds. Use the `:env` option to add deployment-specific clear environment variables to the generated service env file without rebuilding the artifact manifest:
+Use the `:account_home` option when an existing service account should keep a home directory outside the release base. By default the recipe manages `:config_dir`; set `manage_config_dir: false` when the enclosing service declares the same path through `storage/2` for backup or storage metadata. An explicit `port:` overrides both the manifest port and the loopback health URL used by readiness checks. Set `timeout_stop_sec` to bound supervisor and storage shutdown after active work has already drained; the default is 30 seconds. Use the `:env` option to add deployment-specific clear environment variables to the generated service env file without rebuilding the artifact manifest:
 
 ```elixir
 otp_release :demo_app,

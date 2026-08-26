@@ -764,10 +764,15 @@ defmodule HostKit.Recipes.OTPRelease do
   defp health(raw, port, opts) do
     path = Map.get(raw, :path, "/health")
 
+    url =
+      if Keyword.has_key?(opts, :port),
+        do: "http://127.0.0.1:#{port}#{path}",
+        else: Map.get(raw, :url, "http://127.0.0.1:#{port}#{path}")
+
     %{
       path: path,
       timeout: Map.get(raw, :timeout, Keyword.get(opts, :health_timeout, 30)),
-      url: Map.get(raw, :url, "http://127.0.0.1:#{port}#{path}")
+      url: url
     }
   end
 

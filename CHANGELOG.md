@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Make an explicit OTP release `port:` override the manifest health URL used by readiness checks.
 - Reject duplicate resource identities, missing declared dependencies, invalid resources, and dependency cycles before apply; execution graph algorithms now use `libgraph`.
 - Publish managed files, plan/state artifacts, run records, and rollback payloads atomically with restrictive permissions; run ids are collision-resistant and pruning validates tracked paths.
 - Route provider-owned observed-state reads through the provider contract, including Caddy site reads.
